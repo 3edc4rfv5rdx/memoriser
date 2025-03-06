@@ -20,22 +20,39 @@ Future<void> insertItem(String title, String content, {String tags = '', int pri
 }
 
 Future<List<Map<String, dynamic>>> getItems({String? tagFilter}) async {
-  // Get sort order from settings
-  final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
+  try {
+    // Get sort order from settings
+    final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
+    myPrint('Newest first setting: $newestFirst');
 
-  // Determine sort order based on setting
-  final sortOrder = newestFirst == "true" ? "DESC" : "ASC";
-  String orderByClause = 'priority DESC, created ${sortOrder}';
+    // Determine sort order based on setting
+    final sortOrder = newestFirst == "true" ? "DESC" : "ASC";
+    String orderByClause = 'priority DESC, created ${sortOrder}';
+    myPrint('Order by clause: $orderByClause');
 
-  if (tagFilter != null && tagFilter.isNotEmpty) {
-    return await db.query(
-        'items',
-        where: 'tags LIKE ?',
-        whereArgs: ['%$tagFilter%'],
-        orderBy: orderByClause
-    );
+    List<Map<String, dynamic>> result;
+    if (tagFilter != null && tagFilter.isNotEmpty) {
+      myPrint('Filtering by tag: $tagFilter');
+      result = await db.query(
+          'items',
+          where: 'tags LIKE ?',
+          whereArgs: ['%$tagFilter%'],
+          orderBy: orderByClause
+      );
+    } else {
+      result = await db.query('items', orderBy: orderByClause);
+    }
+
+    myPrint('Retrieved items count: ${result.length}');
+    if (result.isNotEmpty) {
+      myPrint('First item: ${result.first}');
+    }
+
+    return result;
+  } catch (e) {
+    myPrint('Error loading items: $e');
+    return []; // Return empty list instead of throwing error
   }
-  return await db.query('items', orderBy: orderByClause);
 }
 
 Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
@@ -153,13 +170,36 @@ Widget settingsPage() => Builder(
     }
 );
 
+void setState(VoidCallback fn) {
+  fn();
+  globalContext = globalContext;
+}
+
+// final itemsKey = GlobalKey<State>();
+
+// Home page as a function
 // Home page as a function
 Widget homePage() => Builder(
     builder: (context) {
       globalContext = context;
+      final scaffoldKey = GlobalKey<ScaffoldState>();
+      final itemsKey = GlobalKey();
 
       return Scaffold(
-        appBar: buildAppBar('Memorizer'),
+        key: scaffoldKey,
+        appBar: AppBar(
+          backgroundColor: clUpBar,
+          foregroundColor: clText,
+          title: Text('Memorizer'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () {
+                scaffoldKey.currentState?.openDrawer();
+              },
+            ),
+          ],
+        ),
         drawer: Drawer(
           backgroundColor: clMenu,
           child: ListView(
@@ -183,10 +223,23 @@ Widget homePage() => Builder(
                   navigateToScreen(settingsPage());
                 },
               ),
+              ListTile(
+                title: Text('About'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAbout();
+                },
+                onLongPress: () {
+                  Navigator.pop(context);
+                  // Здесь будет показ справки
+                  okInfo(lw('Help information will be shown here'));
+                },
+              ),
             ],
           ),
         ),
         body: FutureBuilder<List<Map<String, dynamic>>>(
+          key: itemsKey,
           future: getItems(),
           builder: (context, itemsSnapshot) {
             if (!itemsSnapshot.hasData) {
@@ -194,6 +247,18 @@ Widget homePage() => Builder(
             }
 
             final items = itemsSnapshot.data!;
+
+            if (items.isEmpty) {
+              return Center(
+                child: Text(
+                  lw('No items yet. Press + to add.'),
+                  style: TextStyle(
+                    color: clText,
+                    fontSize: fsMedium,
+                  ),
+                ),
+              );
+            }
 
             return ListView.builder(
               itemCount: items.length,
@@ -203,23 +268,110 @@ Widget homePage() => Builder(
                 final hasReminder = item['reminder'] != null;
 
                 return ListTile(
-                  title: Text(item['title']),
+                  title: Text(
+                    item['title'],
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: clText,
+                    ),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item['content']),
+                      Text(
+                        item['content'],
+                        style: TextStyle(color: clText),
+                      ),
                       if (item['tags'].toString().isNotEmpty)
-                        Text('Tags: ${item['tags']}',
-                            style: TextStyle(fontSize: fsNormal, color: clUpBar)),
+                        Text(
+                          'Tags: ${item['tags']}',
+                          style: TextStyle(
+                            fontSize: fsNormal,
+                            color: clUpBar,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
                     ],
                   ),
                   tileColor: clFill,
                   selectedTileColor: clSel,
-                  textColor: clText,
-                  leading: hasPriority ? Icon(Icons.star, color: Colors.amber) : null,
-                  trailing: hasReminder ? Icon(Icons.alarm) : null,
+                  leading: hasPriority
+                      ? Icon(Icons.star, color: Colors.amber)
+                      : null,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hasReminder)
+                        Icon(Icons.alarm, color: clText),
+                      IconButton(
+                        icon: Icon(Icons.edit, color: clText),
+                        onPressed: () {
+                          // Edit item functionality
+                          navigateToScreen(editItemPage(item));
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: clText),
+                        onPressed: () {
+                          // Delete item confirmation
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return AlertDialog(
+                                backgroundColor: clFill,
+                                title: Text(
+                                  lw('Delete Item'),
+                                  style: TextStyle(color: clText),
+                                ),
+                                content: Text(
+                                  lw('Are you sure you want to delete this item?'),
+                                  style: TextStyle(color: clText),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    child: Text(
+                                      lw('Cancel'),
+                                      style: TextStyle(color: clUpBar),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                  TextButton(
+                                    child: Text(
+                                      lw('Delete'),
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                    onPressed: () async {
+                                      await deleteItem(item['id']);
+                                      Navigator.of(context).pop();
+                                      // Refresh the list
+                                      setState(() {});
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                   onTap: () {
-                    // Item tap functionality
+                    // Item tap functionality - view details
+                    navigateToScreen(editItemPage(item));
+                  },
+                  onLongPress: () {
+                    // Toggle priority
+                    updateItem(
+                      item['id'],
+                      item['title'],
+                      item['content'],
+                      priority: item['priority'] > 0 ? 0 : 1,
+                    ).then((_) {
+                      // Refresh the list
+                      setState(() {});
+                    });
                   },
                 );
               },
@@ -231,8 +383,116 @@ Widget homePage() => Builder(
           foregroundColor: clText,
           onPressed: () {
             // Add new item functionality
+            navigateToScreen(editItemPage(null));
           },
           child: const Icon(Icons.add),
+        ),
+      );
+    }
+);
+
+
+void _showAbout() {
+  String txt = lw('Memorizer');
+  txt += '\n\n';
+  txt += '${lw('Version')}: $progVersion\n\n';
+  txt += '(c): $progAuthor 2025\n';
+  txt += '\n';
+  txt += lw('Long press to HELP');
+  okInfo(txt);
+}
+
+Widget editItemPage(Map<String, dynamic>? item) => Builder(
+    builder: (context) {
+      final isEditing = item != null;
+      final titleController = TextEditingController(
+        text: isEditing ? item['title'] : '',
+      );
+      final contentController = TextEditingController(
+        text: isEditing ? item['content'] : '',
+      );
+      final tagsController = TextEditingController(
+        text: isEditing ? item['tags'] : '',
+      );
+
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: clUpBar,
+          foregroundColor: clText,
+          title: Text(
+            isEditing ? lw('Edit Item') : lw('New Item'),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.save),
+              onPressed: () async {
+                if (titleController.text.trim().isEmpty) {
+                  okInfo(lw('Title cannot be empty'));
+                  return;
+                }
+
+                if (isEditing) {
+                  await updateItem(
+                    item['id'],
+                    titleController.text.trim(),
+                    contentController.text.trim(),
+                    tags: tagsController.text.trim(),
+                  );
+                } else {
+                  await insertItem(
+                    titleController.text.trim(),
+                    contentController.text.trim(),
+                    tags: tagsController.text.trim(),
+                  );
+                }
+
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              TextField(
+                controller: titleController,
+                style: TextStyle(color: clText),
+                decoration: InputDecoration(
+                  labelText: lw('Title'),
+                  labelStyle: TextStyle(color: clText),
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: contentController,
+                style: TextStyle(color: clText),
+                decoration: InputDecoration(
+                  labelText: lw('Content'),
+                  labelStyle: TextStyle(color: clText),
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 5,
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: tagsController,
+                style: TextStyle(color: clText),
+                decoration: InputDecoration(
+                  labelText: lw('Tags (comma separated)'),
+                  labelStyle: TextStyle(color: clText),
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

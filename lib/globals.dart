@@ -4,10 +4,20 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 
+
+const String progVersion = '0.0.250306';
+const String progAuthor = 'Eugen';
+
+final mainDb = 'memorizer.db';
+final settDb = 'settings.db';
+
 // Global variables
 late Database db;
 late Database settingsDb;
 late BuildContext globalContext;
+
+bool xvDebug = true;
+
 
 // Font sizes
 const double fsSmall = 10;
@@ -67,6 +77,10 @@ Map<String, dynamic> defSettings = {
   "Auto-backup": "false"
 };
 
+void myPrint(String msg) {
+  if (xvDebug) print('>>> $msg');
+}
+
 // Get theme index from name
 int getThemeIndex(String themeName) {
   return appTHEMES.indexOf(themeName);
@@ -76,7 +90,7 @@ int getThemeIndex(String themeName) {
 // Максимально упрощенный вариант
 void setThemeColors(String themeName) {
   final index = appTHEMES.indexOf(themeName);
-  final themeIndex = index > 0 ? index : 0;
+  final themeIndex = index >= 0 ? index : 0;
   final colors = colorThemes[themeIndex];
   clText = colors[0];
   clBgrnd = colors[1];
@@ -112,10 +126,9 @@ ThemeData getAppTheme() {
 // Initialize databases
 Future<void> initDatabases() async {
   final databasesPath = await getDatabasesPath();
-
   // Initialize main database
   db = await openDatabase(
-    join(databasesPath, 'memorizer.db'),
+    join(databasesPath, mainDb),
     version: 1,
     onCreate: (db, version) {
       return db.execute(
@@ -123,10 +136,9 @@ Future<void> initDatabases() async {
       );
     },
   );
-
   // Initialize settings database
   settingsDb = await openDatabase(
-    join(databasesPath, 'settings.db'),
+    join(databasesPath, settDb),
     version: 1,
     onCreate: (db, version) {
       return db.execute(
@@ -134,10 +146,8 @@ Future<void> initDatabases() async {
       );
     },
   );
-
   // Initialize default settings
   await initDefaultSettings();
-
   // Initialize theme colors
   final themeName = await getSetting("Color theme") ?? defSettings["Color theme"];
   setThemeColors(themeName);
@@ -160,7 +170,6 @@ Future<void> saveSetting(String key, String value) async {
     {'key': key, 'value': value},
     conflictAlgorithm: ConflictAlgorithm.replace,
   );
-
   // Update theme colors if changing theme
   if (key == "Color theme") {
     setThemeColors(value);
@@ -174,7 +183,6 @@ Future<String?> getSetting(String key) async {
     where: 'key = ?',
     whereArgs: [key],
   );
-
   return result.isNotEmpty ? result.first['value'] as String : null;
 }
 
@@ -191,7 +199,7 @@ void navigateBack() {
 }
 
 // UI helpers
-AppBar buildAppBar(String title) {
+AppBar buildAppBar(String title, {List<Widget>? actions}) {
   return AppBar(
     backgroundColor: clUpBar,
     foregroundColor: clText,
@@ -200,13 +208,32 @@ AppBar buildAppBar(String title) {
       icon: const Icon(Icons.arrow_back),
       onPressed: () => navigateBack(),
     ),
-    actions: [
-      IconButton(
-        icon: const Icon(Icons.menu),
-        onPressed: () {
-          // Menu functionality
-        },
-      ),
-    ],
+    actions: actions,
   );
+}
+
+void okInfo(String message) {
+  showDialog(
+    context: globalContext,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        backgroundColor: clFill,
+        title: Text(lw('Information'), style: TextStyle(color: clText)),
+        content: Text(message, style: TextStyle(color: clText)),
+        actions: <Widget>[
+          TextButton(
+            child: Text(lw('OK'), style: TextStyle(color: clUpBar)),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
+String lw(String text) {
+  // В будущем здесь будет полноценная локализация
+  return text;
 }
