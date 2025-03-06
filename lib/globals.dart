@@ -212,17 +212,53 @@ AppBar buildAppBar(String title, {List<Widget>? actions}) {
   );
 }
 
-void okInfo(String message) {
-  showDialog(
+String lw(String text) {
+  // В будущем здесь будет полноценная локализация
+  return text;
+}
+
+// Universal AlertDialog function with customizable options
+// Universal AlertDialog function with customizable options
+Future<dynamic> showCustomDialog({
+  required String title,
+  required String content,
+  List<Map<String, dynamic>>? actions,
+  bool barrierDismissible = true,
+}) {
+  return showDialog(
     context: globalContext,
+    barrierDismissible: barrierDismissible,
     builder: (BuildContext context) {
       return AlertDialog(
         backgroundColor: clFill,
-        title: Text(lw('Information'), style: TextStyle(color: clText)),
-        content: Text(message, style: TextStyle(color: clText)),
-        actions: <Widget>[
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.0),
+          side: BorderSide(color: clUpBar, width: 2.0),
+        ),
+        title: Text(lw(title), style: TextStyle(color: clText)),
+        content: Text(lw(content), style: TextStyle(color: clText)),
+        actions: actions?.map((action) =>
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: action['isDestructive'] == true ? Colors.red : clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw(action['label'])),
+              onPressed: () {
+                Navigator.of(context).pop(action['value']);
+                if (action['onPressed'] != null) {
+                  action['onPressed']();
+                }
+              },
+            )
+        ).toList() ?? [
+          // Default OK button if no actions provided
           TextButton(
-            child: Text(lw('OK'), style: TextStyle(color: clUpBar)),
+            style: TextButton.styleFrom(
+              backgroundColor: clUpBar,
+              foregroundColor: clText,
+            ),
+            child: Text(lw('OK')),
             onPressed: () {
               Navigator.of(context).pop();
             },
@@ -233,7 +269,10 @@ void okInfo(String message) {
   );
 }
 
-String lw(String text) {
-  // В будущем здесь будет полноценная локализация
-  return text;
+// Simple information dialog using the universal dialog
+void okInfo(String message) {
+  showCustomDialog(
+    title: 'Information',
+    content: message,
+  );
 }
