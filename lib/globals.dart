@@ -34,7 +34,7 @@ Future<void> initDatabases() async {
     version: 1,
     onCreate: (db, version) {
       return db.execute(
-          'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)'',
+          'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)',
       );
     },
   );
