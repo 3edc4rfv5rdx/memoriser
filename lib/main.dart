@@ -1,8 +1,8 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'globals.dart';
 
-// Include the database functions directly in main.dart until db_service.dart is created
 // Item database functions
 Future<void> insertItem(String title, String content, {String tags = '', int priority = 0, int? reminder}) async {
   await db.insert(
@@ -20,15 +20,22 @@ Future<void> insertItem(String title, String content, {String tags = '', int pri
 }
 
 Future<List<Map<String, dynamic>>> getItems({String? tagFilter}) async {
+  // Get sort order from settings
+  final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
+
+  // Determine sort order based on setting
+  final sortOrder = newestFirst == "true" ? "DESC" : "ASC";
+  String orderByClause = 'priority DESC, created ${sortOrder}';
+
   if (tagFilter != null && tagFilter.isNotEmpty) {
     return await db.query(
         'items',
         where: 'tags LIKE ?',
         whereArgs: ['%$tagFilter%'],
-        orderBy: 'priority DESC, created DESC'
+        orderBy: orderByClause
     );
   }
-  return await db.query('items', orderBy: 'priority DESC, created DESC');
+  return await db.query('items', orderBy: orderByClause);
 }
 
 Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
@@ -80,8 +87,70 @@ void main() async {
 // Main app widget as a function
 Widget memorizerApp() => MaterialApp(
   title: 'Memorizer',
-  theme: appTheme,
+  theme: getAppTheme(),
   home: homePage(),
+);
+
+// Settings screen for theme selection
+Widget settingsPage() => Builder(
+    builder: (context) {
+      return Scaffold(
+        appBar: buildAppBar('Settings'),
+        body: FutureBuilder<String?>(
+          future: getSetting("Color theme"),
+          builder: (context, snapshot) {
+            final currentTheme = snapshot.hasData
+                ? snapshot.data!
+                : defSettings["Color theme"];
+
+            return ListView(
+              children: [
+                ListTile(
+                  title: Text('Color Theme'),
+                  subtitle: Text(currentTheme),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          backgroundColor: clFill,
+                          title: Text('Select Theme'),
+                          content: Container(
+                            width: double.minPositive,
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: appTHEMES.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                return ListTile(
+                                  title: Text(appTHEMES[index]),
+                                  selected: appTHEMES[index] == currentTheme,
+                                  selectedTileColor: clSel,
+                                  onTap: () async {
+                                    // Save the theme name, not the index
+                                    await saveSetting("Color theme", appTHEMES[index]);
+                                    Navigator.of(context).pop();
+
+                                    // Rebuild the app to apply new theme
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => memorizerApp()),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+                // Other settings can be added here
+              ],
+            );
+          },
+        ),
+      );
+    }
 );
 
 // Home page as a function
@@ -91,12 +160,40 @@ Widget homePage() => Builder(
 
       return Scaffold(
         appBar: buildAppBar('Memorizer'),
+        drawer: Drawer(
+          backgroundColor: clMenu,
+          child: ListView(
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  color: clUpBar,
+                ),
+                child: Text(
+                  'Memorizer',
+                  style: TextStyle(
+                    color: clText,
+                    fontSize: fsHeader,
+                  ),
+                ),
+              ),
+              ListTile(
+                title: Text('Settings'),
+                onTap: () {
+                  Navigator.pop(context);
+                  navigateToScreen(settingsPage());
+                },
+              ),
+            ],
+          ),
+        ),
         body: FutureBuilder<List<Map<String, dynamic>>>(
           future: getItems(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          builder: (context, itemsSnapshot) {
+            if (!itemsSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-            final items = snapshot.data!;
+            final items = itemsSnapshot.data!;
 
             return ListView.builder(
               itemCount: items.length,
@@ -113,9 +210,12 @@ Widget homePage() => Builder(
                       Text(item['content']),
                       if (item['tags'].toString().isNotEmpty)
                         Text('Tags: ${item['tags']}',
-                            style: TextStyle(fontSize: 12, color: Colors.blue)),
+                            style: TextStyle(fontSize: fsNormal, color: clUpBar)),
                     ],
                   ),
+                  tileColor: clFill,
+                  selectedTileColor: clSel,
+                  textColor: clText,
                   leading: hasPriority ? Icon(Icons.star, color: Colors.amber) : null,
                   trailing: hasReminder ? Icon(Icons.alarm) : null,
                   onTap: () {
@@ -127,6 +227,8 @@ Widget homePage() => Builder(
           },
         ),
         floatingActionButton: FloatingActionButton(
+          backgroundColor: clUpBar,
+          foregroundColor: clText,
           onPressed: () {
             // Add new item functionality
           },
