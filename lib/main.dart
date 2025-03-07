@@ -109,7 +109,7 @@ void main() async {
 
 // Main app widget as a function
 Widget memorizerApp() => MaterialApp(
-  title: 'Memorizer',
+  title: lw('Memorizer'),
   theme: getAppTheme(),
   home: HomePage(),
   debugShowCheckedModeBanner: false,
@@ -194,16 +194,16 @@ class _HomePageState extends State<HomePage> {
 
               // Use the showCustomDialog function for delete confirmation
               showCustomDialog(
-                title: 'Delete Item',
-                content: 'Are you sure you want to delete this item?',
+                title: lw('Delete Item'),
+                content: lw('Are you sure you want to delete this item?'),
                 actions: [
                   {
-                    'label': 'Cancel',
+                    'label': lw('Cancel'),
                     'value': false,
                     'isDestructive': false,
                   },
                   {
-                    'label': 'Delete',
+                    'label': lw('Delete'),
                     'value': true,
                     'isDestructive': true,
                     'onPressed': () async {
@@ -228,10 +228,10 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: clUpBar,
         foregroundColor: clText,
-        title: Text('Memorizer'),
+        title: Text(lw('Memorizer')),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () {
+          onPressed: () async {
             // Vacuum the databases before closing
             await vacuumDatabases();
             // Close the app when X button is pressed from main screen

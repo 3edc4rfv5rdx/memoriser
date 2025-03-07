@@ -242,7 +242,7 @@ Future<dynamic> showCustomDialog({
                 backgroundColor: action['isDestructive'] == true ? Colors.red : clUpBar,
                 foregroundColor: clText,
               ),
-              child: Text(lw(action['label'])),
+              child: Text(action['label']),
               onPressed: () {
                 Navigator.of(context).pop(action['value']);
                 if (action['onPressed'] != null) {
@@ -257,7 +257,7 @@ Future<dynamic> showCustomDialog({
               backgroundColor: clUpBar,
               foregroundColor: clText,
             ),
-            child: Text(lw('OK')),
+            child: Text(lw('Ok')),
             onPressed: () {
               Navigator.of(context).pop();
             },
@@ -271,7 +271,7 @@ Future<dynamic> showCustomDialog({
 // Simple information dialog using the universal dialog
 void okInfo(String message) {
   showCustomDialog(
-    title: 'Information',
+    title: lw('Information'),
     content: message,
   );
 }

@@ -45,7 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(
         backgroundColor: clUpBar,
         foregroundColor: clText,
-        title: Text('Settings'),
+        title: Text(lw('Settings')),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
@@ -60,7 +60,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 Expanded(
                   flex: 60,
                   child: Text(
-                    'Color theme',
+                    lw('Color theme'),
                     style: TextStyle(
                       color: clText,
                       fontSize: fsMedium,
@@ -113,7 +113,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 Expanded(
                   flex: 60,
                   child: Text(
-                    'Newest first',
+                    lw('Newest first'),
                     style: TextStyle(
                       color: clText,
                       fontSize: fsMedium,
