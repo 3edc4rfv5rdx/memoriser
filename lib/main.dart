@@ -104,6 +104,10 @@ void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   await initDatabases();
+  // Загрузка локализации
+  final languageSetting = await getSetting("Language") ?? defSettings["Language"];
+  await readLocale(languageSetting.toLowerCase());
+
   runApp(memorizerApp());
 }
 
@@ -255,7 +259,7 @@ class _HomePageState extends State<HomePage> {
                   Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => SettingsPage(
+                          builder: (context) => buildSettingsScreen(
                             rebuildApp: () {
                               // Function to rebuild the app
                               Navigator.of(context).pushReplacement(
@@ -382,9 +386,9 @@ class _HomePageState extends State<HomePage> {
 }
 
 void _showAbout() {
-  String txt = lw('Memorizer');
+  String txt = 'Memorizer';
   txt += '\n\n';
-  txt += '${lw('Version')}: $progVersion\n\n';
+  txt += lw('Version') + ': $progVersion\n\n';
   txt += '(c): $progAuthor 2025\n';
   txt += '\n';
   txt += lw('Long press to HELP');

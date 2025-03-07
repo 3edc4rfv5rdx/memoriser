@@ -2,12 +2,16 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'dart:convert'; // Для работы с JSON (json.decode)
+import 'package:flutter/services.dart'; // Для доступа к rootBundle
 import 'package:path/path.dart';
 
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 const String progVersion = '0.0.250306';
 const String progAuthor = 'Eugen';
 
+const String localesFile = 'assets/locales.json';
 const String mainDbFile = 'memorizer.db';  // Changed from mainDbFile
 const String settDbFile = 'settings.db';
 
@@ -70,11 +74,70 @@ List<List<Color>> colorThemes = [
 
 // Default settings
 Map<String, dynamic> defSettings = {
+  "Language": "EN",
+  "Color theme": "Light",
   "Newest first": "true",
-  "Color theme": "Light",  // Default to "Light" theme
   "Notification time": "10:00",
   "Auto-backup": "false"
 };
+
+// Карта поддерживаемых языков с их названиями
+Map<String, String> langNames = {
+  'en': 'English',
+  'ru': 'Русский',
+  'ua': 'Українська',
+};
+
+// Кеш переводов для текущего языка
+Map<String, String> _uiLocale = {};
+// Текущая локаль
+String currentLocale = 'en';
+
+// Функция проверки поддерживаемого языка
+bool isLanguageSupported(String locale) {
+  return langNames.containsKey(locale.toLowerCase());
+}
+
+String lw(String text) {
+  if (currentLocale == 'en') {return text;}
+  return _uiLocale[text] ?? text;
+}
+
+// Чтение локализаций из файла
+Future<void> readLocale(String locale) async {
+  locale = locale.toLowerCase();
+  // Проверяем, что язык поддерживается
+  if (!isLanguageSupported(locale)) {
+    myPrint('Language $locale not supported, using English instead');
+    currentLocale = 'en';
+  } else {
+    currentLocale = locale;
+  }
+
+  // Для английского языка кеш не нужен
+  if (currentLocale == 'en') {
+    _uiLocale = {};
+    return;
+  }
+
+  try {
+    // Загружаем JSON файл с локализациями
+    final jsonString = await rootBundle.loadString(localesFile);
+    final Map<String, dynamic> allTranslations = json.decode(jsonString);
+    // Создаем пустой кеш
+    _uiLocale = {};
+    // Заполняем кеш переводами для текущей локали
+    allTranslations.forEach((key, value) {
+      if (value is Map && value.containsKey(currentLocale)) {
+        _uiLocale[key] = value[currentLocale];
+      }
+    });
+  } catch (e) {
+    myPrint('Error loading translations: $e');
+    _uiLocale = {};
+  }
+}
+
 
 void myPrint(String msg) {
   if (xvDebug) print('>>> $msg');
@@ -211,11 +274,6 @@ AppBar buildAppBar(String title, {List<Widget>? actions}) {
   );
 }
 
-String lw(String text) {
-  // В будущем здесь будет полноценная локализация
-  return text;
-}
-
 // Universal AlertDialog function with customizable options
 // Universal AlertDialog function with customizable options
 Future<dynamic> showCustomDialog({
@@ -234,8 +292,8 @@ Future<dynamic> showCustomDialog({
           borderRadius: BorderRadius.circular(8.0),
           side: BorderSide(color: clUpBar, width: 2.0),
         ),
-        title: Text(lw(title), style: TextStyle(color: clText)),
-        content: Text(lw(content), style: TextStyle(color: clText)),
+        title: Text(title, style: TextStyle(color: clText)),
+        content: Text(content, style: TextStyle(color: clText)),
         actions: actions?.map((action) =>
             TextButton(
               style: TextButton.styleFrom(
@@ -288,3 +346,58 @@ Future<void> vacuumDatabases() async {
   }
 }
 
+// Function to show a blue SnackBar
+void okInfoBarBlue(String message) {
+  scaffoldMessengerKey.currentState?.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: TextStyle(
+          fontSize: fsSmall,
+          color: Colors.white,
+        ),
+      ),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.blue,
+      duration: Duration(seconds: 5),
+    ),
+  );
+}
+
+// Function to show a red SnackBar
+// EXAMPLE: okInfoBarRed("This is a message", duration: Duration(seconds: 3));
+void okInfoBarRed(String message, {Duration? duration}) {
+  scaffoldMessengerKey.currentState?.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: TextStyle(
+          fontSize: fsSmall,
+          color: Colors.white,
+        ),
+      ),
+      backgroundColor: Colors.red,
+      duration: duration ?? Duration(seconds: 7),
+      behavior: SnackBarBehavior.floating,
+      dismissDirection: DismissDirection.none,
+    ),
+  );
+}
+
+// // Function to show a green SnackBar
+void okInfoBarGreen(String message, {Duration? duration}) {
+  scaffoldMessengerKey.currentState?.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: TextStyle(
+          fontSize: fsSmall,
+          color: clText,
+        ),
+      ),
+      duration: duration ?? Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.green,
+    ),
+  );
+}
