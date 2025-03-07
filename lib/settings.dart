@@ -2,12 +2,43 @@
 import 'package:flutter/material.dart';
 import 'globals.dart';
 
-// Settings screen for theme selection
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   final Function rebuildApp;
-  
+
   const SettingsPage({Key? key, required this.rebuildApp}) : super(key: key);
-  
+
+  @override
+  _SettingsPageState createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  String? _currentTheme;
+  bool _newestFirst = true;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    // Load current theme
+    final themeValue = await getSetting("Color theme") ?? defSettings["Color theme"];
+
+    // Load sort order setting
+    final newestFirstValue = await getSetting("Newest first") ?? defSettings["Newest first"];
+    final isNewestFirst = newestFirstValue == "true";
+
+    if (mounted) {
+      setState(() {
+        _currentTheme = themeValue;
+        _newestFirst = isNewestFirst;
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -16,68 +47,103 @@ class SettingsPage extends StatelessWidget {
         foregroundColor: clText,
         title: Text('Settings'),
       ),
-      body: FutureBuilder<String?>(
-        future: getSetting("Color theme"),
-        builder: (context, snapshot) {
-          final currentTheme = snapshot.hasData
-              ? snapshot.data!
-              : defSettings["Color theme"];
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Color theme selector row
+            Row(
+              children: [
+                // Left side - Label (60%)
+                Expanded(
+                  flex: 60,
+                  child: Text(
+                    'Color theme',
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsMedium,
+                    ),
+                  ),
+                ),
+                // Right side - Dropdown (40%)
+                Expanded(
+                  flex: 40,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: clFill,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: DropdownButton<String>(
+                      value: _currentTheme,
+                      isExpanded: true,
+                      underline: Container(),
+                      dropdownColor: clMenu,
+                      icon: Icon(Icons.arrow_drop_down, color: clText),
+                      style: TextStyle(color: clText),
+                      onChanged: (String? newValue) async {
+                        if (newValue != null) {
+                          await saveSetting("Color theme", newValue);
+                          setState(() {
+                            _currentTheme = newValue;
+                          });
+                          widget.rebuildApp();
+                        }
+                      },
+                      items: appTHEMES.map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
 
-          return ListView(
-            children: [
-              ListTile(
-                title: Text('Color Theme'),
-                subtitle: Text(currentTheme!),
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        backgroundColor: clFill,
-                        title: Text('Select Theme'),
-                        content: Container(
-                          width: double.minPositive,
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: appTHEMES.length,
-                            itemBuilder: (BuildContext context, int index) {
-                              return ListTile(
-                                title: Text(appTHEMES[index]),
-                                selected: appTHEMES[index] == currentTheme,
-                                selectedTileColor: clSel,
-                                onTap: () async {
-                                  // Save the theme name, not the index
-                                  await saveSetting("Color theme", appTHEMES[index]);
-                                  Navigator.of(context).pop();
+            SizedBox(height: 10),
 
-                                  // Call the rebuildApp function passed from main
-                                  rebuildApp();
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-              // Other settings
-              SwitchListTile(
-                title: Text('Newest First'),
-                value: (defSettings["Newest first"] == "true"),
-                onChanged: (bool value) async {
-                  await saveSetting("Newest first", value.toString());
-                  Navigator.of(context).pop();
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => SettingsPage(rebuildApp: rebuildApp))
-                  );
-                },
-              ),
-            ],
-          );
-        },
+            // Newest first checkbox row
+            Row(
+              children: [
+                // Left side - Label (60%)
+                Expanded(
+                  flex: 60,
+                  child: Text(
+                    'Newest first',
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsMedium,
+                    ),
+                  ),
+                ),
+                // Right side - Checkbox (40%)
+                Expanded(
+                  flex: 40,
+                  child: Container(
+                    alignment: Alignment.centerLeft,
+                    child: Checkbox(
+                      value: _newestFirst,
+                      activeColor: clUpBar,
+                      checkColor: clText,
+                      onChanged: (bool? value) async {
+                        if (value != null) {
+                          await saveSetting("Newest first", value.toString());
+                          setState(() {
+                            _newestFirst = value;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

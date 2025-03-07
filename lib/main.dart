@@ -8,7 +8,7 @@ import 'additem.dart';
 
 // Item database functions
 Future<void> insertItem(String title, String content, {String tags = '', int priority = 0, int? reminder}) async {
-  await db.insert(
+  await mainDb.insert(
     'items',
     {
       'title': title,
@@ -37,14 +37,14 @@ Future<List<Map<String, dynamic>>> getItems({String? tagFilter}) async {
     List<Map<String, dynamic>> result;
     if (tagFilter != null && tagFilter.isNotEmpty) {
       myPrint('Filtering by tag: $tagFilter');
-      result = await db.query(
+      result = await mainDb.query(
           'items',
           where: 'tags LIKE ?',
           whereArgs: ['%$tagFilter%'],
           orderBy: orderByClause
       );
     } else {
-      result = await db.query('items', orderBy: orderByClause);
+      result = await mainDb.query('items', orderBy: orderByClause);
     }
 
     myPrint('Retrieved items count: ${result.length}');
@@ -61,7 +61,7 @@ Future<List<Map<String, dynamic>>> getItems({String? tagFilter}) async {
 
 Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
   final now = DateTime.now().millisecondsSinceEpoch;
-  return await db.query(
+  return await mainDb.query(
       'items',
       where: 'reminder IS NOT NULL AND reminder > ?',
       whereArgs: [now],
@@ -79,7 +79,7 @@ Future<void> updateItem(int id, String title, String content, {String? tags, int
   if (priority != null) updates['priority'] = priority;
   if (reminder != null) updates['reminder'] = reminder;
 
-  await db.update(
+  await mainDb.update(
     'items',
     updates,
     where: 'id = ?',
@@ -89,7 +89,7 @@ Future<void> updateItem(int id, String title, String content, {String? tags, int
 }
 
 Future<void> deleteItem(int id) async {
-  await db.delete(
+  await mainDb.delete(
     'items',
     where: 'id = ?',
     whereArgs: [id],
@@ -155,7 +155,8 @@ class _HomePageState extends State<HomePage> {
   void _showContextMenu(BuildContext context, Map<String, dynamic> item) {
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(100, 100, 100, 100),  // This will be positioned near the tap
+      position: RelativeRect.fromLTRB(100, 100, 100, 100),
+      color: clMenu, // Set the background color to clMenu to match the theme
       items: <PopupMenuEntry>[
         PopupMenuItem(
           child: ListTile(
@@ -231,6 +232,8 @@ class _HomePageState extends State<HomePage> {
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () {
+            // Vacuum the databases before closing
+            await vacuumDatabases();
             // Close the app when X button is pressed from main screen
             Navigator.of(context).canPop()
                 ? Navigator.of(context).pop()
@@ -238,53 +241,51 @@ class _HomePageState extends State<HomePage> {
           },
         ),
         actions: [
-          PopupMenuButton<String>(
-            icon: Icon(Icons.menu),
-            color: clMenu,
-            onSelected: (String result) {
-              if (result == 'settings') {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => SettingsPage(
-                          rebuildApp: () {
-                            // Function to rebuild the app
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(builder: (context) => memorizerApp()),
-                            );
-                          },
-                        )
-                    )
-                ).then((_) => _refreshItems());
-              } else if (result == 'about') {
-                _showAbout();
-              } else if (result == 'help') {
-                okInfo(lw('Help information will be shown here'));
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Text(
-                  lw('Settings'),
-                  style: TextStyle(color: clText),
+          // Using a Container with alignment to position the menu button at the bottom
+          Container(
+            alignment: Alignment.bottomRight,
+            margin: EdgeInsets.only(bottom: 4),  // Small margin to avoid being too close to the edge
+            child: PopupMenuButton<String>(
+              icon: Icon(Icons.menu),
+              color: clMenu,
+              // This controls where the menu appears relative to the button
+              offset: Offset(0, 30),  // Offset to position menu below the AppBar
+              onSelected: (String result) {
+                if (result == 'settings') {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => SettingsPage(
+                            rebuildApp: () {
+                              // Function to rebuild the app
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(builder: (context) => memorizerApp()),
+                              );
+                            },
+                          )
+                      )
+                  ).then((_) => _refreshItems());
+                } else if (result == 'about') {
+                  _showAbout();
+                }
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                PopupMenuItem<String>(
+                  value: 'settings',
+                  child: Text(
+                    lw('Settings'),
+                    style: TextStyle(color: clText),
+                  ),
                 ),
-              ),
-              PopupMenuItem<String>(
-                value: 'about',
-                child: Text(
-                  lw('About'),
-                  style: TextStyle(color: clText),
+                PopupMenuItem<String>(
+                  value: 'about',
+                  child: Text(
+                    lw('About'),
+                    style: TextStyle(color: clText),
+                  ),
                 ),
-              ),
-              PopupMenuItem<String>(
-                value: 'help',
-                child: Text(
-                  lw('Help'),
-                  style: TextStyle(color: clText),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
