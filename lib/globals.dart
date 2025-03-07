@@ -8,16 +8,15 @@ import 'package:path/path.dart';
 const String progVersion = '0.0.250306';
 const String progAuthor = 'Eugen';
 
-final mainDb = 'memorizer.db';
-final settDb = 'settings.db';
+const String mainDbFile = 'memorizer.db';  // Changed from mainDbFile
+const String settDbFile = 'settings.db';
 
 // Global variables
-late Database db;
-late Database settingsDb;
+late Database mainDb;
+late Database settDb;
 late BuildContext globalContext;
 
 bool xvDebug = true;
-
 
 // Font sizes
 const double fsSmall = 10;
@@ -127,21 +126,21 @@ ThemeData getAppTheme() {
 Future<void> initDatabases() async {
   final databasesPath = await getDatabasesPath();
   // Initialize main database
-  db = await openDatabase(
-    join(databasesPath, mainDb),
+  mainDb = await openDatabase(
+    join(databasesPath, mainDbFile),
     version: 1,
-    onCreate: (db, version) {
-      return db.execute(
+    onCreate: (mainDb, version) {
+      return mainDb.execute(
         'CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, title TEXT, content TEXT, tags TEXT, priority INTEGER, reminder INTEGER, created INTEGER)',
       );
     },
   );
   // Initialize settings database
-  settingsDb = await openDatabase(
-    join(databasesPath, settDb),
+  settDb = await openDatabase(
+    join(databasesPath, settDbFile),
     version: 1,
-    onCreate: (db, version) {
-      return db.execute(
+    onCreate: (mainDb, version) {
+      return mainDb.execute(
         'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)',
       );
     },
@@ -165,7 +164,7 @@ Future<void> initDefaultSettings() async {
 
 // Settings functions
 Future<void> saveSetting(String key, String value) async {
-  await settingsDb.insert(
+  await settDb.insert(
     'settings',
     {'key': key, 'value': value},
     conflictAlgorithm: ConflictAlgorithm.replace,
@@ -177,7 +176,7 @@ Future<void> saveSetting(String key, String value) async {
 }
 
 Future<String?> getSetting(String key) async {
-  final List<Map<String, dynamic>> result = await settingsDb.query(
+  final List<Map<String, dynamic>> result = await settDb.query(
     'settings',
     columns: ['value'],
     where: 'key = ?',
@@ -276,3 +275,16 @@ void okInfo(String message) {
     content: message,
   );
 }
+
+// Function to vacuum databases for better performance
+Future<void> vacuumDatabases() async {
+  try {
+    myPrint("Running vacuum on the databases");
+    await mainDb.execute("VACUUM");
+    await settDb.execute("VACUUM");
+    myPrint("Vacuum completed successfully");
+  } catch (e) {
+    myPrint("Error during vacuum: $e");
+  }
+}
+
