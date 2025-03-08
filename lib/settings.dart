@@ -22,7 +22,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentLanguage;
   bool _newestFirst = true;
   bool _isLoading = true;
-  bool _settingsChanged = false;
 
   @override
   void initState() {
@@ -47,24 +46,62 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _currentLanguage = languageValue.toLowerCase();
         _newestFirst = isNewestFirst;
         _isLoading = false;
-        _settingsChanged = false;
       });
     }
   }
 
-  Future<void> _applyChanges() async {
-    if (_settingsChanged) {
-      // Перечитываем локализацию, если выбран новый язык
-      if (_currentLanguage != null) {
-        await readLocale(_currentLanguage!);
-      }
+  // Функция для применения изменений языка
+  Future<void> _applyLanguageChange(String newLanguage) async {
+    // Сохраняем новый язык
+    await saveSetting("Language", newLanguage.toUpperCase());
 
-      // Перестраиваем всё приложение, применяя новые настройки
-      widget.rebuildApp();
-      okInfoBarGreen(lw('Settings applied'));
-    } else {
-      okInfoBarBlue(lw('No changes to apply'));
-    }
+    // Перечитываем языковой файл
+    await readLocale(newLanguage);
+
+    // Обновляем состояние
+    setState(() {
+      _currentLanguage = newLanguage;
+    });
+
+    // Показываем уведомление
+    okInfoBarGreen(lw('Language changed'));
+
+    // Полное перестроение приложения для применения языка
+    widget.rebuildApp();
+  }
+
+  // Функция для применения изменений темы
+  Future<void> _applyThemeChange(String newTheme) async {
+    // Сохраняем новую тему
+    await saveSetting("Color theme", newTheme);
+
+    // Применяем цвета темы
+    setThemeColors(newTheme);
+
+    // Обновляем состояние
+    setState(() {
+      _currentTheme = newTheme;
+    });
+
+    // Показываем уведомление
+    okInfoBarGreen(lw('Theme changed'));
+
+    // Перестраиваем приложение для применения темы
+    widget.rebuildApp();
+  }
+
+  // Функция для применения изменений сортировки
+  Future<void> _applySortOrderChange(bool newValue) async {
+    // Сохраняем новое значение
+    await saveSetting("Newest first", newValue.toString());
+
+    // Обновляем состояние
+    setState(() {
+      _newestFirst = newValue;
+    });
+
+    // Показываем уведомление
+    okInfoBarGreen(lw('Sort order changed'));
   }
 
   @override
@@ -74,25 +111,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         backgroundColor: clUpBar,
         foregroundColor: clText,
         title: Text(lw('Settings')),
-        actions: [
-          // Добавляем кнопку применения в AppBar - делаем её более заметной
-          Container(
-            margin: EdgeInsets.only(right: 10),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-              icon: Icon(Icons.check),
-              label: Text(lw('Apply')),
-              onPressed: _applyChanges,
-            ),
-          ),
-        ],
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
@@ -168,17 +186,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         style: TextStyle(color: clText),
         onChanged: (String? newValue) async {
           if (newValue != null && newValue != _currentLanguage) {
-            // Сохраняем выбранный язык
-            await saveSetting("Language", newValue.toUpperCase());
-
-            // Обновляем состояние локально
-            setState(() {
-              _currentLanguage = newValue;
-              _settingsChanged = true;
-            });
-
-            // Показываем сообщение, что настройки изменены
-            okInfoBarBlue(lw('Language changed. Apply to see changes.'));
+            // Непосредственно применяем изменение языка
+            await _applyLanguageChange(newValue);
           }
         },
         items: langNames.entries.map<DropdownMenuItem<String>>((entry) {
@@ -208,17 +217,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         style: TextStyle(color: clText),
         onChanged: (String? newValue) async {
           if (newValue != null && newValue != _currentTheme) {
-            // Сохраняем выбранную тему
-            await saveSetting("Color theme", newValue);
-
-            // Обновляем состояние локально
-            setState(() {
-              _currentTheme = newValue;
-              _settingsChanged = true;
-            });
-
-            // Показываем сообщение, что настройки изменены
-            okInfoBarBlue(lw('Theme changed. Apply to see changes.'));
+            // Непосредственно применяем изменение темы
+            await _applyThemeChange(newValue);
           }
         },
         items: appTHEMES.map<DropdownMenuItem<String>>((String value) {
@@ -241,14 +241,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         checkColor: clText,
         onChanged: (bool? value) async {
           if (value != null && value != _newestFirst) {
-            await saveSetting("Newest first", value.toString());
-            setState(() {
-              _newestFirst = value;
-              _settingsChanged = true;
-            });
-
-            // Показываем сообщение, что настройки изменены
-            okInfoBarBlue(lw('Sort order changed. Apply to see changes.'));
+            // Непосредственно применяем изменение порядка сортировки
+            await _applySortOrderChange(value);
           }
         },
       ),
