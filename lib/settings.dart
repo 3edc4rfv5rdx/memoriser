@@ -71,28 +71,34 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   }
 
   // Функция сохранения и возврата
+// Функция сохранения с улучшенным показом уведомлений
   Future<void> _saveChanges() async {
     if (!_hasChanges) {
       okInfoBarBlue(lw('No changes to save'));
       return;
     }
 
+    bool languageOrThemeChanged = false;
+    List<String> savedSettings = [];
+
     // Сохраняем новые настройки языка, если изменились
     if (_newLanguage != _currentLanguage && _newLanguage != null) {
       await saveSetting("Language", _newLanguage!.toUpperCase());
-      okInfoBarGreen(lw('Language settings saved'));
+      savedSettings.add('language');
+      languageOrThemeChanged = true;
     }
 
     // Сохраняем новые настройки темы, если изменились
     if (_newTheme != _currentTheme && _newTheme != null) {
       await saveSetting("Color theme", _newTheme!);
-      okInfoBarGreen(lw('Theme settings saved'));
+      savedSettings.add('theme');
+      languageOrThemeChanged = true;
     }
 
     // Сохраняем новые настройки сортировки, если изменились
     if (_newNewestFirst != _newestFirst && _newNewestFirst != null) {
       await saveSetting("Newest first", _newNewestFirst.toString());
-      okInfoBarGreen(lw('Sort order settings saved'));
+      savedSettings.add('sort order');
     }
 
     // Обновляем текущие значения
@@ -103,44 +109,63 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _hasChanges = false;
     });
 
-    // Показываем уведомление о перезапуске
-    okInfoBarOrange(lw('Please restart app'));
+    // Показываем одно общее уведомление о всех сохраненных настройках
+    if (savedSettings.isNotEmpty) {
+      okInfoBarGreen(lw('Settings saved: ') + savedSettings.join(', '));
 
-    // Возвращаемся на главный экран
-    Future.delayed(Duration(seconds: 1), () {
+      // Даем время увидеть первое уведомление
+      await Future.delayed(Duration(milliseconds: 1500));
+
+      // Показываем уведомление о перезапуске только если изменились язык или тема
+      if (languageOrThemeChanged) {
+        okInfoBarOrange(lw('PLEASE RESTART APP'));
+      }
+    }
+
+    // Возвращаемся на главный экран после уведомлений
+    Future.delayed(Duration(seconds: 2), () {
       Navigator.of(context).pop(true);
     });
   }
 
+// Исправленная версия с учетом типов
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      // Предупреждаем о несохраненных изменениях при попытке выхода
-      onWillPop: () async {
+    return PopScope(
+      // canPop: false означает, что мы хотим контролировать поведение кнопки "назад"
+      canPop: !_hasChanges,
+      // onPopInvokedWithResult - возвращает void, не bool
+      onPopInvokedWithResult: (didPop, result) async {
+        // Если уже обработано (нет изменений), то ничего не делаем
+        if (didPop) return;
+
         if (_hasChanges) {
-          final shouldSave = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text(lw('Unsaved Changes')),
-              content: Text(lw('Do you want to save changes before exiting?')),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(lw('No')),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(lw('Yes')),
-                ),
-              ],
-            ),
+          // Используем функцию showCustomDialog из globals.dart для единого стиля
+          final shouldSave = await showCustomDialog(
+            title: lw('Unsaved Changes'),
+            content: lw('Do you want to save changes before exiting?'),
+            actions: [
+              {
+                'label': lw('No'),
+                'value': false,
+                'isDestructive': false,
+              },
+              {
+                'label': lw('Yes'),
+                'value': true,
+                'isDestructive': false,
+                'onPressed': null, // Нет дополнительных действий, просто вернуть значение
+              },
+            ],
           );
 
           if (shouldSave == true) {
             await _saveChanges();
+          } else {
+            // Если не сохраняем, то просто закрываем экран
+            Navigator.of(context).pop();
           }
         }
-        return true;
       },
       child: Scaffold(
         appBar: AppBar(
