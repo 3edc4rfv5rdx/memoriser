@@ -263,25 +263,21 @@ class _HomePageState extends State<HomePage> {
               offset: Offset(0, 30),  // Offset to position menu below the AppBar
               onSelected: (String result) {
                 if (result == 'settings') {
-                  // Показываем экран настроек и ждем результат
-                  final needsRefresh =  Navigator.push<bool>(
+                  // Показываем экран настроек и обрабатываем результат после возврата
+                  Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
                           builder: (context) => buildSettingsScreen()
                       )
-                  );
+                  ).then((needsRefresh) {
+                    // Обновляем текущий экран в любом случае
+                    _refreshItems();
 
-                  // Обновляем текущий экран
-                  _refreshItems();
-
-                  // Если нужна полная перезагрузка приложения,
-                  // например для применения темы или языка
-                  if (needsRefresh == true) {
-                    // При необходимости можно перезагрузить приложение
-                    // Navigator.of(context).pushReplacement(
-                    //   MaterialPageRoute(builder: (context) => memorizerApp()),
-                    // );
-                  }
+                    // Если вернулось true, можем выполнить дополнительные действия
+                    if (needsRefresh == true) {
+                      // При необходимости можно добавить дополнительные действия
+                    }
+                  });
                 } else if (result == 'about') {
                   _showAbout();
                 }
