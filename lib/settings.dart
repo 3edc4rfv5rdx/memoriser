@@ -50,6 +50,24 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     }
   }
 
+  // Показать уведомление напрямую
+  void _showNotification(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: TextStyle(
+            fontSize: fsSmall,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: color,
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   // Функция для применения изменений языка
   Future<void> _applyLanguageChange(String newLanguage) async {
     // Сохраняем новый язык
@@ -64,7 +82,10 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     });
 
     // Показываем уведомление
-    okInfoBarGreen(lw('Language changed'));
+    _showNotification(lw('Language changed'), Colors.green);
+
+    // Небольшая задержка перед перестроением приложения
+    await Future.delayed(Duration(milliseconds: 500));
 
     // Полное перестроение приложения для применения языка
     widget.rebuildApp();
@@ -84,7 +105,10 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     });
 
     // Показываем уведомление
-    okInfoBarGreen(lw('Theme changed'));
+    _showNotification(lw('Theme changed'), Colors.green);
+
+    // Небольшая задержка перед перестроением приложения
+    await Future.delayed(Duration(milliseconds: 500));
 
     // Перестраиваем приложение для применения темы
     widget.rebuildApp();
@@ -101,7 +125,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     });
 
     // Показываем уведомление
-    okInfoBarGreen(lw('Sort order changed'));
+    _showNotification(lw('Sort order changed'), Colors.green);
   }
 
   @override
