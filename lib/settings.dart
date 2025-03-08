@@ -2,16 +2,14 @@
 import 'package:flutter/material.dart';
 import 'globals.dart';
 
-// Используем более уникальное имя для функции
-Widget buildSettingsScreen({required Function rebuildApp}) {
-  return _SettingsScreenImpl(rebuildApp: rebuildApp);
+// Функция для создания экрана настроек
+Widget buildSettingsScreen() {
+  return _SettingsScreenImpl();
 }
 
-// Internal stateful widget to manage settings state
+// Внутренний StatefulWidget для управления состоянием настроек
 class _SettingsScreenImpl extends StatefulWidget {
-  final Function rebuildApp;
-
-  const _SettingsScreenImpl({Key? key, required this.rebuildApp}) : super(key: key);
+  const _SettingsScreenImpl({Key? key}) : super(key: key);
 
   @override
   _SettingsScreenImplState createState() => _SettingsScreenImplState();
@@ -23,6 +21,12 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   bool _newestFirst = true;
   bool _isLoading = true;
 
+  // Временные значения для отслеживания изменений
+  String? _newTheme;
+  String? _newLanguage;
+  bool? _newNewestFirst;
+  bool _hasChanges = false;
+
   @override
   void initState() {
     super.initState();
@@ -30,13 +34,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   }
 
   Future<void> _loadSettings() async {
-    // Load current theme
+    // Загрузка текущей темы
     final themeValue = await getSetting("Color theme") ?? defSettings["Color theme"];
 
-    // Load current language
+    // Загрузка текущего языка
     final languageValue = await getSetting("Language") ?? defSettings["Language"];
 
-    // Load sort order setting
+    // Загрузка настройки сортировки
     final newestFirstValue = await getSetting("Newest first") ?? defSettings["Newest first"];
     final isNewestFirst = newestFirstValue == "true";
 
@@ -45,125 +49,142 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _currentTheme = themeValue;
         _currentLanguage = languageValue.toLowerCase();
         _newestFirst = isNewestFirst;
+
+        // Инициализация временных значений
+        _newTheme = themeValue;
+        _newLanguage = languageValue.toLowerCase();
+        _newNewestFirst = isNewestFirst;
+
         _isLoading = false;
+        _hasChanges = false;
       });
     }
   }
 
-  // Показать уведомление напрямую
-  void _showNotification(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            fontSize: fsSmall,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: color,
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  // Функция для проверки наличия изменений
+  void _checkForChanges() {
+    setState(() {
+      _hasChanges = _newTheme != _currentTheme ||
+          _newLanguage != _currentLanguage ||
+          _newNewestFirst != _newestFirst;
+    });
   }
 
-  // Функция для применения изменений языка
-  Future<void> _applyLanguageChange(String newLanguage) async {
-    // Сохраняем новый язык
-    await saveSetting("Language", newLanguage.toUpperCase());
+  // Функция сохранения и возврата
+  Future<void> _saveChanges() async {
+    if (!_hasChanges) {
+      okInfoBarBlue(lw('No changes to save'));
+      return;
+    }
 
-    // Перечитываем языковой файл
-    await readLocale(newLanguage);
+    // Сохраняем новые настройки языка, если изменились
+    if (_newLanguage != _currentLanguage && _newLanguage != null) {
+      await saveSetting("Language", _newLanguage!.toUpperCase());
+      okInfoBarGreen(lw('Language settings saved'));
+    }
 
-    // Обновляем состояние
+    // Сохраняем новые настройки темы, если изменились
+    if (_newTheme != _currentTheme && _newTheme != null) {
+      await saveSetting("Color theme", _newTheme!);
+      okInfoBarGreen(lw('Theme settings saved'));
+    }
+
+    // Сохраняем новые настройки сортировки, если изменились
+    if (_newNewestFirst != _newestFirst && _newNewestFirst != null) {
+      await saveSetting("Newest first", _newNewestFirst.toString());
+      okInfoBarGreen(lw('Sort order settings saved'));
+    }
+
+    // Обновляем текущие значения
     setState(() {
-      _currentLanguage = newLanguage;
+      _currentTheme = _newTheme;
+      _currentLanguage = _newLanguage;
+      _newestFirst = _newNewestFirst ?? _newestFirst;
+      _hasChanges = false;
     });
 
-    // Показываем уведомление
-    _showNotification(lw('Language changed'), Colors.green);
+    // Показываем уведомление о перезапуске
+    okInfoBarOrange(lw('Please restart app'));
 
-    // Небольшая задержка перед перестроением приложения
-    await Future.delayed(Duration(milliseconds: 500));
-
-    // Полное перестроение приложения для применения языка
-    widget.rebuildApp();
-  }
-
-  // Функция для применения изменений темы
-  Future<void> _applyThemeChange(String newTheme) async {
-    // Сохраняем новую тему
-    await saveSetting("Color theme", newTheme);
-
-    // Применяем цвета темы
-    setThemeColors(newTheme);
-
-    // Обновляем состояние
-    setState(() {
-      _currentTheme = newTheme;
+    // Возвращаемся на главный экран
+    Future.delayed(Duration(seconds: 1), () {
+      Navigator.of(context).pop(true);
     });
-
-    // Показываем уведомление
-    _showNotification(lw('Theme changed'), Colors.green);
-
-    // Небольшая задержка перед перестроением приложения
-    await Future.delayed(Duration(milliseconds: 500));
-
-    // Перестраиваем приложение для применения темы
-    widget.rebuildApp();
-  }
-
-  // Функция для применения изменений сортировки
-  Future<void> _applySortOrderChange(bool newValue) async {
-    // Сохраняем новое значение
-    await saveSetting("Newest first", newValue.toString());
-
-    // Обновляем состояние
-    setState(() {
-      _newestFirst = newValue;
-    });
-
-    // Показываем уведомление
-    _showNotification(lw('Sort order changed'), Colors.green);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: clUpBar,
-        foregroundColor: clText,
-        title: Text(lw('Settings')),
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Language selector row
-            _buildSettingsRow(
-              label: lw('App language'),
-              child: _buildLanguageDropdown(),
+    return WillPopScope(
+      // Предупреждаем о несохраненных изменениях при попытке выхода
+      onWillPop: () async {
+        if (_hasChanges) {
+          final shouldSave = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(lw('Unsaved Changes')),
+              content: Text(lw('Do you want to save changes before exiting?')),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(lw('No')),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(lw('Yes')),
+                ),
+              ],
             ),
+          );
 
-            SizedBox(height: 10),
-
-            // Color theme selector row
-            _buildSettingsRow(
-              label: lw('Color theme'),
-              child: _buildThemeDropdown(),
-            ),
-
-            SizedBox(height: 10),
-
-            // Newest first checkbox row
-            _buildSettingsRow(
-              label: lw('Newest first'),
-              child: _buildSortOrderCheckbox(),
+          if (shouldSave == true) {
+            await _saveChanges();
+          }
+        }
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: clUpBar,
+          foregroundColor: clText,
+          title: Text(lw('Settings')),
+          actions: [
+            // Кнопка Save в AppBar (дискета)
+            IconButton(
+              icon: Icon(Icons.save),
+              tooltip: lw('Save'),
+              onPressed: _saveChanges,
             ),
           ],
+        ),
+        body: _isLoading
+            ? Center(child: CircularProgressIndicator())
+            : Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              // Language selector row
+              _buildSettingsRow(
+                label: lw('App language'),
+                child: _buildLanguageDropdown(),
+              ),
+
+              SizedBox(height: 10),
+
+              // Color theme selector row
+              _buildSettingsRow(
+                label: lw('Color theme'),
+                child: _buildThemeDropdown(),
+              ),
+
+              SizedBox(height: 10),
+
+              // Newest first checkbox row
+              _buildSettingsRow(
+                label: lw('Newest first'),
+                child: _buildSortOrderCheckbox(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -202,16 +223,19 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       ),
       padding: EdgeInsets.symmetric(horizontal: 8),
       child: DropdownButton<String>(
-        value: _currentLanguage,
+        value: _newLanguage,
         isExpanded: true,
         underline: Container(),
         dropdownColor: clMenu,
         icon: Icon(Icons.arrow_drop_down, color: clText),
         style: TextStyle(color: clText),
-        onChanged: (String? newValue) async {
-          if (newValue != null && newValue != _currentLanguage) {
-            // Непосредственно применяем изменение языка
-            await _applyLanguageChange(newValue);
+        onChanged: (String? newValue) {
+          if (newValue != null && newValue != _newLanguage) {
+            // Только обновляем временное значение без сохранения
+            setState(() {
+              _newLanguage = newValue;
+            });
+            _checkForChanges();
           }
         },
         items: langNames.entries.map<DropdownMenuItem<String>>((entry) {
@@ -233,16 +257,19 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       ),
       padding: EdgeInsets.symmetric(horizontal: 8),
       child: DropdownButton<String>(
-        value: _currentTheme,
+        value: _newTheme,
         isExpanded: true,
         underline: Container(),
         dropdownColor: clMenu,
         icon: Icon(Icons.arrow_drop_down, color: clText),
         style: TextStyle(color: clText),
-        onChanged: (String? newValue) async {
-          if (newValue != null && newValue != _currentTheme) {
-            // Непосредственно применяем изменение темы
-            await _applyThemeChange(newValue);
+        onChanged: (String? newValue) {
+          if (newValue != null && newValue != _newTheme) {
+            // Только обновляем временное значение без сохранения
+            setState(() {
+              _newTheme = newValue;
+            });
+            _checkForChanges();
           }
         },
         items: appTHEMES.map<DropdownMenuItem<String>>((String value) {
@@ -260,13 +287,16 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     return Container(
       alignment: Alignment.centerLeft,
       child: Checkbox(
-        value: _newestFirst,
+        value: _newNewestFirst,
         activeColor: clUpBar,
         checkColor: clText,
-        onChanged: (bool? value) async {
-          if (value != null && value != _newestFirst) {
-            // Непосредственно применяем изменение порядка сортировки
-            await _applySortOrderChange(value);
+        onChanged: (bool? value) {
+          if (value != null && value != _newNewestFirst) {
+            // Только обновляем временное значение без сохранения
+            setState(() {
+              _newNewestFirst = value;
+            });
+            _checkForChanges();
           }
         },
       ),

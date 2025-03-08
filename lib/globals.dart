@@ -6,7 +6,10 @@ import 'dart:convert'; // Для работы с JSON (json.decode)
 import 'package:flutter/services.dart'; // Для доступа к rootBundle
 import 'package:path/path.dart';
 
+// Глобальные ключи для доступа к основным компонентам Flutter
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 const String progVersion = '0.0.250306';
 const String progAuthor = 'Eugen';
@@ -346,27 +349,10 @@ Future<void> vacuumDatabases() async {
   }
 }
 
-// Function to show a blue SnackBar
-void okInfoBarBlue(String message) {
-  scaffoldMessengerKey.currentState?.showSnackBar(
-    SnackBar(
-      content: Text(
-        message,
-        style: TextStyle(
-          fontSize: fsSmall,
-          color: Colors.white,
-        ),
-      ),
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: Colors.blue,
-      duration: Duration(seconds: 5),
-    ),
-  );
-}
-
 // Function to show a red SnackBar
-// EXAMPLE: okInfoBarRed("This is a message", duration: Duration(seconds: 3));
 void okInfoBarRed(String message, {Duration? duration}) {
+  myPrint("Showing red SnackBar: $message");
+  scaffoldMessengerKey.currentState?.clearSnackBars();
   scaffoldMessengerKey.currentState?.showSnackBar(
     SnackBar(
       content: Text(
@@ -384,20 +370,71 @@ void okInfoBarRed(String message, {Duration? duration}) {
   );
 }
 
-// // Function to show a green SnackBar
+// Function to show a green SnackBar
 void okInfoBarGreen(String message, {Duration? duration}) {
+  myPrint("Showing green SnackBar: $message");
+  scaffoldMessengerKey.currentState?.clearSnackBars();
   scaffoldMessengerKey.currentState?.showSnackBar(
     SnackBar(
       content: Text(
         message,
         style: TextStyle(
           fontSize: fsSmall,
-          color: clText,
+          color: Colors.white,
         ),
       ),
+      backgroundColor: Colors.green,
       duration: duration ?? Duration(seconds: 3),
       behavior: SnackBarBehavior.floating,
-      backgroundColor: Colors.green,
+      dismissDirection: DismissDirection.none,
     ),
   );
+}
+
+// Function to show a blue SnackBar
+void okInfoBarBlue(String message, {Duration? duration}) {
+  myPrint("Showing blue SnackBar: $message");
+  scaffoldMessengerKey.currentState?.clearSnackBars();
+  scaffoldMessengerKey.currentState?.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: TextStyle(
+          fontSize: fsSmall,
+          color: Colors.white,
+        ),
+      ),
+      backgroundColor: Colors.blue,
+      duration: duration ?? Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      dismissDirection: DismissDirection.none,
+    ),
+  );
+}
+
+void okInfoBarOrange(String message, {Duration? duration}) {
+  myPrint("Showing green SnackBar: $message");
+  scaffoldMessengerKey.currentState?.clearSnackBars();
+  scaffoldMessengerKey.currentState?.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: TextStyle(
+          fontSize: fsSmall,
+          color: Colors.black,
+        ),
+      ),
+      backgroundColor: Colors.orange,
+      duration: duration ?? Duration(seconds: 4),
+      behavior: SnackBarBehavior.floating,
+      dismissDirection: DismissDirection.none,
+    ),
+  );
+}
+
+// Отладочная функция для проверки состояния ключа
+bool isScaffoldMessengerKeyInitialized() {
+  bool isInitialized = scaffoldMessengerKey.currentState != null;
+  myPrint("ScaffoldMessengerKey initialized: $isInitialized");
+  return isInitialized;
 }
