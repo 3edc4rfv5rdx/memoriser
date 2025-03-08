@@ -111,12 +111,19 @@ void main() async {
   runApp(memorizerApp());
 }
 
-// Main app widget as a function
 Widget memorizerApp() => MaterialApp(
   title: lw('Memorizer'),
   theme: getAppTheme(),
   home: HomePage(),
   debugShowCheckedModeBanner: false,
+  scaffoldMessengerKey: scaffoldMessengerKey,
+  navigatorKey: navigatorKey,
+  navigatorObservers: [routeObserver],
+  onGenerateRoute: (settings) {
+    // Обеспечиваем доступность ключей для всех маршрутов
+    myPrint("Generating route: ${settings.name}");
+    return null;
+  },
 );
 
 // StatefulWidget implementation for HomePage
@@ -256,19 +263,25 @@ class _HomePageState extends State<HomePage> {
               offset: Offset(0, 30),  // Offset to position menu below the AppBar
               onSelected: (String result) {
                 if (result == 'settings') {
-                  Navigator.push(
+                  // Показываем экран настроек и ждем результат
+                  final needsRefresh =  Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => buildSettingsScreen(
-                            rebuildApp: () {
-                              // Function to rebuild the app
-                              Navigator.of(context).pushReplacement(
-                                MaterialPageRoute(builder: (context) => memorizerApp()),
-                              );
-                            },
-                          )
+                          builder: (context) => buildSettingsScreen()
                       )
-                  ).then((_) => _refreshItems());
+                  );
+
+                  // Обновляем текущий экран
+                  _refreshItems();
+
+                  // Если нужна полная перезагрузка приложения,
+                  // например для применения темы или языка
+                  if (needsRefresh == true) {
+                    // При необходимости можно перезагрузить приложение
+                    // Navigator.of(context).pushReplacement(
+                    //   MaterialPageRoute(builder: (context) => memorizerApp()),
+                    // );
+                  }
                 } else if (result == 'about') {
                   _showAbout();
                 }
