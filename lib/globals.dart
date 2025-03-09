@@ -4,7 +4,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:convert'; // Для работы с JSON (json.decode)
 import 'package:flutter/services.dart'; // Для доступа к rootBundle
-import 'package:path/path.dart';
 
 // Глобальные ключи для доступа к основным компонентам Flutter
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -188,46 +187,6 @@ ThemeData getAppTheme() {
   );
 }
 
-// Initialize databases
-Future<void> initDatabases() async {
-  final databasesPath = await getDatabasesPath();
-
-  // Initialize main database
-  mainDb = await openDatabase(
-    join(databasesPath, mainDbFile),
-    version: 2, // Increment version number from 1 to 2
-    onCreate: (mainDb, version) {
-      return mainDb.execute(
-        'CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, title TEXT, content TEXT, tags TEXT, priority INTEGER, reminder INTEGER, event_date INTEGER, created INTEGER)',
-      );
-    },
-    onUpgrade: (db, oldVersion, newVersion) async {
-      if (oldVersion < 2) {
-        // Add the event_date column if upgrading from version 1
-        await db.execute('ALTER TABLE items ADD COLUMN event_date INTEGER');
-      }
-    },
-  );
-
-  // Initialize settings database
-  settDb = await openDatabase(
-    join(databasesPath, settDbFile),
-    version: 1,
-    onCreate: (mainDb, version) {
-      return mainDb.execute(
-        'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)',
-      );
-    },
-  );
-
-  // Initialize default settings
-  await initDefaultSettings();
-
-  // Initialize theme colors
-  final themeName = await getSetting("Color theme") ?? defSettings["Color theme"];
-  setThemeColors(themeName);
-}
-
 // Initialize default settings if not already set
 Future<void> initDefaultSettings() async {
   for (var entry in defSettings.entries) {
@@ -287,7 +246,6 @@ AppBar buildAppBar(String title, {List<Widget>? actions}) {
   );
 }
 
-// Universal AlertDialog function with customizable options
 // Universal AlertDialog function with customizable options
 Future<dynamic> showCustomDialog({
   required String title,
