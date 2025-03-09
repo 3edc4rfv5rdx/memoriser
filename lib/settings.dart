@@ -83,7 +83,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
     // Сохраняем новые настройки языка, если изменились
     if (_newLanguage != _currentLanguage && _newLanguage != null) {
-      await saveSetting("Language", _newLanguage!.toUpperCase());
+      await saveSetting("Language", _newLanguage!);
       savedSettings.add('language');
       languageOrThemeChanged = true;
     }

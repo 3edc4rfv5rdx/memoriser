@@ -35,9 +35,9 @@ Future<void> initDatabases() async {
   // Initialize settings database
   settDb = await openDatabase(
     join(databasesPath, settDbFile),
-    version: 1,
-    onCreate: (mainDb, version) {
-      return mainDb.execute(
+    version: 2,
+    onCreate: (settDb, version) {
+      return settDb.execute(
         'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)',
       );
     },
