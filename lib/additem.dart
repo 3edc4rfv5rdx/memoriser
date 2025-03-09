@@ -139,6 +139,7 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   // Method to show date picker
+// Method to show date picker
   Future<void> _selectDate(BuildContext context) async {
     final DateTime initialDate = _date ?? DateTime.now();
 
@@ -155,7 +156,10 @@ class _EditItemPageState extends State<EditItemPage> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            dialogBackgroundColor: clFill,
+            // Replace deprecated dialogBackgroundColor with DialogTheme
+            dialogTheme: DialogTheme(
+              backgroundColor: clFill,
+            ),
           ),
           child: child!,
         );
