@@ -191,16 +191,24 @@ ThemeData getAppTheme() {
 // Initialize databases
 Future<void> initDatabases() async {
   final databasesPath = await getDatabasesPath();
+
   // Initialize main database
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 1,
+    version: 2, // Increment version number from 1 to 2
     onCreate: (mainDb, version) {
       return mainDb.execute(
-        'CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, title TEXT, content TEXT, tags TEXT, priority INTEGER, reminder INTEGER, created INTEGER)',
+        'CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, title TEXT, content TEXT, tags TEXT, priority INTEGER, reminder INTEGER, event_date INTEGER, created INTEGER)',
       );
     },
+    onUpgrade: (db, oldVersion, newVersion) async {
+      if (oldVersion < 2) {
+        // Add the event_date column if upgrading from version 1
+        await db.execute('ALTER TABLE items ADD COLUMN event_date INTEGER');
+      }
+    },
   );
+
   // Initialize settings database
   settDb = await openDatabase(
     join(databasesPath, settDbFile),
@@ -211,8 +219,10 @@ Future<void> initDatabases() async {
       );
     },
   );
+
   // Initialize default settings
   await initDefaultSettings();
+
   // Initialize theme colors
   final themeName = await getSetting("Color theme") ?? defSettings["Color theme"];
   setThemeColors(themeName);
@@ -428,6 +438,31 @@ void okInfoBarOrange(String message, {Duration? duration}) {
       duration: duration ?? Duration(seconds: 4),
       behavior: SnackBarBehavior.floating,
       dismissDirection: DismissDirection.none,
+    ),
+  );
+}
+
+// Function to show a purple SnackBar
+void okInfoBarPurple(String message) {
+  scaffoldMessengerKey.currentState?.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: TextStyle(
+          fontSize: fsSmall,
+          color: clFill,
+        ),
+      ),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.purple,
+      duration: Duration(days: 3),
+      dismissDirection: DismissDirection.none,
+      action: SnackBarAction(
+        label: '[ OK ]',
+        onPressed: () {
+          scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+        },
+      ),
     ),
   );
 }

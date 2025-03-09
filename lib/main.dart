@@ -2,25 +2,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:path/path.dart';
+import 'package:intl/intl.dart';
 import 'globals.dart';
 import 'settings.dart';
 import 'additem.dart';
 
-// Item database functions
-Future<void> insertItem(String title, String content, {String tags = '', int priority = 0, int? reminder}) async {
-  await mainDb.insert(
-    'items',
-    {
-      'title': title,
-      'content': content,
-      'tags': tags,
-      'priority': priority,
-      'reminder': reminder,
-      'created': DateTime.now().millisecondsSinceEpoch,
+// Initialize databases
+Future<void> initDatabases() async {
+  final databasesPath = await getDatabasesPath();
+
+  // Initialize main database with all columns in the create statement
+  mainDb = await openDatabase(
+    join(databasesPath, mainDbFile),
+    version: 2, // Using version 2 for the updated schema
+    onCreate: (mainDb, version) {
+      return mainDb.execute('''
+        CREATE TABLE IF NOT EXISTS items(
+          id INTEGER PRIMARY KEY, 
+          title TEXT, 
+          content TEXT, 
+          tags TEXT, 
+          priority INTEGER, 
+          date INTEGER, 
+          remind INTEGER, 
+          created INTEGER
+        )
+      ''');
     },
-    conflictAlgorithm: ConflictAlgorithm.replace,
   );
-  myPrint("Item inserted: $title");
+
+  // Initialize settings database
+  settDb = await openDatabase(
+    join(databasesPath, settDbFile),
+    version: 1,
+    onCreate: (mainDb, version) {
+      return mainDb.execute(
+        'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)',
+      );
+    },
+  );
+
+  // Initialize default settings
+  await initDefaultSettings();
+
+  // Initialize theme colors
+  final themeName = await getSetting("Color theme") ?? defSettings["Color theme"];
+  setThemeColors(themeName);
 }
 
 Future<List<Map<String, dynamic>>> getItems({String? tagFilter}) async {
@@ -63,38 +91,10 @@ Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
   final now = DateTime.now().millisecondsSinceEpoch;
   return await mainDb.query(
       'items',
-      where: 'reminder IS NOT NULL AND reminder > ?',
+      where: 'remind = 1 AND date > ?',
       whereArgs: [now],
-      orderBy: 'reminder ASC'
+      orderBy: 'date ASC'
   );
-}
-
-Future<void> updateItem(int id, String title, String content, {String? tags, int? priority, int? reminder}) async {
-  final Map<String, dynamic> updates = {
-    'title': title,
-    'content': content,
-  };
-
-  if (tags != null) updates['tags'] = tags;
-  if (priority != null) updates['priority'] = priority;
-  if (reminder != null) updates['reminder'] = reminder;
-
-  await mainDb.update(
-    'items',
-    updates,
-    where: 'id = ?',
-    whereArgs: [id],
-  );
-  myPrint("Item updated: $id - $title");
-}
-
-Future<void> deleteItem(int id) async {
-  await mainDb.delete(
-    'items',
-    where: 'id = ?',
-    whereArgs: [id],
-  );
-  myPrint("Item deleted: $id");
 }
 
 void main() async {
@@ -176,23 +176,18 @@ class _HomePageState extends State<HomePage> {
             onTap: () {
               Navigator.pop(context); // Close the menu
               // Navigate to edit page
-              Navigator.push(
+              Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                       builder: (context) => EditItemPage(
                         item: item,
-                        onSave: (id, title, content, tags) async {
-                          await updateItem(
-                            id,
-                            title,
-                            content,
-                            tags: tags,
-                          );
-                          _refreshItems();
-                        },
                       )
                   )
-              );
+              ).then((updated) {
+                if (updated == true) {
+                  _refreshItems();
+                }
+              });
             },
           ),
         ),
@@ -218,7 +213,11 @@ class _HomePageState extends State<HomePage> {
                     'value': true,
                     'isDestructive': true,
                     'onPressed': () async {
-                      await deleteItem(item['id']);
+                      await mainDb.delete(
+                        'items',
+                        where: 'id = ?',
+                        whereArgs: [item['id']],
+                      );
                       _refreshItems();
                     },
                   },
@@ -318,16 +317,39 @@ class _HomePageState extends State<HomePage> {
         itemCount: _items.length,
         itemBuilder: (context, index) {
           final item = _items[index];
-          final hasPriority = item['priority'] > 0;
-          final hasReminder = item['reminder'] != null;
+          final priorityValue = item['priority'] ?? 0;
+          final hasDate = item['date'] != null;
+          final isReminder = item['remind'] == 1;
+
+          // Format date for display if it exists
+          String? formattedDate;
+          if (hasDate) {
+            final eventDate = DateTime.fromMillisecondsSinceEpoch(item['date']);
+            formattedDate = DateFormat('yyyy-MM-dd').format(eventDate);
+          }
 
           return ListTile(
-            title: Text(
-              item['title'],
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: clText,
-              ),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item['title'],
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: clText,
+                    ),
+                  ),
+                ),
+                // Display priority as stars
+                if (priorityValue > 0)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(
+                        priorityValue > 5 ? 5 : priorityValue,
+                            (i) => Icon(Icons.star, color: clUpBar, size: 16)
+                    ),
+                  ),
+              ],
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,18 +363,54 @@ class _HomePageState extends State<HomePage> {
                     'Tags: ${item['tags']}',
                     style: TextStyle(
                       fontSize: fsNormal,
-                      color: clText,  // Changed from clUpBar to clText
+                      color: clText,
                       fontStyle: FontStyle.italic,
                     ),
+                  ),
+                // Add date information if available
+                if (hasDate)
+                  Row(
+                    children: [
+                      Icon(
+                          isReminder ? Icons.alarm : Icons.event,
+                          color: isReminder ? Colors.red : clText,
+                          size: 14
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        formattedDate!,
+                        style: TextStyle(
+                          fontSize: fsNormal,
+                          color: isReminder ? Colors.red : clText,
+                          fontWeight: isReminder ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
             tileColor: _selectedItemId == item['id'] ? clSel : clFill,
-            leading: hasPriority
-                ? Icon(Icons.star, color: Colors.amber)
+            leading: priorityValue > 0
+                ? Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: clUpBar,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                priorityValue.toString(),
+                style: TextStyle(
+                  color: clText,
+                  fontWeight: FontWeight.bold,
+                  fontSize: fsSmall,
+                ),
+              ),
+            )
                 : null,
-            trailing: hasReminder
-                ? Icon(Icons.alarm, color: clText)
+            trailing: isReminder
+                ? Icon(Icons.notifications_active, color: Colors.red)
                 : null,
             onTap: () {
               // Just select the item and highlight it
@@ -371,22 +429,16 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: clUpBar,
         foregroundColor: clText,
         onPressed: () async {
-          await Navigator.push(
+          final result = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
-                builder: (context) => EditItemPage(
-                  onSave: (id, title, content, tags) async {
-                    await insertItem(
-                      title,
-                      content,
-                      tags: tags,
-                    );
-                  },
-                )
+                builder: (context) => EditItemPage()
             ),
           );
-          // Always refresh after returning
-          _refreshItems();
+
+          if (result == true) {
+            _refreshItems();
+          }
         },
         child: const Icon(Icons.add),
       ),
