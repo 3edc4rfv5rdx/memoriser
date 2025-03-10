@@ -24,14 +24,16 @@ late Database settDb;
 late BuildContext globalContext;
 
 bool xvDebug = true;
+String xvTagFilter = '';
 
 // Font sizes
-const double fsSmall = 10;
+const double fsSmall = 11;
 const double fsNormal = 12;
 const double fsMedium = 14;
 const double fsLarge = 16;
 const double fsXLarge = 18;
 const double fsHeader = 22;
+const double fsSHeader = 24;
 
 // Theme names
 const List<String> appTHEMES = ['Light', 'Dark', 'Blue'];
@@ -77,7 +79,7 @@ List<List<Color>> colorThemes = [
 
 // Default settings
 Map<String, dynamic> defSettings = {
-  "Language": "EN",
+  "Language": "en",
   "Color theme": "Light",
   "Newest first": "true",
   "Notification time": "10:00",
