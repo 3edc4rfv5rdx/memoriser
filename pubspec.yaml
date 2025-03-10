@@ -64,6 +64,7 @@ dev_dependencies:
 flutter:
     assets:
     - assets/locales.json
+    - assets/help.json
 #  assets:
 #    - assets/sql/bikelog_main.sql
 #    - assets/sql/bikelog_lang.sql
