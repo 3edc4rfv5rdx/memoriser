@@ -345,8 +345,8 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: List.generate(
-                        priorityValue > 5 ? 5 : priorityValue,
-                            (i) => Icon(Icons.star, color: clUpBar, size: 16)
+                        priorityValue > 3 ? 3 : priorityValue,
+                            (i) => Icon(Icons.star, color: clUpBar, size: 34)
                     ),
                   ),
               ],

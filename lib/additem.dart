@@ -52,15 +52,15 @@ class _EditItemPageState extends State<EditItemPage> {
           : '',
     );
 
-    // Initialize priority (1-5 range)
+    // Initialize priority (0-3 range)
     if (isEditing && widget.item!['priority'] != null) {
       _priority = widget.item!['priority'];
-      // Ensure priority is within 1-5 range
-      if (_priority < 1 || _priority > 5) {
-        _priority = _priority > 0 ? 5 : 1; // Convert old values to new range
+      // Ensure priority is within 0-3 range
+      if (_priority < 0 || _priority > 3) {
+        _priority = _priority > 3 ? 3 : 0; // Convert old values to new range
       }
     } else {
-      _priority = 1; // Default priority
+      _priority = 0; // Default priority
     }
 
     // Initialize remind checkbox
@@ -181,7 +181,7 @@ class _EditItemPageState extends State<EditItemPage> {
       children: [
         // Label for priority
         Text(
-          lw('Priority (1-5)'),
+          lw('Priority (0-3)'),
           style: TextStyle(
             color: clText,
             fontSize: fsMedium,
@@ -193,7 +193,7 @@ class _EditItemPageState extends State<EditItemPage> {
           children: [
             // LEFT SIDE: Minus button with upbar color
             ElevatedButton(
-              onPressed: _priority > 1
+              onPressed: _priority > 0
                   ? () => setState(() => _priority--)
                   : null,
               style: ElevatedButton.styleFrom(
@@ -226,7 +226,7 @@ class _EditItemPageState extends State<EditItemPage> {
             ),
             // Plus button with upbar color
             ElevatedButton(
-              onPressed: _priority < 5
+              onPressed: _priority < 3
                   ? () => setState(() => _priority++)
                   : null,
               style: ElevatedButton.styleFrom(
@@ -243,11 +243,11 @@ class _EditItemPageState extends State<EditItemPage> {
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
+                children: List.generate(3, (index) {
                   return Icon(
                     Icons.star,
                     color: index < _priority ? clUpBar : clFill,
-                    size: 28, // Larger stars
+                    size: 34, // Larger stars
                   );
                 }),
               ),
@@ -276,6 +276,7 @@ class _EditItemPageState extends State<EditItemPage> {
       ],
     );
   }
+
 
   // Build date field with date picker button
   Widget _buildDateField() {
