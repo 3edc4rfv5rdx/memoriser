@@ -25,6 +25,7 @@ late BuildContext globalContext;
 
 bool xvDebug = true;
 String xvTagFilter = '';
+String xvFilter = '';
 
 // Font sizes
 const double fsSmall = 11;
@@ -82,8 +83,9 @@ Map<String, dynamic> defSettings = {
   "Language": "en",
   "Color theme": "Light",
   "Newest first": "true",
+  "Last items": "0",
   "Notification time": "10:00",
-  "Auto-backup": "false"
+  "Auto-backup": "false",
 };
 
 // Карта поддерживаемых языков с их названиями

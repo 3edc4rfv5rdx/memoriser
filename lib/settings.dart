@@ -20,18 +20,29 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentTheme;
   String? _currentLanguage;
   bool _newestFirst = true;
+  int _lastItems = 0; // Добавлена настройка Last items
   bool _isLoading = true;
 
   // Временные значения для отслеживания изменений
   String? _newTheme;
   String? _newLanguage;
   bool? _newNewestFirst;
+  int? _newLastItems; // Временное значение для Last items
   bool _hasChanges = false;
+
+  // Контроллер для поля ввода Last items
+  late TextEditingController _lastItemsController;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _lastItemsController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -45,16 +56,24 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     final newestFirstValue = await getSetting("Newest first") ?? defSettings["Newest first"];
     final isNewestFirst = newestFirstValue == "true";
 
+    // Загрузка настройки Last items
+    final lastItemsValue = await getSetting("Last items") ?? defSettings["Last items"];
+    final lastItems = int.tryParse(lastItemsValue) ?? 0;
+
+    _lastItemsController = TextEditingController(text: lastItems.toString());
+
     if (mounted) {
       setState(() {
         _currentTheme = themeValue;
         _currentLanguage = languageValue.toLowerCase();
         _newestFirst = isNewestFirst;
+        _lastItems = lastItems; // Инициализация текущего значения
 
         // Инициализация временных значений
         _newTheme = themeValue;
         _newLanguage = languageValue.toLowerCase();
         _newNewestFirst = isNewestFirst;
+        _newLastItems = lastItems; // Инициализация временного значения
 
         _isLoading = false;
         _hasChanges = false;
@@ -67,7 +86,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     setState(() {
       _hasChanges = _newTheme != _currentTheme ||
           _newLanguage != _currentLanguage ||
-          _newNewestFirst != _newestFirst;
+          _newNewestFirst != _newestFirst ||
+          _newLastItems != _lastItems;
     });
   }
 
@@ -101,11 +121,18 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       savedSettings.add('sort order');
     }
 
+    // Сохраняем настройку Last items, если изменилась
+    if (_newLastItems != _lastItems && _newLastItems != null) {
+      await saveSetting("Last items", _newLastItems.toString());
+      savedSettings.add('last items');
+    }
+
     // Обновляем текущие значения
     setState(() {
       _currentTheme = _newTheme;
       _currentLanguage = _newLanguage;
       _newestFirst = _newNewestFirst ?? _newestFirst;
+      _lastItems = _newLastItems ?? _lastItems;
       _hasChanges = false;
     });
 
@@ -235,16 +262,16 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                 helpId: 102,
               ),
 
+              SizedBox(height: 10),
+
+              // Last items row - новая строка настроек
+              _buildSettingsRow(
+                label: lw('Last items'),
+                child: _buildLastItemsField(),
+                helpId: 103,
+              ),
+
               // Добавляйте новые настройки сюда - теперь они будут прокручиваться
-              // Пример добавления новых настроек:
-              /*
-                    SizedBox(height: 10),
-                    _buildSettingsRow(
-                      label: lw('Notification'),
-                      child: _buildNotificationSwitch(),
-                      helpId: 1,
-                    ),
-                    */
             ],
           ),
         ),
@@ -360,6 +387,38 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             // Только обновляем временное значение без сохранения
             setState(() {
               _newNewestFirst = value;
+            });
+            _checkForChanges();
+          }
+        },
+      ),
+    );
+  }
+
+  // Новая функция для поля ввода Last items
+  Widget _buildLastItemsField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: clFill,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: clUpBar),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: TextField(
+        controller: _lastItemsController,
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.left,
+        style: TextStyle(color: clText),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: '0',
+          hintStyle: TextStyle(color: clText.withOpacity(0.5)),
+        ),
+        onChanged: (value) {
+          final parsedValue = int.tryParse(value) ?? 0;
+          if (parsedValue >= 0) { // Проверяем, что значение неотрицательное
+            setState(() {
+              _newLastItems = parsedValue;
             });
             _checkForChanges();
           }
