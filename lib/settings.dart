@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'globals.dart';
 
+
 // Функция для создания экрана настроек
 Widget buildSettingsScreen() {
   return _SettingsScreenImpl();
@@ -70,8 +71,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     });
   }
 
-  // Функция сохранения и возврата
-// Функция сохранения с улучшенным показом уведомлений
+  // Функция сохранения с улучшенным показом уведомлений
   Future<void> _saveChanges() async {
     if (!_hasChanges) {
       okInfoBarBlue(lw('No changes to save'));
@@ -128,7 +128,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     });
   }
 
-// Исправленная версия с учетом типов
+  // Исправленная версия с учетом типов
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -171,13 +171,36 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         appBar: AppBar(
           backgroundColor: clUpBar,
           foregroundColor: clText,
-          title: Text(lw('Settings')),
+          // Кастомизация кнопки "назад" с обработкой долгого нажатия
+          leading: GestureDetector(
+            onLongPress: () => showHelp(10),
+            child: IconButton(
+              icon: Icon(Icons.arrow_back),
+              onPressed: () {
+                // Проверяем наличие изменений перед выходом
+                if (_hasChanges) {
+                  // Вызываем логику проверки изменений через PopScope
+                  Navigator.maybePop(context);
+                } else {
+                  // Если изменений нет, просто выходим
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ),
+          title: GestureDetector(
+            onLongPress: () => showHelp(11),
+            child: Text(lw('Settings')),
+          ),
           actions: [
-            // Кнопка Save в AppBar (дискета)
-            IconButton(
-              icon: Icon(Icons.save),
-              tooltip: lw('Save'),
-              onPressed: _saveChanges,
+            // Кнопка Save в AppBar (дискета) с обработкой долгого нажатия
+            GestureDetector(
+              onLongPress: () => showHelp(12),
+              child: IconButton(
+                icon: Icon(Icons.save),
+                tooltip: lw('Save'),
+                onPressed: _saveChanges,
+              ),
             ),
           ],
         ),
@@ -185,12 +208,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             ? Center(child: CircularProgressIndicator())
             : Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
+          child: ListView(
             children: [
               // Language selector row
               _buildSettingsRow(
                 label: lw('App language'),
                 child: _buildLanguageDropdown(),
+                helpId: 100,
               ),
 
               SizedBox(height: 10),
@@ -199,6 +223,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('Color theme'),
                 child: _buildThemeDropdown(),
+                helpId: 101,
               ),
 
               SizedBox(height: 10),
@@ -207,7 +232,19 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('Newest first'),
                 child: _buildSortOrderCheckbox(),
+                helpId: 102,
               ),
+
+              // Добавляйте новые настройки сюда - теперь они будут прокручиваться
+              // Пример добавления новых настроек:
+              /*
+                    SizedBox(height: 10),
+                    _buildSettingsRow(
+                      label: lw('Notification'),
+                      child: _buildNotificationSwitch(),
+                      helpId: 1,
+                    ),
+                    */
             ],
           ),
         ),
@@ -216,17 +253,20 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   }
 
   // Function to build a settings row with label and control
-  Widget _buildSettingsRow({required String label, required Widget child}) {
+  Widget _buildSettingsRow({required String label, required Widget child, int helpId = 11}) {
     return Row(
       children: [
-        // Left side - Label (60%)
+        // Left side - Label (60%) with longPress handler
         Expanded(
           flex: 60,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: clText,
-              fontSize: fsMedium,
+          child: GestureDetector(
+            onLongPress: () => showHelp(helpId),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: clText,
+                fontSize: fsMedium,
+              ),
             ),
           ),
         ),
