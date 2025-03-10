@@ -14,6 +14,7 @@ const String progVersion = '0.0.250306';
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
+const String helpFile = 'assets/help.json';
 const String mainDbFile = 'memorizer.db';  // Changed from mainDbFile
 const String settDbFile = 'settings.db';
 
@@ -430,4 +431,45 @@ bool isScaffoldMessengerKeyInitialized() {
   bool isInitialized = scaffoldMessengerKey.currentState != null;
   myPrint("ScaffoldMessengerKey initialized: $isInitialized");
   return isInitialized;
+}
+
+// Функция для отображения справки по ID
+void showHelp(int id) async {
+  try {
+    // Загружаем JSON файл с текстами справки
+    final jsonString = await rootBundle.loadString(helpFile);
+    final Map<String, dynamic> helpTexts = json.decode(jsonString);
+    final String helpId = id.toString();
+    String helpText = '';
+    // Получаем текст справки для текущего языка
+    if (helpTexts.containsKey(helpId)) {
+      final Map<String, dynamic> helpEntry = helpTexts[helpId];
+      if (helpEntry.containsKey(currentLocale)) {
+        helpText = helpEntry[currentLocale];
+      } else if (helpEntry.containsKey('en')) {
+        // Если нет перевода для текущего языка, используем английский
+        helpText = helpEntry['en'];
+      } else {
+        helpText = 'Help text not available';
+      }
+    } else {
+      helpText = 'Help ID:$helpId not found';
+    }
+    // Отображаем диалог с текстом справки
+    showCustomDialog(
+      title: lw('Help'),
+      content: helpText,
+      actions: [
+        {
+          'label': lw('Ok'),
+          'value': null,
+          'isDestructive': false,
+        },
+      ],
+    );
+    myPrint('Showing help for ID: $helpId');
+  } catch (e) {
+    myPrint('Error showing help: $e');
+    okInfo(lw('Error loading help') + ': $e');
+  }
 }
