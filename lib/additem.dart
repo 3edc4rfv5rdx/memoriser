@@ -139,7 +139,6 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   // Method to show date picker
-// Method to show date picker
   Future<void> _selectDate(BuildContext context) async {
     final DateTime initialDate = _date ?? DateTime.now();
 
@@ -148,6 +147,7 @@ class _EditItemPageState extends State<EditItemPage> {
       initialDate: initialDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
+      locale: Locale(getLocaleCode(currentLocale)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -156,9 +156,19 @@ class _EditItemPageState extends State<EditItemPage> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            // Replace deprecated dialogBackgroundColor with DialogTheme
             dialogTheme: DialogTheme(
               backgroundColor: clFill,
+            ),
+            // Add custom button styling
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
             ),
           ),
           child: child!,
