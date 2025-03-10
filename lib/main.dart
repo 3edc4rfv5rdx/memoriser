@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'globals.dart';
 import 'settings.dart';
 import 'additem.dart';
+import 'tagscloud.dart';
 
 // Initialize databases
 Future<void> initDatabases() async {
@@ -52,7 +53,7 @@ Future<void> initDatabases() async {
   setThemeColors(themeName);
 }
 
-Future<List<Map<String, dynamic>>> getItems({String? tagFilter}) async {
+Future<List<Map<String, dynamic>>> getItems() async {
   try {
     // Get sort order from settings
     final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
@@ -64,12 +65,25 @@ Future<List<Map<String, dynamic>>> getItems({String? tagFilter}) async {
     myPrint('Order by clause: $orderByClause');
 
     List<Map<String, dynamic>> result;
-    if (tagFilter != null && tagFilter.isNotEmpty) {
-      myPrint('Filtering by tag: $tagFilter');
+
+    // Check if we have a tag filter
+    if (xvTagFilter.isNotEmpty) {
+      myPrint('Filtering by tags: $xvTagFilter');
+
+      // Split the tags by comma
+      List<String> filterTags = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
+
+      // Build WHERE clause for AND logic - all specified tags must be present
+      List<String> conditions = filterTags.map((_) => 'tags LIKE ?').toList();
+      String whereClause = conditions.join(' AND ');
+
+      // Build whereArgs with each tag surrounded by % for partial matching
+      List<String> whereArgs = filterTags.map((tag) => '%$tag%').toList();
+
       result = await mainDb.query(
           'items',
-          where: 'tags LIKE ?',
-          whereArgs: ['%$tagFilter%'],
+          where: whereClause,
+          whereArgs: whereArgs,
           orderBy: orderByClause
       );
     } else {
@@ -247,46 +261,55 @@ class _HomePageState extends State<HomePage> {
     globalContext = context;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: clUpBar,
-        foregroundColor: clText,
-        title: Text(lw('Memorizer')),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () async {
-            // Vacuum the databases before closing
-            await vacuumDatabases();
-            // Close the app when X button is pressed from main screen
-            Navigator.of(context).canPop()
-                ? Navigator.of(context).pop()
-                : SystemNavigator.pop();
-          },
-        ),
-        actions: [
-          // Using a Container with alignment to position the menu button at the bottom
-          Container(
-            alignment: Alignment.bottomRight,
-            margin: EdgeInsets.only(bottom: 4),  // Small margin to avoid being too close to the edge
-            child: PopupMenuButton<String>(
+        appBar: AppBar(
+          backgroundColor: clUpBar,
+          foregroundColor: clText,
+          title: Text(lw('Memorizer')),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () async {
+              // Vacuum the databases before closing
+              await vacuumDatabases();
+              // Close the app when X button is pressed from main screen
+              Navigator.of(context).canPop()
+                  ? Navigator.of(context).pop()
+                  : SystemNavigator.pop();
+            },
+          ),
+          actions: [
+            // Add tag filter button
+            IconButton(
+              icon: Icon(Icons.filter_list),
+              tooltip: lw('Tag filter'),
+              onPressed: () {
+                Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TagsCloudScreen(),
+                  ),
+                ).then((needsRefresh) {
+                  if (needsRefresh == true) {
+                    _refreshItems();
+                  }
+                });
+              },
+            ),
+            // Menu button without container
+            PopupMenuButton<String>(
               icon: Icon(Icons.menu),
               color: clMenu,
-              // This controls where the menu appears relative to the button
-              offset: Offset(0, 30),  // Offset to position menu below the AppBar
+              offset: Offset(0, 30),
               onSelected: (String result) {
                 if (result == 'settings') {
-                  // Показываем экран настроек и обрабатываем результат после возврата
                   Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
                           builder: (context) => buildSettingsScreen()
                       )
                   ).then((needsRefresh) {
-                    // Обновляем текущий экран в любом случае
                     _refreshItems();
-
-                    // Если вернулось true, можем выполнить дополнительные действия
                     if (needsRefresh == true) {
-                      // При необходимости можно добавить дополнительные действия
+                      // Additional actions if needed
                     }
                   });
                 } else if (result == 'about') {
@@ -310,9 +333,8 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : _items.isEmpty
