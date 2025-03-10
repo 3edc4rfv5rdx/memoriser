@@ -10,7 +10,7 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<Scaffol
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-const String progVersion = '0.0.250306';
+const String progVersion = '0.0.250310';
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -472,4 +472,22 @@ void showHelp(int id) async {
     myPrint('Error showing help: $e');
     okInfo(lw('Error loading help') + ': $e');
   }
+}
+
+// Convert language codes used in the app to proper locale codes
+String getLocaleCode(String language) {
+  // Dictionary for exceptions where country code differs from language code
+  final Map<String, String> exceptions = {
+    'ua': 'uk',  // Ukrainian
+    'gr': 'el',  // Greek
+    'cn': 'zh',  // Chinese
+    'jp': 'ja',  // Japanese
+    'se': 'sv',  // Swedish
+    'dk': 'da',  // Danish
+    'cz': 'cs',  // Czech
+  };
+
+  // Make sure input is lowercase to match our exception map keys
+  String langCode = language.toLowerCase();
+  return exceptions[langCode] ?? langCode;
 }

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'globals.dart';
 import 'settings.dart';
 import 'additem.dart';
@@ -119,8 +120,19 @@ Widget memorizerApp() => MaterialApp(
   scaffoldMessengerKey: scaffoldMessengerKey,
   navigatorKey: navigatorKey,
   navigatorObservers: [routeObserver],
+  // Add localization delegates
+  localizationsDelegates: [
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ],
+  // Add supported locales with proper locale codes
+  supportedLocales: langNames.keys.map((key) =>
+      Locale(getLocaleCode(key))
+  ).toList(),
+  // Set the app locale with proper locale code
+  locale: Locale(getLocaleCode(currentLocale)),
   onGenerateRoute: (settings) {
-    // Обеспечиваем доступность ключей для всех маршрутов
     myPrint("Generating route: ${settings.name}");
     return null;
   },
