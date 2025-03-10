@@ -116,38 +116,22 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
     });
   }
 
-  // Get font size based on tag count and position - with MUCH larger sizes
+  // Get font size based on tag count and position
   double _getTagFontSize(int count, int maxCount, int index, int totalTags) {
     // Calculate relative size (0.0 to 1.0) based on count
     double relativeSize = count / maxCount;
 
-    // Calculate position factor (0.0 to 1.0) - how far from center
-    // 0.0 means center, 1.0 means at the edge
-    double positionFactor;
-    if (totalTags <= 1) {
-      positionFactor = 0.0;
-    } else {
-      // Normalize index to be centered around the middle
-      int middleIndex = totalTags ~/ 2;
-      int distanceFromMiddle = (index - middleIndex).abs();
-      positionFactor = distanceFromMiddle / (totalTags / 2);
-    }
-
-    // Combine count and position factors
-    // Higher counts get bigger, further from center gets smaller
-    double combinedFactor = relativeSize * (1.0 - 0.5 * positionFactor);
-
-    // Use much more dramatic font size differences
-    if (combinedFactor < 0.3) {
+    // Use font size based primarily on frequency
+    if (relativeSize < 0.3) {
       return 14.0; // Smallest size
-    } else if (combinedFactor < 0.5) {
+    } else if (relativeSize < 0.5) {
       return 18.0; // Small-medium size
-    } else if (combinedFactor < 0.7) {
+    } else if (relativeSize < 0.7) {
       return 22.0; // Medium size
-    } else if (combinedFactor < 0.9) {
+    } else if (relativeSize < 0.9) {
       return 26.0; // Large size
     } else {
-      return 32.0; // Extra large size
+      return 30.0; // Extra large size
     }
   }
 
@@ -165,13 +149,12 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
     // Calculate the maximum count for font size scaling
     int maxCount = _tags.isNotEmpty ? _tags.first.count : 1;
 
-    // Create a centered cloud where most frequent tags are in the center
-    // and less frequent ones spread outwards
-    return Center(
+    // Top-aligned tag cloud with reduced vertical spacing
+    return SingleChildScrollView(
       child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 12.0, // Increased gap between tags horizontally
-        runSpacing: 16.0, // Increased gap between lines
+        alignment: WrapAlignment.start, // Start from the top-left
+        spacing: 12.0, // Gap between tags horizontally
+        runSpacing: 8.0, // Reduced gap between lines
         children: _tags.asMap().entries.map((entry) {
           final index = entry.key;
           final tag = entry.value;
@@ -190,7 +173,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Increased padding
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4), // Reduced vertical padding
             ),
           );
         }).toList(),
@@ -230,30 +213,35 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Selected tags information
-            if (_selectedTags.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: Text(
-                  lw('Selected tags') + ': ${_selectedTags.join(", ")}',
-                  style: TextStyle(
-                    color: clText,
-                    fontSize: fsMedium,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+          : Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Fixed height container for selected tags information (smaller height)
+          Container(
+            height: 24, // Reduced fixed height
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: _selectedTags.isEmpty
+                ? Container() // Empty container when no tags selected
+                : Text(
+              lw('Selected tags') + ': ${_selectedTags.join(", ")}',
+              style: TextStyle(
+                color: clText,
+                fontSize: fsMedium,
+                fontWeight: FontWeight.bold,
               ),
-            // Tags cloud
-            Expanded(
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // Tags cloud - using Expanded to take remaining space
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              alignment: Alignment.topLeft,
+              padding: EdgeInsets.all(16),
               child: _buildTagCloud(),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
