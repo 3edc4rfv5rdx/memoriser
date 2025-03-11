@@ -5,11 +5,11 @@ import 'package:intl/intl.dart'; // For date formatting
 import 'globals.dart';
 
 class EditItemPage extends StatefulWidget {
-  final Map<String, dynamic>? item;
+  final int? itemId; // Используем ID вместо целой записи
 
   const EditItemPage({
     Key? key,
-    this.item,
+    this.itemId,
   }) : super(key: key);
 
   @override
@@ -23,48 +23,79 @@ class _EditItemPageState extends State<EditItemPage> {
   late TextEditingController dateController;
 
   DateTime? _date;
-  int _priority = 1; // Default priority value
+  int _priority = 0; // Default priority value
   bool _remind = false; // Default remind value
+  bool _hidden = false; // Default hidden value for privacy feature
+  bool _isLoading = false; // Индикатор загрузки
 
   @override
   void initState() {
     super.initState();
-    final isEditing = widget.item != null;
+    titleController = TextEditingController();
+    contentController = TextEditingController();
+    tagsController = TextEditingController();
+    dateController = TextEditingController();
 
-    titleController = TextEditingController(
-      text: isEditing ? widget.item!['title'] : '',
-    );
-    contentController = TextEditingController(
-      text: isEditing ? widget.item!['content'] : '',
-    );
-    tagsController = TextEditingController(
-      text: isEditing ? widget.item!['tags'] : '',
-    );
-
-    // Initialize date
-    _date = isEditing && widget.item!['date'] != null
-        ? DateTime.fromMillisecondsSinceEpoch(widget.item!['date'])
-        : null;
-    dateController = TextEditingController(
-      text: _date != null
-          ? DateFormat(ymdDateFormat).format(_date!)
-          : '',
-    );
-
-    // Initialize priority (0-3 range)
-    if (isEditing && widget.item!['priority'] != null) {
-      _priority = widget.item!['priority'];
-      // Ensure priority is within 0-3 range
-      if (_priority < 0 || _priority > 3) {
-        _priority = _priority > 3 ? 3 : 0; // Convert old values to new range
-      }
+    // Если передан ID, значит это режим редактирования
+    if (widget.itemId != null) {
+      _loadItem(widget.itemId!);
     } else {
-      _priority = 0; // Default priority
+      // Если ID не передан, это новая запись
+      _hidden = xvHiddenMode; // По умолчанию скрываем в скрытом режиме
     }
+  }
 
-    // Initialize remind checkbox
-    if (isEditing && widget.item!['remind'] != null) {
-      _remind = widget.item!['remind'] == 1;
+  // Метод для загрузки записи по ID
+  Future<void> _loadItem(int itemId) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Получаем запись из базы данных
+      final List<Map<String, dynamic>> result = await mainDb.query(
+        'items',
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+
+      if (result.isNotEmpty) {
+        final item = result.first;
+
+        // Если запись скрытая и мы в режиме скрытых записей, декодируем данные
+        if (item['hidden'] == 1 && xvHiddenMode) {
+          final decodedTitle = deobfuscateText(item['title'] ?? '');
+          final decodedContent = deobfuscateText(item['content'] ?? '');
+          final decodedTags = deobfuscateText(item['tags'] ?? '');
+
+          titleController.text = decodedTitle;
+          contentController.text = decodedContent;
+          tagsController.text = decodedTags;
+        } else {
+          // Обычные записи используем как есть
+          titleController.text = item['title'] ?? '';
+          contentController.text = item['content'] ?? '';
+          tagsController.text = item['tags'] ?? '';
+        }
+
+        // Инициализируем остальные поля
+        _priority = item['priority'] ?? 0;
+        _remind = item['remind'] == 1;
+        _hidden = item['hidden'] == 1;
+
+        // Инициализируем дату, если она есть
+        if (item['date'] != null) {
+          _date = DateTime.fromMillisecondsSinceEpoch(item['date']);
+          dateController.text = DateFormat(ymdDateFormat).format(_date!);
+        }
+      }
+    } catch (e) {
+      myPrint('Error loading item: $e');
+      okInfoBarRed(lw('Error loading item'));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -92,40 +123,55 @@ class _EditItemPageState extends State<EditItemPage> {
     // Convert date to milliseconds for storage
     final dateMillis = _date?.millisecondsSinceEpoch;
     final remindValue = _remind ? 1 : 0;
+    final hiddenValue = _hidden ? 1 : 0;
+
+    // Подготавливаем данные для сохранения
+    String titleText = titleController.text.trim();
+    String contentText = contentController.text.trim();
+    String tagsText = tagsController.text.trim();
+
+    // Обфусцируем данные, если запись скрытая и мы в режиме скрытых записей
+    if (hiddenValue == 1 && xvHiddenMode) {
+      titleText = obfuscateText(titleText);
+      contentText = obfuscateText(contentText);
+      tagsText = obfuscateText(tagsText);
+    }
 
     try {
-      if (widget.item != null) {
+      if (widget.itemId != null) {
         // Update existing item
         await mainDb.update(
           'items',
           {
-            'title': titleController.text.trim(),
-            'content': contentController.text.trim(),
-            'tags': tagsController.text.trim(),
+            'title': titleText,
+            'content': contentText,
+            'tags': tagsText,
             'priority': _priority,
             'date': dateMillis,
             'remind': remindValue,
+            'hidden': hiddenValue,
           },
           where: 'id = ?',
-          whereArgs: [widget.item!['id']],
+          whereArgs: [widget.itemId],
         );
-        myPrint("Item updated: ${widget.item!['id']} - ${titleController.text}");
+        myPrint("Item updated: ${widget.itemId} - $titleText");
       } else {
         // Insert new item
         await mainDb.insert(
           'items',
           {
-            'title': titleController.text.trim(),
-            'content': contentController.text.trim(),
-            'tags': tagsController.text.trim(),
+            'title': titleText,
+            'content': contentText,
+            'tags': tagsText,
             'priority': _priority,
             'date': dateMillis,
             'remind': remindValue,
+            'hidden': hiddenValue,
             'created': DateTime.now().millisecondsSinceEpoch,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
-        myPrint("Item inserted: ${titleController.text}");
+        myPrint("Item inserted: $titleText");
       }
 
       // Return to previous screen
@@ -296,6 +342,38 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
+  // Build hidden checkbox (only shown in hidden mode)
+  Widget _buildHiddenSelector() {
+    // Показываем чекбокс только если мы в режиме скрытых записей
+    if (!xvHiddenMode) return SizedBox.shrink();
+
+    return GestureDetector(
+      onLongPress: () => showHelp(37), // ID 37 для чекбокса скрытых записей
+      child: Row(
+        children: [
+          Checkbox(
+            value: _hidden,
+            activeColor: Color(0xFFf29238),
+            checkColor: clText,
+            onChanged: (value) {
+              setState(() {
+                _hidden = value ?? false;
+              });
+            },
+          ),
+          Text(
+            lw('Private item'),
+            style: TextStyle(
+              color: clText,
+              fontSize: fsMedium,
+            ),
+          ),
+          SizedBox(width: 4),
+          Icon(Icons.lock, color: Color(0xFFf29238), size: 16),
+        ],
+      ),
+    );
+  }
 
   // Build date field with date picker button
   Widget _buildDateField() {
@@ -338,11 +416,11 @@ class _EditItemPageState extends State<EditItemPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.item != null;
+    final isEditing = widget.itemId != null; // Проверяем наличие ID
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: clUpBar,
+        backgroundColor: xvHiddenMode ? Color(0xFFf29238) : clUpBar,
         foregroundColor: clText,
         title: GestureDetector(
           onLongPress: () => showHelp(30), // ID 30 для заголовка
@@ -367,7 +445,9 @@ class _EditItemPageState extends State<EditItemPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,6 +507,10 @@ class _EditItemPageState extends State<EditItemPage> {
             // Priority section
             _buildPrioritySelector(),
             SizedBox(height: 16),
+
+            // Hidden checkbox (only in hidden mode)
+            _buildHiddenSelector(),
+            if (xvHiddenMode) SizedBox(height: 16),
 
             // Date field
             _buildDateField(),

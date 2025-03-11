@@ -497,7 +497,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             child: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-//                color: clUpBar,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Icon(
