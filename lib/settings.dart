@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'globals.dart';
 
 
-// Функция для создания экрана настроек
+// Function to create settings screen
 Widget buildSettingsScreen() {
   return _SettingsScreenImpl();
 }
 
-// Внутренний StatefulWidget для управления состоянием настроек
+// Internal StatefulWidget to manage settings state
 class _SettingsScreenImpl extends StatefulWidget {
   const _SettingsScreenImpl({Key? key}) : super(key: key);
 
@@ -20,17 +20,17 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentTheme;
   String? _currentLanguage;
   bool _newestFirst = true;
-  int _lastItems = 0; // Добавлена настройка Last items
+  int _lastItems = 0; // Last items setting
   bool _isLoading = true;
 
-  // Временные значения для отслеживания изменений
+  // Temporary values to track changes
   String? _newTheme;
   String? _newLanguage;
   bool? _newNewestFirst;
-  int? _newLastItems; // Временное значение для Last items
+  int? _newLastItems; // Temporary value for Last items
   bool _hasChanges = false;
 
-  // Контроллер для поля ввода Last items
+  // Controller for Last items input field
   late TextEditingController _lastItemsController;
 
   @override
@@ -46,17 +46,17 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   }
 
   Future<void> _loadSettings() async {
-    // Загрузка текущей темы
+    // Load current theme
     final themeValue = await getSetting("Color theme") ?? defSettings["Color theme"];
 
-    // Загрузка текущего языка
+    // Load current language
     final languageValue = await getSetting("Language") ?? defSettings["Language"];
 
-    // Загрузка настройки сортировки
+    // Load sort order setting
     final newestFirstValue = await getSetting("Newest first") ?? defSettings["Newest first"];
     final isNewestFirst = newestFirstValue == "true";
 
-    // Загрузка настройки Last items
+    // Load Last items setting
     final lastItemsValue = await getSetting("Last items") ?? defSettings["Last items"];
     final lastItems = int.tryParse(lastItemsValue) ?? 0;
 
@@ -67,13 +67,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _currentTheme = themeValue;
         _currentLanguage = languageValue.toLowerCase();
         _newestFirst = isNewestFirst;
-        _lastItems = lastItems; // Инициализация текущего значения
+        _lastItems = lastItems; // Initialize current value
 
-        // Инициализация временных значений
+        // Initialize temporary values
         _newTheme = themeValue;
         _newLanguage = languageValue.toLowerCase();
         _newNewestFirst = isNewestFirst;
-        _newLastItems = lastItems; // Инициализация временного значения
+        _newLastItems = lastItems; // Initialize temporary value
 
         _isLoading = false;
         _hasChanges = false;
@@ -81,7 +81,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     }
   }
 
-  // Функция для проверки наличия изменений
+  // Function to check for changes
   void _checkForChanges() {
     setState(() {
       _hasChanges = _newTheme != _currentTheme ||
@@ -91,7 +91,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     });
   }
 
-  // Функция сохранения с улучшенным показом уведомлений
+  // Save function with improved notifications
   Future<void> _saveChanges() async {
     if (!_hasChanges) {
       okInfoBarBlue(lw('No changes to save'));
@@ -101,33 +101,33 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     bool languageOrThemeChanged = false;
     List<String> savedSettings = [];
 
-    // Сохраняем новые настройки языка, если изменились
+    // Save new language settings if changed
     if (_newLanguage != _currentLanguage && _newLanguage != null) {
       await saveSetting("Language", _newLanguage!);
       savedSettings.add('language');
       languageOrThemeChanged = true;
     }
 
-    // Сохраняем новые настройки темы, если изменились
+    // Save new theme settings if changed
     if (_newTheme != _currentTheme && _newTheme != null) {
       await saveSetting("Color theme", _newTheme!);
       savedSettings.add('theme');
       languageOrThemeChanged = true;
     }
 
-    // Сохраняем новые настройки сортировки, если изменились
+    // Save new sort order settings if changed
     if (_newNewestFirst != _newestFirst && _newNewestFirst != null) {
       await saveSetting("Newest first", _newNewestFirst.toString());
       savedSettings.add('sort order');
     }
 
-    // Сохраняем настройку Last items, если изменилась
+    // Save Last items setting if changed
     if (_newLastItems != _lastItems && _newLastItems != null) {
       await saveSetting("Last items", _newLastItems.toString());
       savedSettings.add('last items');
     }
 
-    // Обновляем текущие значения
+    // Update current values
     setState(() {
       _currentTheme = _newTheme;
       _currentLanguage = _newLanguage;
@@ -136,38 +136,38 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _hasChanges = false;
     });
 
-    // Показываем одно общее уведомление о всех сохраненных настройках
+    // Show one common notification for all saved settings
     if (savedSettings.isNotEmpty) {
       okInfoBarGreen(lw('Settings saved: ') + savedSettings.join(', '));
 
-      // Даем время увидеть первое уведомление
+      // Give time to see first notification
       await Future.delayed(Duration(milliseconds: 1500));
 
-      // Показываем уведомление о перезапуске только если изменились язык или тема
+      // Show restart notification only if language or theme changed
       if (languageOrThemeChanged) {
         okInfoBarOrange(lw('PLEASE RESTART APP'));
       }
     }
 
-    // Возвращаемся на главный экран после уведомлений
+    // Return to main screen after notifications
     Future.delayed(Duration(seconds: 2), () {
       Navigator.of(context).pop(true);
     });
   }
 
-  // Исправленная версия с учетом типов
+  // Fixed version with correct types
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // canPop: false означает, что мы хотим контролировать поведение кнопки "назад"
+      // canPop: false means we want to control back button behavior
       canPop: !_hasChanges,
-      // onPopInvokedWithResult - возвращает void, не bool
+      // onPopInvokedWithResult returns void, not bool
       onPopInvokedWithResult: (didPop, result) async {
-        // Если уже обработано (нет изменений), то ничего не делаем
+        // If already handled (no changes), do nothing
         if (didPop) return;
 
         if (_hasChanges) {
-          // Используем функцию showCustomDialog из globals.dart для единого стиля
+          // Use showCustomDialog function from globals.dart for consistent style
           final shouldSave = await showCustomDialog(
             title: lw('Unsaved Changes'),
             content: lw('Do you want to save changes before exiting?'),
@@ -181,7 +181,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                 'label': lw('Yes'),
                 'value': true,
                 'isDestructive': false,
-                'onPressed': null, // Нет дополнительных действий, просто вернуть значение
+                'onPressed': null, // No additional actions, just return value
               },
             ],
           );
@@ -189,7 +189,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           if (shouldSave == true) {
             await _saveChanges();
           } else {
-            // Если не сохраняем, то просто закрываем экран
+            // If not saving, just close the screen
             Navigator.of(context).pop();
           }
         }
@@ -198,31 +198,31 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         appBar: AppBar(
           backgroundColor: clUpBar,
           foregroundColor: clText,
-          // Кастомизация кнопки "назад" с обработкой долгого нажатия
+          // Customize back button with long press handler
           leading: GestureDetector(
-            onLongPress: () => showHelp(10),
+            onLongPress: () => showHelp(10), // ID 10 for back button (same as in other screens)
             child: IconButton(
               icon: Icon(Icons.arrow_back),
               onPressed: () {
-                // Проверяем наличие изменений перед выходом
+                // Check for changes before exiting
                 if (_hasChanges) {
-                  // Вызываем логику проверки изменений через PopScope
+                  // Trigger exit check logic via PopScope
                   Navigator.maybePop(context);
                 } else {
-                  // Если изменений нет, просто выходим
+                  // If no changes, just exit
                   Navigator.pop(context);
                 }
               },
             ),
           ),
           title: GestureDetector(
-            onLongPress: () => showHelp(11),
+            onLongPress: () => showHelp(60), // ID 60 for settings screen title
             child: Text(lw('Settings')),
           ),
           actions: [
-            // Кнопка Save в AppBar (дискета) с обработкой долгого нажатия
+            // Save button in AppBar (disk icon) with long press handler
             GestureDetector(
-              onLongPress: () => showHelp(12),
+              onLongPress: () => showHelp(12), // ID 12 for save button (same as in additem.dart)
               child: IconButton(
                 icon: Icon(Icons.save),
                 tooltip: lw('Save'),
@@ -241,7 +241,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('App language'),
                 child: _buildLanguageDropdown(),
-                helpId: 100,
+                helpId: 100, // Keep existing ID 100 for language setting
               ),
 
               SizedBox(height: 10),
@@ -250,7 +250,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('Color theme'),
                 child: _buildThemeDropdown(),
-                helpId: 101,
+                helpId: 101, // Keep existing ID 101 for theme setting
               ),
 
               SizedBox(height: 10),
@@ -259,19 +259,19 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('Newest first'),
                 child: _buildSortOrderCheckbox(),
-                helpId: 102,
+                helpId: 102, // Keep existing ID 102 for sort order setting
               ),
 
               SizedBox(height: 10),
 
-              // Last items row - новая строка настроек
+              // Last items row
               _buildSettingsRow(
                 label: lw('Last items'),
                 child: _buildLastItemsField(),
-                helpId: 103,
+                helpId: 103, // Keep existing ID 103 for last items setting
               ),
 
-              // Добавляйте новые настройки сюда - теперь они будут прокручиваться
+              // Add new settings here - they will scroll
             ],
           ),
         ),
@@ -281,13 +281,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
   // Function to build a settings row with label and control
   Widget _buildSettingsRow({required String label, required Widget child, int helpId = 11}) {
-    return Row(
-      children: [
-        // Left side - Label (60%) with longPress handler
-        Expanded(
-          flex: 60,
-          child: GestureDetector(
-            onLongPress: () => showHelp(helpId),
+    return GestureDetector(
+      onLongPress: () => showHelp(helpId),
+      child: Row(
+        children: [
+          // Left side - Label (60%)
+          Expanded(
+            flex: 60,
             child: Text(
               label,
               style: TextStyle(
@@ -296,13 +296,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               ),
             ),
           ),
-        ),
-        // Right side - Control (40%)
-        Expanded(
-          flex: 40,
-          child: child,
-        ),
-      ],
+          // Right side - Control (40%)
+          Expanded(
+            flex: 40,
+            child: child,
+          ),
+        ],
+      ),
     );
   }
 
@@ -323,7 +323,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         style: TextStyle(color: clText),
         onChanged: (String? newValue) {
           if (newValue != null && newValue != _newLanguage) {
-            // Только обновляем временное значение без сохранения
+            // Only update temporary value without saving
             setState(() {
               _newLanguage = newValue;
             });
@@ -357,7 +357,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         style: TextStyle(color: clText),
         onChanged: (String? newValue) {
           if (newValue != null && newValue != _newTheme) {
-            // Только обновляем временное значение без сохранения
+            // Only update temporary value without saving
             setState(() {
               _newTheme = newValue;
             });
@@ -384,7 +384,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         checkColor: clText,
         onChanged: (bool? value) {
           if (value != null && value != _newNewestFirst) {
-            // Только обновляем временное значение без сохранения
+            // Only update temporary value without saving
             setState(() {
               _newNewestFirst = value;
             });
@@ -395,7 +395,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     );
   }
 
-  // Новая функция для поля ввода Last items
+  // Function for Last items input field
   Widget _buildLastItemsField() {
     return Container(
       decoration: BoxDecoration(
@@ -416,7 +416,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         ),
         onChanged: (value) {
           final parsedValue = int.tryParse(value) ?? 0;
-          if (parsedValue >= 0) { // Проверяем, что значение неотрицательное
+          if (parsedValue >= 0) { // Check that value is non-negative
             setState(() {
               _newLastItems = parsedValue;
             });
