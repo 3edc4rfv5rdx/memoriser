@@ -4,7 +4,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'globals.dart';
 
-
 class EditItemPage extends StatefulWidget {
   final Map<String, dynamic>? item;
 
@@ -186,141 +185,154 @@ class _EditItemPageState extends State<EditItemPage> {
 
   // Build priority selector with + and - buttons
   Widget _buildPrioritySelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Label for priority
-        Text(
-          lw('Priority (0-3)'),
-          style: TextStyle(
-            color: clText,
-            fontSize: fsMedium,
-          ),
-        ),
-        SizedBox(height: 8),
-        // Single row containing all elements
-        Row(
-          children: [
-            // LEFT SIDE: Minus button with upbar color
-            ElevatedButton(
-              onPressed: _priority > 0
-                  ? () => setState(() => _priority--)
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: clUpBar,
-                foregroundColor: clText,
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(8),
-                minimumSize: Size(36, 36),
-              ),
-              child: Icon(Icons.remove, size: 20),
+    return GestureDetector(
+      onLongPress: () => showHelp(34), // ID 34 для всех элементов приоритета
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Label for priority
+          Text(
+            lw('Priority (0-3)'),
+            style: TextStyle(
+              color: clText,
+              fontSize: fsMedium,
             ),
-            Container(
-              width: 40,
-              height: 40,
-              margin: EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                color: clFill,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: clUpBar),
+          ),
+          SizedBox(height: 8),
+          // Single row containing all elements
+          Row(
+            children: [
+              // LEFT SIDE: Minus button with upbar color
+              ElevatedButton(
+                onPressed: _priority > 0
+                    ? () => setState(() => _priority--)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: clUpBar,
+                  foregroundColor: clText,
+                  shape: CircleBorder(),
+                  padding: EdgeInsets.all(8),
+                  minimumSize: Size(36, 36),
+                ),
+                child: Icon(Icons.remove, size: 20),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                _priority.toString(),
-                style: TextStyle(
-                  color: clText,
-                  fontSize: fsMedium,
-                  fontWeight: FontWeight.bold,
+              Container(
+                width: 40,
+                height: 40,
+                margin: EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: clFill,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: clUpBar),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _priority.toString(),
+                  style: TextStyle(
+                    color: clText,
+                    fontSize: fsMedium,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
-            // Plus button with upbar color
-            ElevatedButton(
-              onPressed: _priority < 3
-                  ? () => setState(() => _priority++)
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: clUpBar,
-                foregroundColor: clText,
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(8),
-                minimumSize: Size(36, 36),
+              // Plus button with upbar color
+              ElevatedButton(
+                onPressed: _priority < 3
+                    ? () => setState(() => _priority++)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: clUpBar,
+                  foregroundColor: clText,
+                  shape: CircleBorder(),
+                  padding: EdgeInsets.all(8),
+                  minimumSize: Size(36, 36),
+                ),
+                child: Icon(Icons.add, size: 20),
               ),
-              child: Icon(Icons.add, size: 20),
-            ),
 
-            // MIDDLE: Stars moved to center with expanded space on both sides
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(3, (index) {
-                  return Icon(
-                    Icons.star,
-                    color: index < _priority ? clUpBar : clFill,
-                    size: 34, // Larger stars
-                  );
-                }),
+              // MIDDLE: Stars moved to center with expanded space on both sides
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (index) {
+                    return Icon(
+                      Icons.star,
+                      color: index < _priority ? clUpBar : clFill,
+                      size: 34, // Larger stars
+                    );
+                  }),
+                ),
               ),
-            ),
 
-            // RIGHT SIDE: Checkbox and reminder text
-            Checkbox(
-              value: _remind,
-              activeColor: clUpBar,
-              checkColor: clText,
-              onChanged: (value) {
-                setState(() {
-                  _remind = value ?? false;
-                });
-              },
-            ),
-            Text(
-              lw('Set reminder'),
-              style: TextStyle(
-                color: clText,
-                fontSize: fsMedium,
+              // RIGHT SIDE: Checkbox and reminder text
+              GestureDetector(
+                onLongPress: () => showHelp(35), // ID 35 для чекбокса и текста напоминания
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _remind,
+                      activeColor: clUpBar,
+                      checkColor: clText,
+                      onChanged: (value) {
+                        setState(() {
+                          _remind = value ?? false;
+                        });
+                      },
+                    ),
+                    Text(
+                      lw('Set reminder'),
+                      style: TextStyle(
+                        color: clText,
+                        fontSize: fsMedium,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
 
   // Build date field with date picker button
   Widget _buildDateField() {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: dateController,
-            style: TextStyle(color: clText),
-            readOnly: true, // Make the field read-only
-            decoration: InputDecoration(
-              labelText: lw('Date (YYYY-MM-DD)'),
-              labelStyle: TextStyle(color: clText),
-              fillColor: clFill,
-              filled: true,
-              border: OutlineInputBorder(),
+    return GestureDetector(
+      onLongPress: () => showHelp(36), // ID 36 для поля даты и кнопок
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: dateController,
+              style: TextStyle(color: clText),
+              readOnly: true, // Make the field read-only
+              decoration: InputDecoration(
+                labelText: lw('Date (YYYY-MM-DD)'),
+                labelStyle: TextStyle(color: clText),
+                fillColor: clFill,
+                filled: true,
+                border: OutlineInputBorder(),
+              ),
             ),
           ),
-        ),
-        IconButton(
-          icon: Icon(Icons.calendar_today, color: clText),
-          onPressed: () => _selectDate(context),
-        ),
-        // Clear button
-        IconButton(
-          icon: Icon(Icons.clear, color: clText),
-          onPressed: () {
-            setState(() {
-              dateController.clear();
-              _date = null;
-            });
-          },
-        ),
-      ],
+          IconButton(
+            icon: Icon(Icons.calendar_today, color: clText),
+            onPressed: () => _selectDate(context),
+          ),
+          // Clear button
+          IconButton(
+            icon: Icon(Icons.clear, color: clText),
+            onPressed: () {
+              setState(() {
+                dateController.clear();
+                _date = null;
+              });
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -332,13 +344,26 @@ class _EditItemPageState extends State<EditItemPage> {
       appBar: AppBar(
         backgroundColor: clUpBar,
         foregroundColor: clText,
-        title: Text(
-          isEditing ? lw('Edit Item') : lw('New Item'),
+        title: GestureDetector(
+          onLongPress: () => showHelp(30), // ID 30 для заголовка
+          child: Text(
+            isEditing ? lw('Edit Item') : lw('New Item'),
+          ),
+        ),
+        leading: GestureDetector(
+          onLongPress: () => showHelp(10), // ID 10 для кнопки назад
+          child: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.save),
-            onPressed: _saveItem,
+          GestureDetector(
+            onLongPress: () => showHelp(12), // ID 12 для кнопки сохранения
+            child: IconButton(
+              icon: Icon(Icons.save),
+              onPressed: _saveItem,
+            ),
           ),
         ],
       ),
@@ -348,44 +373,53 @@ class _EditItemPageState extends State<EditItemPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Title field
-            TextField(
-              controller: titleController,
-              style: TextStyle(color: clText),
-              decoration: InputDecoration(
-                labelText: lw('Title'),
-                labelStyle: TextStyle(color: clText),
-                fillColor: clFill,
-                filled: true,
-                border: OutlineInputBorder(),
+            GestureDetector(
+              onLongPress: () => showHelp(31), // ID 31 для поля заголовка
+              child: TextField(
+                controller: titleController,
+                style: TextStyle(color: clText),
+                decoration: InputDecoration(
+                  labelText: lw('Title'),
+                  labelStyle: TextStyle(color: clText),
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
               ),
             ),
             SizedBox(height: 16),
 
             // Content field
-            TextField(
-              controller: contentController,
-              style: TextStyle(color: clText),
-              decoration: InputDecoration(
-                labelText: lw('Content'),
-                labelStyle: TextStyle(color: clText),
-                fillColor: clFill,
-                filled: true,
-                border: OutlineInputBorder(),
+            GestureDetector(
+              onLongPress: () => showHelp(32), // ID 32 для поля содержимого
+              child: TextField(
+                controller: contentController,
+                style: TextStyle(color: clText),
+                decoration: InputDecoration(
+                  labelText: lw('Content'),
+                  labelStyle: TextStyle(color: clText),
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 5,
               ),
-              maxLines: 5,
             ),
             SizedBox(height: 16),
 
             // Tags field
-            TextField(
-              controller: tagsController,
-              style: TextStyle(color: clText),
-              decoration: InputDecoration(
-                labelText: lw('Tags (comma separated)'),
-                labelStyle: TextStyle(color: clText),
-                fillColor: clFill,
-                filled: true,
-                border: OutlineInputBorder(),
+            GestureDetector(
+              onLongPress: () => showHelp(33), // ID 33 для поля тегов
+              child: TextField(
+                controller: tagsController,
+                style: TextStyle(color: clText),
+                decoration: InputDecoration(
+                  labelText: lw('Tags (comma separated)'),
+                  labelStyle: TextStyle(color: clText),
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
               ),
             ),
             SizedBox(height: 16),
