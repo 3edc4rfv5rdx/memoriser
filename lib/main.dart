@@ -107,9 +107,20 @@ Future<List<Map<String, dynamic>>> getItems() async {
       // Разбиваем строку тегов на отдельные теги
       List<String> tagFilters = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
 
-      for (String tag in tagFilters) {
-        whereConditions.add('tags LIKE ?');
-        whereArgs.add('%$tag%');
+      if (xvHiddenMode) {
+        // В скрытом режиме обфусцируем теги перед поиском
+        for (String tag in tagFilters) {
+          // Обфусцируем тег для поиска в базе данных
+          String obfuscatedTag = obfuscateText(tag);
+          whereConditions.add('tags LIKE ?');
+          whereArgs.add('%$obfuscatedTag%');
+        }
+      } else {
+        // В обычном режиме ищем как есть
+        for (String tag in tagFilters) {
+          whereConditions.add('tags LIKE ?');
+          whereArgs.add('%$tag%');
+        }
       }
     }
 
@@ -179,9 +190,19 @@ Future<List<Map<String, dynamic>>> getItems() async {
               // Разбиваем строку тегов на отдельные теги
               List<String> tagFilters = value.split(',').map((tag) => tag.trim()).toList();
 
-              for (String tag in tagFilters) {
-                whereConditions.add('tags LIKE ?');
-                whereArgs.add('%$tag%');
+              if (xvHiddenMode) {
+                // В скрытом режиме обфусцируем теги перед поиском
+                for (String tag in tagFilters) {
+                  String obfuscatedTag = obfuscateText(tag);
+                  whereConditions.add('tags LIKE ?');
+                  whereArgs.add('%$obfuscatedTag%');
+                }
+              } else {
+                // В обычном режиме ищем как есть
+                for (String tag in tagFilters) {
+                  whereConditions.add('tags LIKE ?');
+                  whereArgs.add('%$tag%');
+                }
               }
             }
             break;
@@ -940,7 +961,7 @@ class _HomePageState extends State<HomePage> {
                 if (xvHiddenMode)
                   Padding(
                     padding: const EdgeInsets.only(right: 4.0),
-                    child: Icon(Icons.lock, color: Colors.deepPurple, size: 16),
+                    child: Icon(Icons.lock, color: clText, size: 16),
                   ),
                 if (priorityValue > 0)
                   Container(

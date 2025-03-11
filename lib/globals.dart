@@ -581,7 +581,7 @@ Map<String, dynamic> processItemForView(Map<String, dynamic> item) {
 
 // Функция для добавления визуальной индикации режима скрытых записей
 Color getAppBarColor() {
-  return xvHiddenMode ? Colors.deepPurple : clUpBar;
+  return xvHiddenMode ? hidModeColor : clUpBar;
 }
 
 void exitHiddenMode(BuildContext context) {

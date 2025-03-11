@@ -26,7 +26,20 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
 
     try {
       // Query all items to extract tags
-      final allItems = await mainDb.query('items');
+      List<Map<String, dynamic>> allItems = [];
+
+      // In hidden mode, we need to filter items and deobfuscate tags
+      if (xvHiddenMode) {
+        // Get items with hidden=1 when in hidden mode
+        final items = await mainDb.query('items', where: 'hidden = 1');
+
+        // Process each item for view (deobfuscate)
+        allItems = items.map((item) => processItemForView(item)).toList();
+      } else {
+        // Normal mode - only get non-hidden items
+        allItems = await mainDb.query('items', where: 'hidden = 0 OR hidden IS NULL');
+      }
+
       Map<String, int> tagCounts = {};
 
       // Process each item's tags
@@ -67,8 +80,15 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
         return countComparison;
       });
 
+      // Initialize selected tags based on current filter (if any)
+      List<String> initialSelectedTags = [];
+      if (xvTagFilter.isNotEmpty) {
+        initialSelectedTags = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
+      }
+
       setState(() {
         _tags = tags;
+        _selectedTags = initialSelectedTags;
         _isLoading = false;
       });
     } catch (e) {
@@ -185,11 +205,20 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: clUpBar,
+        backgroundColor: xvHiddenMode ? hidModeColor : clUpBar,
         foregroundColor: clText,
         title: GestureDetector(
           onLongPress: () => showHelp(50), // ID 50 for Tags Cloud screen title
-          child: Text(lw('Tags Cloud')),
+          child: Row(
+            children: [
+              Text(lw('Tags Cloud')),
+              if (xvHiddenMode)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Icon(Icons.visibility_off, size: 16),
+                ),
+            ],
+          ),
         ),
         leading: GestureDetector(
           onLongPress: () => showHelp(10), // ID 10 for back button (same as in filters.dart)
