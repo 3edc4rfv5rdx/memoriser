@@ -404,107 +404,134 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: clUpBar,
         foregroundColor: clText,
-        title: Text(lw('Memorizer')), // Убираем индикатор из заголовка
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () async {
-            // Vacuum the databases before closing
-            await vacuumDatabases();
-            // Close the app when X button is pressed from main screen
-            Navigator.of(context).canPop()
-                ? Navigator.of(context).pop() : SystemNavigator.pop();
-          },
+        title: GestureDetector(
+          onLongPress: () => showHelp(20), // ID 20 для заголовка
+          child: Text(lw('Memorizer')),
+        ),
+        leading: GestureDetector(
+          onLongPress: () => showHelp(21), // ID 21 для кнопки закрытия
+          child: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () async {
+              // Vacuum the databases before closing
+              await vacuumDatabases();
+              // Close the app when X button is pressed from main screen
+              Navigator.of(context).canPop()
+                  ? Navigator.of(context).pop() : SystemNavigator.pop();
+            },
+          ),
         ),
         actions: [
           // Индикатор состояния фильтра
-          Center(
-            child: Text(
-              _filterStatus,
-              style: TextStyle(
-                color: clText,
-                fontSize: fsXLarge,
-                fontWeight: FontWeight.bold,
+          GestureDetector(
+            onLongPress: () => showHelp(22), // ID 22 для индикатора фильтра
+            child: Center(
+              child: Text(
+                _filterStatus,
+                style: TextStyle(
+                  color: clText,
+                  fontSize: fsXLarge,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
           // Кнопка фильтра
-          IconButton(
-            icon: Icon(Icons.filter_alt),
-            tooltip: lw('Filters'),
-            onPressed: () {
-              Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => FiltersScreen(),
-                ),
-              ).then((needsRefresh) {
-                if (needsRefresh == true) {
-                  _refreshItems();
-                }
-              });
-            },
+          GestureDetector(
+            onLongPress: () => showHelp(23), // ID 23 для кнопки фильтра
+            child: IconButton(
+              icon: Icon(Icons.filter_alt),
+              tooltip: lw('Filters'),
+              onPressed: () {
+                Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FiltersScreen(),
+                  ),
+                ).then((needsRefresh) {
+                  if (needsRefresh == true) {
+                    _refreshItems();
+                  }
+                });
+              },
+            ),
           ),
           // Кнопка тег-фильтра
-          IconButton(
-            icon: Icon(Icons.filter_list),
-            tooltip: lw('Tag filter'),
-            onPressed: () {
-              Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TagsCloudScreen(),
-                ),
-              ).then((needsRefresh) {
-                if (needsRefresh == true) {
-                  _refreshItems();
-                }
-              });
-            },
+          GestureDetector(
+            onLongPress: () => showHelp(24), // ID 24 для кнопки тег-фильтра
+            child: IconButton(
+              icon: Icon(Icons.filter_list),
+              tooltip: lw('Tag filter'),
+              onPressed: () {
+                Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TagsCloudScreen(),
+                  ),
+                ).then((needsRefresh) {
+                  if (needsRefresh == true) {
+                    _refreshItems();
+                  }
+                });
+              },
+            ),
           ),
           // Меню
-          PopupMenuButton<String>(
-            icon: Icon(Icons.menu),
-            color: clMenu,
-            offset: Offset(0, 30),
-            onSelected: (String result) {
-              if (result == 'settings') {
-                Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => buildSettingsScreen()
-                    )
-                ).then((needsRefresh) {
-                  _refreshItems();
-                });
-              } else if (result == 'about') {
-                _showAbout();
-              } else if (result == 'clear_filters') {
-                _clearAllFilters();
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                value: 'clear_filters',
-                child: Text(
-                  lw('Clear all filters'),
-                  style: TextStyle(color: clText),
+          GestureDetector(
+            onLongPress: () => showHelp(25), // ID 25 для кнопки меню
+            child: PopupMenuButton<String>(
+              icon: Icon(Icons.menu),
+              color: clMenu,
+              offset: Offset(0, 30),
+              onSelected: (String result) {
+                if (result == 'settings') {
+                  Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => buildSettingsScreen()
+                      )
+                  ).then((needsRefresh) {
+                    _refreshItems();
+                  });
+                } else if (result == 'about') {
+                  _showAbout();
+                } else if (result == 'clear_filters') {
+                  _clearAllFilters();
+                }
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                PopupMenuItem<String>(
+                  value: 'clear_filters',
+                  child: GestureDetector(
+                    onLongPress: () => showHelp(26), // ID 26 для пункта меню очистки фильтров
+                    child: Text(
+                      lw('Clear all filters'),
+                      style: TextStyle(color: clText),
+                    ),
+                  ),
                 ),
-              ),
-              PopupMenuItem<String>(
-                value: 'settings',
-                child: Text(
-                  lw('Settings'),
-                  style: TextStyle(color: clText),
+                PopupMenuItem<String>(
+                  value: 'settings',
+                  child: GestureDetector(
+                    onLongPress: () => showHelp(27), // ID 27 для пункта меню настроек
+                    child: Text(
+                      lw('Settings'),
+                      style: TextStyle(color: clText),
+                    ),
+                  ),
                 ),
-              ),
-              PopupMenuItem<String>(
-                value: 'about',
-                child: Text(
-                  lw('About'),
-                  style: TextStyle(color: clText),
+                PopupMenuItem<String>(
+                  value: 'about',
+                  child: GestureDetector(
+                    onLongPress: () => showHelp(28), // ID 28 для пункта меню "О программе"
+                    child: Text(
+                      lw('About'),
+                      style: TextStyle(color: clText),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -632,22 +659,25 @@ class _HomePageState extends State<HomePage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: clUpBar,
-        foregroundColor: clText,
-        onPressed: () async {
-          final result = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-                builder: (context) => EditItemPage()
-            ),
-          );
+      floatingActionButton: GestureDetector(
+        onLongPress: () => showHelp(29), // ID 29 для кнопки добавления
+        child: FloatingActionButton(
+          backgroundColor: clUpBar,
+          foregroundColor: clText,
+          onPressed: () async {
+            final result = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => EditItemPage()
+              ),
+            );
 
-          if (result == true) {
-            _refreshItems();
-          }
-        },
-        child: const Icon(Icons.add),
+            if (result == true) {
+              _refreshItems();
+            }
+          },
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
