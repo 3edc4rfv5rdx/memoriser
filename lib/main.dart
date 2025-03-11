@@ -6,6 +6,8 @@ import 'package:path/path.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:io' show Platform;
+import 'dart:async'; // Для Timer
+
 import 'globals.dart';
 import 'settings.dart';
 import 'additem.dart';
@@ -31,7 +33,8 @@ Future<void> initDatabases() async {
           priority INTEGER, 
           date INTEGER, 
           remind INTEGER, 
-          created INTEGER
+          created INTEGER,
+          hidden INTEGER DEFAULT 0
         )
       ''');
     },
@@ -89,6 +92,13 @@ Future<List<Map<String, dynamic>>> getItems() async {
     // Начальные значения для WHERE и параметров
     List<String> whereConditions = [];
     List<dynamic> whereArgs = [];
+
+    // Добавляем условие для фильтрации по hidden
+    if (xvHiddenMode) {
+      whereConditions.add('hidden = 1');
+    } else {
+      whereConditions.add('(hidden = 0 OR hidden IS NULL)');
+    }
 
     // Обработка тег-фильтра
     if (xvTagFilter.isNotEmpty) {
@@ -180,30 +190,27 @@ Future<List<Map<String, dynamic>>> getItems() async {
     }
 
     // Собираем окончательный WHERE и параметры
-    String? whereClause;
-    if (whereConditions.isNotEmpty) {
-      whereClause = whereConditions.join(' AND ');
-      myPrint('WHERE clause: $whereClause');
-      myPrint('WHERE args: $whereArgs');
-    }
+    String whereClause = whereConditions.join(' AND ');
+    myPrint('WHERE clause: $whereClause');
+    myPrint('WHERE args: $whereArgs');
 
     // Выполняем запрос с учетом фильтров
-    List<Map<String, dynamic>> result;
-    if (whereClause != null) {
-      result = await mainDb.query(
-          'items',
-          where: whereClause,
-          whereArgs: whereArgs,
-          orderBy: orderByClause
-      );
-    } else {
-      result = await mainDb.query('items', orderBy: orderByClause);
-    }
+    List<Map<String, dynamic>> result = await mainDb.query(
+        'items',
+        where: whereClause,
+        whereArgs: whereArgs,
+        orderBy: orderByClause
+    );
 
     // Применяем ограничение на количество записей из настройки "Last items"
     if (lastItems > 0 && result.length > lastItems) {
       myPrint('Limiting results to last $lastItems items');
       result = result.sublist(0, lastItems);
+    }
+
+    // Обработка обфускированных записей, если мы в режиме скрытых записей
+    if (xvHiddenMode) {
+      result = result.map((item) => processItemForView(item)).toList();
     }
 
     myPrint('Retrieved items count: ${result.length}');
@@ -285,11 +292,254 @@ class _HomePageState extends State<HomePage> {
   int? _selectedItemId; // Track the selected item
   String _filterStatus = '(All) ';
 
+  // Переменные для обработки множественного тапа
+  int _tapCount = 0;
+  Timer? _tapTimer;
+
   @override
   void initState() {
     super.initState();
     _refreshItems();
     _updateFilterStatus(); // Обновление статуса фильтра при запуске
+  }
+
+  @override
+  void dispose() {
+    _tapTimer?.cancel();
+    super.dispose();
+  }
+
+  // Обработчик множественного тапа
+  void _handleMultipleTap() {
+    _tapCount++;
+
+    if (_tapCount == 1) {
+      // При первом тапе запускаем таймер
+      _tapTimer?.cancel();
+      _tapTimer = Timer(Duration(milliseconds: 800), () {
+        // Если таймер истек, сбрасываем счетчик
+        _tapCount = 0;
+      });
+    } else if (_tapCount >= 4) {
+      // При четвертом тапе обрабатываем вход в скрытый режим
+      _tapCount = 0;
+      _tapTimer?.cancel();
+      _showPinDialog();
+    }
+  }
+
+// Метод _showPinDialog должен использовать this.context
+  void _showPinDialog() async {
+    // Проверяем, установлен ли уже PIN-код
+    bool hasPIN = await isPinSet();
+
+    if (hasPIN) {
+      // Если PIN уже установлен, показываем диалог входа
+      _showEnterPinDialog();
+    } else {
+      // Если PIN еще не установлен, показываем диалог создания PIN-кода
+      _showCreatePinDialog();
+    }
+  }
+
+// Диалог для создания нового PIN-кода
+  void _showCreatePinDialog() {
+    String enteredPin = '';
+    final TextEditingController pinController = TextEditingController();
+    final FocusNode focusNode = FocusNode();
+
+    showDialog(
+      context: this.context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        // Используем Future.delayed для надежной установки фокуса
+        Future.delayed(Duration.zero, () {
+          FocusScope.of(dialogContext).requestFocus(focusNode);
+        });
+
+        return AlertDialog(
+          backgroundColor: clFill,
+          title: Text(lw('Create PIN code'), style: TextStyle(color: clText)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                lw('Enter a 4-digit PIN code to access private items'),
+                style: TextStyle(color: clText),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: pinController,
+                focusNode: focusNode,
+                autofocus: true, // Добавляем autofocus свойство
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                obscureText: true,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: fsGiga,
+                  color: clText,
+                ),
+                decoration: InputDecoration(
+                  hintText: '****',
+                  counterText: '',
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  enteredPin = value;
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw('Cancel')),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw('Save')),
+              onPressed: () async {
+                // Получаем PIN из контроллера
+                final pin = pinController.text;
+
+                // Проверяем, что PIN состоит из 4 цифр
+                if (pin.length == 4 && int.tryParse(pin) != null) {
+                  Navigator.pop(dialogContext);
+
+                  // Сохраняем PIN-код
+                  await saveNewPin(pin);
+
+                  // Активируем режим скрытых записей
+                  setState(() {
+                    xvHiddenMode = true;
+                    currentPin = pin;
+                  });
+
+                  // Обновляем список элементов, чтобы отобразить скрытые
+                  _refreshItems();
+
+                  // Запускаем таймер автоматического выхода
+                  resetHiddenModeTimer();
+
+                  // Показываем подтверждение
+                  okInfoBarGreen(lw('Private mode activated'));
+                } else {
+                  // Показываем ошибку, если PIN неверного формата
+                  okInfoBarRed(lw('PIN must be 4 digits'));
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// Диалог для ввода существующего PIN-кода
+  void _showEnterPinDialog() {
+    String enteredPin = '';
+    final TextEditingController pinController = TextEditingController();
+    final FocusNode focusNode = FocusNode();
+
+    showDialog(
+      context: this.context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        // Используем Future.delayed вместо addPostFrameCallback
+        Future.delayed(Duration.zero, () {
+          FocusScope.of(dialogContext).requestFocus(focusNode);
+        });
+        return AlertDialog(
+          backgroundColor: clFill,
+          title: Text(lw('Enter PIN code'), style: TextStyle(color: clText)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                lw('Enter your PIN code to access private items'),
+                style: TextStyle(color: clText),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: pinController,
+                focusNode: focusNode,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                obscureText: true,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: fsGiga,
+                  color: clText,
+                ),
+                decoration: InputDecoration(
+                  hintText: '****',
+                  counterText: '',
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  enteredPin = value;
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw('Cancel')),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw('Ok')),
+              onPressed: () async {
+                // Проверяем PIN-код
+                if (await verifyPin(enteredPin)) {
+                  Navigator.pop(dialogContext);
+
+                  // Активируем режим скрытых записей
+                  setState(() {
+                    xvHiddenMode = true;
+                    currentPin = enteredPin;
+                  });
+
+                  // Обновляем список элементов, чтобы отобразить скрытые
+                  _refreshItems();
+
+                  // Запускаем таймер автоматического выхода
+                  resetHiddenModeTimer();
+
+                  // Показываем подтверждение
+                  okInfoBarGreen(lw('Private mode activated'));
+                } else {
+                  // Показываем ошибку, если PIN неверный
+                  Navigator.pop(dialogContext);
+                  okInfoBarRed(lw('Incorrect PIN'));
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _clearAllFilters() {
@@ -330,83 +580,117 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showContextMenu(BuildContext context, Map<String, dynamic> item) {
+    List<PopupMenuEntry> menuItems = [
+// В методе _showContextMenu
+      PopupMenuItem(
+        child: ListTile(
+          leading: Icon(Icons.edit, color: clText),
+          title: Text(lw('Edit'), style: TextStyle(color: clText)),
+          onTap: () {
+            Navigator.pop(context); // Close the menu
+            // Navigate to edit page, передаем только ID
+            Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => EditItemPage(
+                      itemId: item['id'], // Передаем только ID
+                    )
+                )
+            ).then((updated) {
+              if (updated == true) {
+                _refreshItems();
+              }
+            });
+          },
+        ),
+      ),
+      PopupMenuItem(
+        child: ListTile(
+          leading: Icon(Icons.delete, color: Colors.red),
+          title: Text(lw('Delete'), style: TextStyle(color: clText)),
+          onTap: () {
+            Navigator.pop(context); // Close the menu
+
+            // Use the showCustomDialog function for delete confirmation
+            showCustomDialog(
+              title: lw('Delete Item'),
+              content: lw('Are you sure you want to delete this item?'),
+              actions: [
+                {
+                  'label': lw('Cancel'),
+                  'value': false,
+                  'isDestructive': false,
+                },
+                {
+                  'label': lw('Delete'),
+                  'value': true,
+                  'isDestructive': true,
+                  'onPressed': () async {
+                    await mainDb.delete(
+                      'items',
+                      where: 'id = ?',
+                      whereArgs: [item['id']],
+                    );
+                    _refreshItems();
+                  },
+                },
+              ],
+            );
+          },
+        ),
+      ),
+    ];
+
+    // Если находимся в режиме скрытых записей, добавляем опцию выхода
+    if (xvHiddenMode) {
+      menuItems.add(
+        PopupMenuItem(
+          child: ListTile(
+            leading: Icon(Icons.exit_to_app, color: clText),
+            title: Text(lw('Exit private mode'),
+                style: TextStyle(color: clText)),
+            onTap: () {
+              Navigator.pop(context); // Close the menu
+              setState(() {
+                xvHiddenMode = false;
+                currentPin = '';
+              });
+              _refreshItems();
+              okInfoBarBlue(lw('Left private mode'));
+            },
+          ),
+        ),
+      );
+    }
+
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(100, 100, 100, 100),
+      position: RelativeRect.fromLTRB(200, 200, 200, 200),
       color: clMenu, // Set the background color to clMenu to match the theme
-      items: <PopupMenuEntry>[
-        PopupMenuItem(
-          child: ListTile(
-            leading: Icon(Icons.edit, color: clText),
-            title: Text(lw('Edit'), style: TextStyle(color: clText)),
-            onTap: () {
-              Navigator.pop(context); // Close the menu
-              // Navigate to edit page
-              Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => EditItemPage(
-                        item: item,
-                      )
-                  )
-              ).then((updated) {
-                if (updated == true) {
-                  _refreshItems();
-                }
-              });
-            },
-          ),
-        ),
-        PopupMenuItem(
-          child: ListTile(
-            leading: Icon(Icons.delete, color: Colors.red),
-            title: Text(lw('Delete'), style: TextStyle(color: clText)),
-            onTap: () {
-              Navigator.pop(context); // Close the menu
-
-              // Use the showCustomDialog function for delete confirmation
-              showCustomDialog(
-                title: lw('Delete Item'),
-                content: lw('Are you sure you want to delete this item?'),
-                actions: [
-                  {
-                    'label': lw('Cancel'),
-                    'value': false,
-                    'isDestructive': false,
-                  },
-                  {
-                    'label': lw('Delete'),
-                    'value': true,
-                    'isDestructive': true,
-                    'onPressed': () async {
-                      await mainDb.delete(
-                        'items',
-                        where: 'id = ?',
-                        whereArgs: [item['id']],
-                      );
-                      _refreshItems();
-                    },
-                  },
-                ],
-              );
-            },
-          ),
-        ),
-      ],
+      items: menuItems,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     globalContext = context;
-
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: clUpBar,
+        backgroundColor: xvHiddenMode ? hidModeColor : clUpBar,
         foregroundColor: clText,
         title: GestureDetector(
           onLongPress: () => showHelp(20), // ID 20 для заголовка
-          child: Text(lw('Memorizer')),
+          onTap: _handleMultipleTap, // Добавляем обработчик множественного тапа
+          child: Row(
+            children: [
+              Text(lw('Memorizer')),
+              if (xvHiddenMode)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: Icon(Icons.visibility_off, size: 16),
+                ),
+            ],
+          ),
         ),
         leading: GestureDetector(
           onLongPress: () => showHelp(21), // ID 21 для кнопки закрытия
@@ -497,40 +781,64 @@ class _HomePageState extends State<HomePage> {
                   _showAbout();
                 } else if (result == 'clear_filters') {
                   _clearAllFilters();
+                } else if (result == 'exit_private') {
+                  setState(() {
+                    xvHiddenMode = false;
+                    currentPin = '';
+                  });
+                  _refreshItems();
+                  okInfoBarBlue(lw('Left private mode'));
                 }
               },
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                PopupMenuItem<String>(
-                  value: 'clear_filters',
-                  child: GestureDetector(
-                    onLongPress: () => showHelp(26), // ID 26 для пункта меню очистки фильтров
-                    child: Text(
-                      lw('Clear all filters'),
-                      style: TextStyle(color: clText),
+              itemBuilder: (BuildContext context) {
+                List<PopupMenuEntry<String>> menuItems = [
+                  PopupMenuItem<String>(
+                    value: 'clear_filters',
+                    child: GestureDetector(
+                      onLongPress: () => showHelp(26), // ID 26 для пункта меню очистки фильтров
+                      child: Text(
+                        lw('Clear all filters'),
+                        style: TextStyle(color: clText),
+                      ),
                     ),
                   ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'settings',
-                  child: GestureDetector(
-                    onLongPress: () => showHelp(27), // ID 27 для пункта меню настроек
-                    child: Text(
-                      lw('Settings'),
-                      style: TextStyle(color: clText),
+                  PopupMenuItem<String>(
+                    value: 'settings',
+                    child: GestureDetector(
+                      onLongPress: () => showHelp(27), // ID 27 для пункта меню настроек
+                      child: Text(
+                        lw('Settings'),
+                        style: TextStyle(color: clText),
+                      ),
                     ),
                   ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'about',
-                  child: GestureDetector(
-                    onLongPress: () => showHelp(28), // ID 28 для пункта меню "О программе"
-                    child: Text(
-                      lw('About'),
-                      style: TextStyle(color: clText),
+                  PopupMenuItem<String>(
+                    value: 'about',
+                    child: GestureDetector(
+                      onLongPress: () => showHelp(28), // ID 28 для пункта меню "О программе"
+                      child: Text(
+                        lw('About'),
+                        style: TextStyle(color: clText),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ];
+
+                // Добавляем опцию выхода из режима скрытых записей, если мы в нем
+                if (xvHiddenMode) {
+                  menuItems.add(
+                    PopupMenuItem<String>(
+                      value: 'exit_private',
+                      child: Text(
+                        lw('Exit private mode'),
+                        style: TextStyle(color: clText), // Изменено с Colors.orange
+                      ),
+                    ),
+                  );
+                }
+
+                return menuItems;
+              },
             ),
           ),
         ],
@@ -540,7 +848,9 @@ class _HomePageState extends State<HomePage> {
           : _items.isEmpty
           ? Center(
         child: Text(
-          lw('No items yet. Press + to add.'),
+          xvHiddenMode
+              ? lw('No private items yet. Press + to add.')
+              : lw('No items yet. Press + to add.'),
           style: TextStyle(
             color: clText,
             fontSize: fsMedium,
@@ -624,25 +934,34 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             tileColor: _selectedItemId == item['id'] ? clSel : clFill,
-            leading: priorityValue > 0
-                ? Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: clUpBar,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                priorityValue.toString(),
-                style: TextStyle(
-                  color: clText,
-                  fontWeight: FontWeight.bold,
-                  fontSize: fsSmall,
-                ),
-              ),
-            )
-                : null,
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (xvHiddenMode)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4.0),
+                    child: Icon(Icons.lock, color: Colors.deepPurple, size: 16),
+                  ),
+                if (priorityValue > 0)
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: clUpBar,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      priorityValue.toString(),
+                      style: TextStyle(
+                        color: clText,
+                        fontWeight: FontWeight.bold,
+                        fontSize: fsSmall,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             trailing: isReminder
                 ? Icon(Icons.notifications_active, color: Colors.red)
                 : null,
@@ -651,24 +970,40 @@ class _HomePageState extends State<HomePage> {
               setState(() {
                 _selectedItemId = item['id'];
               });
+
+              // Сбрасываем таймер автоматического выхода из скрытого режима
+              if (xvHiddenMode) {
+                resetHiddenModeTimer();
+              }
             },
             onLongPress: () {
               // Show context menu with Edit and Delete options
               _showContextMenu(context, item);
+
+              // Сбрасываем таймер автоматического выхода из скрытого режима
+              if (xvHiddenMode) {
+                resetHiddenModeTimer();
+              }
             },
           );
         },
       ),
+// В методе build класса _HomePageState
       floatingActionButton: GestureDetector(
         onLongPress: () => showHelp(29), // ID 29 для кнопки добавления
         child: FloatingActionButton(
-          backgroundColor: clUpBar,
+          backgroundColor: xvHiddenMode ? Color(0xFFf29238) : clUpBar,
           foregroundColor: clText,
           onPressed: () async {
+            // Сбрасываем таймер автоматического выхода из скрытого режима
+            if (xvHiddenMode) {
+              resetHiddenModeTimer();
+            }
+
             final result = await Navigator.push<bool>(
               context,
               MaterialPageRoute(
-                  builder: (context) => EditItemPage()
+                  builder: (context) => EditItemPage() // Без параметров для новой записи
               ),
             );
 

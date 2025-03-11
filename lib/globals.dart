@@ -2,8 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'dart:convert'; // Для работы с JSON (json.decode)
+import 'dart:convert'; // Для работы с JSON (json.decode) and base64
 import 'package:flutter/services.dart'; // Для доступа к rootBundle
+import 'dart:async'; // Для Timer
+
 
 // Глобальные ключи для доступа к основным компонентам Flutter
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -25,6 +27,12 @@ late BuildContext globalContext;
 bool xvDebug = true;
 String xvTagFilter = '';
 String xvFilter = '';
+bool xvHiddenMode = false;
+
+String currentPin = '';
+// Константа для ключа в настройках
+const String hiddPinKey = 'hiddpin';
+const hidModeColor = Color(0xFFf29238);
 
 // Font sizes
 const double fsSmall = 11;
@@ -34,6 +42,7 @@ const double fsLarge = 16;
 const double fsXLarge = 18;
 const double fsHeader = 22;
 const double fsSHeader = 24;
+const double fsGiga = 28;
 
 // Theme names
 const List<String> appTHEMES = ['Light', 'Dark', 'Blue', 'Green'];
@@ -493,4 +502,107 @@ String getLocaleCode(String language) {
   // Make sure input is lowercase to match our exception map keys
   String langCode = language.toLowerCase();
   return exceptions[langCode] ?? langCode;
+}
+
+// Функция для проверки PIN-кода
+Future<bool> verifyPin(String enteredPin) async {
+  final storedPin = await getSetting(hiddPinKey);
+
+  if (storedPin == null) {
+    return false;
+  }
+
+  return storedPin == enteredPin;
+}
+
+// Функция для сохранения нового PIN-кода
+Future<void> saveNewPin(String pin) async {
+  await saveSetting(hiddPinKey, pin);
+}
+
+// Функция проверки, установлен ли уже PIN-код
+Future<bool> isPinSet() async {
+  final storedPin = await getSetting(hiddPinKey);
+  return storedPin != null;
+}
+
+// Функция для обфускации текста - просто Base64
+String obfuscateText(String text) {
+  if (text.isEmpty) return text;
+
+  // Используем простой Base64 для обфускации
+  return base64Encode(utf8.encode(text));
+}
+
+// Функция для деобфускации текста - просто Base64
+// String deobfuscateText(String encodedText) {
+//   if (encodedText.isEmpty) return encodedText;
+//
+//   try {
+//     // Декодируем из Base64
+//     return utf8.decode(base64Decode(encodedText));
+//   } catch (e) {
+//     myPrint('Error deobfuscating text: $e');
+//     return 'Error: Corrupted data';
+//   }
+// }
+
+String deobfuscateText(String encodedText) {
+  if (encodedText.isEmpty) return encodedText;
+  try {
+    // Проверяем, является ли строка валидным Base64
+    if (RegExp(r'^[A-Za-z0-9+/=]+$').hasMatch(encodedText)) {
+      return utf8.decode(base64Decode(encodedText));
+    } else {
+      // Если не Base64, возвращаем как есть
+      myPrint('Text is not Base64 encoded, returning as is');
+      return encodedText;
+    }
+  } catch (e) {
+    myPrint('Error deobfuscating text: $e');
+    // Возвращаем оригинальный текст вместо сообщения об ошибке
+    return encodedText;
+  }
+}
+
+// Функция для кодирования/декодирования записи в зависимости от режима
+Map<String, dynamic> processItemForView(Map<String, dynamic> item) {
+  if (item['hidden'] == 1 && xvHiddenMode) {
+    // Деобфускация скрытых записей при просмотре в скрытом режиме
+    return {
+      ...item,
+      'title': deobfuscateText(item['title'] ?? ''),
+      'content': deobfuscateText(item['content'] ?? ''),
+      'tags': deobfuscateText(item['tags'] ?? ''),
+    };
+  }
+  return item;
+}
+
+// Функция для добавления визуальной индикации режима скрытых записей
+Color getAppBarColor() {
+  return xvHiddenMode ? Colors.deepPurple : clUpBar;
+}
+
+void exitHiddenMode(BuildContext context) {
+  xvHiddenMode = false;
+  currentPin = '';
+  okInfoBarBlue(lw('Left private mode'));
+  // возвращаемся на главный экран
+  Navigator.popUntil(navigatorKey.currentContext!, (route) => route.isFirst);
+}
+
+// Таймер для автоматического выхода из режима скрытых записей
+Timer? _hiddenModeTimer;
+
+// Функция для сброса таймера автоматического выхода
+void resetHiddenModeTimer() {
+  _hiddenModeTimer?.cancel();
+  if (xvHiddenMode) {
+    _hiddenModeTimer = Timer(Duration(minutes: 5), () {
+      if (navigatorKey.currentContext != null) {
+        exitHiddenMode(navigatorKey.currentContext!);
+      }
+    });
+  }
 }
