@@ -412,7 +412,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: '0',
-          hintStyle: TextStyle(color: clText.withOpacity(0.5)),
+          hintStyle: TextStyle(color: clText),
         ),
         onChanged: (value) {
           final parsedValue = int.tryParse(value) ?? 0;
