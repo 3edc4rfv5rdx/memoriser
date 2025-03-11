@@ -418,7 +418,7 @@ void okInfoBarPurple(String message) {
       duration: Duration(days: 3),
       dismissDirection: DismissDirection.none,
       action: SnackBarAction(
-        label: '[ OK ]',
+        label: '[ Ok ]',
         onPressed: () {
           scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
         },
