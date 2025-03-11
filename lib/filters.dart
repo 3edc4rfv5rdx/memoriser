@@ -71,13 +71,13 @@ class _FiltersScreenState extends State<FiltersScreen> {
     // Инициализация контроллеров
     _dateFromController = TextEditingController(
         text: _filterData.dateFrom != null
-            ? DateFormat('yyyy-MM-dd').format(_filterData.dateFrom!)
+            ? DateFormat(ymdDateFormat).format(_filterData.dateFrom!)
             : ''
     );
 
     _dateToController = TextEditingController(
         text: _filterData.dateTo != null
-            ? DateFormat('yyyy-MM-dd').format(_filterData.dateTo!)
+            ? DateFormat(ymdDateFormat).format(_filterData.dateTo!)
             : ''
     );
 
@@ -118,12 +118,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
         switch (key) {
           case 'dateFrom':
             if (value.isNotEmpty) {
-              _filterData.dateFrom = DateFormat('yyyy-MM-dd').parse(value);
+              _filterData.dateFrom = DateFormat(ymdDateFormat).parse(value);
             }
             break;
           case 'dateTo':
             if (value.isNotEmpty) {
-              _filterData.dateTo = DateFormat('yyyy-MM-dd').parse(value);
+              _filterData.dateTo = DateFormat(ymdDateFormat).parse(value);
             }
             break;
           case 'priority':
@@ -154,11 +154,11 @@ class _FiltersScreenState extends State<FiltersScreen> {
     List<String> parts = [];
 
     if (_filterData.dateFrom != null) {
-      parts.add('dateFrom:${DateFormat('yyyy-MM-dd').format(_filterData.dateFrom!)}');
+      parts.add('dateFrom:${DateFormat(ymdDateFormat).format(_filterData.dateFrom!)}');
     }
 
     if (_filterData.dateTo != null) {
-      parts.add('dateTo:${DateFormat('yyyy-MM-dd').format(_filterData.dateTo!)}');
+      parts.add('dateTo:${DateFormat(ymdDateFormat).format(_filterData.dateTo!)}');
     }
 
     if (_filterData.priority != null) {
@@ -251,7 +251,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     if (picked != null) {
       setState(() {
         _filterData.dateFrom = picked;
-        _dateFromController.text = DateFormat('yyyy-MM-dd').format(picked);
+        _dateFromController.text = DateFormat(ymdDateFormat).format(picked);
       });
     }
   }
@@ -296,7 +296,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     if (picked != null) {
       setState(() {
         _filterData.dateTo = picked;
-        _dateToController.text = DateFormat('yyyy-MM-dd').format(picked);
+        _dateToController.text = DateFormat(ymdDateFormat).format(picked);
       });
     }
   }

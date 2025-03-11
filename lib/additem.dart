@@ -48,7 +48,7 @@ class _EditItemPageState extends State<EditItemPage> {
         : null;
     dateController = TextEditingController(
       text: _date != null
-          ? DateFormat('yyyy-MM-dd').format(_date!)
+          ? DateFormat(ymdDateFormat).format(_date!)
           : '',
     );
 
@@ -179,7 +179,7 @@ class _EditItemPageState extends State<EditItemPage> {
     if (picked != null) {
       setState(() {
         _date = picked;
-        dateController.text = DateFormat('yyyy-MM-dd').format(picked);
+        dateController.text = DateFormat(ymdDateFormat).format(picked);
       });
     }
   }

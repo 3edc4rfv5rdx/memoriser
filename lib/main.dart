@@ -121,7 +121,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
           case 'dateFrom':
             if (value.isNotEmpty) {
               try {
-                final date = DateFormat('yyyy-MM-dd').parse(value);
+                final date = DateFormat(ymdDateFormat).parse(value);
                 // Начало дня в миллисекундах
                 final timestamp = DateTime(date.year, date.month, date.day).millisecondsSinceEpoch;
                 whereConditions.add('date >= ?');
@@ -135,7 +135,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
           case 'dateTo':
             if (value.isNotEmpty) {
               try {
-                final date = DateFormat('yyyy-MM-dd').parse(value);
+                final date = DateFormat(ymdDateFormat).parse(value);
                 // Конец дня в миллисекундах
                 final timestamp = DateTime(date.year, date.month, date.day, 23, 59, 59).millisecondsSinceEpoch;
                 whereConditions.add('date <= ?');
@@ -559,7 +559,7 @@ class _HomePageState extends State<HomePage> {
           String? formattedDate;
           if (hasDate) {
             final eventDate = DateTime.fromMillisecondsSinceEpoch(item['date']);
-            formattedDate = DateFormat('yyyy-MM-dd').format(eventDate);
+            formattedDate = DateFormat(ymdDateFormat).format(eventDate);
           }
 
           return ListTile(
