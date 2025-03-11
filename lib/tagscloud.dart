@@ -187,27 +187,46 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
       appBar: AppBar(
         backgroundColor: clUpBar,
         foregroundColor: clText,
-        title: Text(lw('Tags Cloud')),
+        title: GestureDetector(
+          onLongPress: () => showHelp(50), // ID 50 for Tags Cloud screen title
+          child: Text(lw('Tags Cloud')),
+        ),
+        leading: GestureDetector(
+          onLongPress: () => showHelp(10), // ID 10 for back button (same as in filters.dart)
+          child: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+        ),
         actions: [
           // Clear button
-          IconButton(
-            icon: Icon(Icons.clear_all),
-            tooltip: lw('Clear selection'),
-            onPressed: _clearSelection,
+          GestureDetector(
+            onLongPress: () => showHelp(41), // ID 41 for clear selection button
+            child: IconButton(
+              icon: Icon(Icons.clear_all),
+              tooltip: lw('Clear selection'),
+              onPressed: _clearSelection,
+            ),
           ),
           // Apply button
-          IconButton(
-            icon: Icon(Icons.check),
-            tooltip: lw('Apply filter'),
-            onPressed: _applyFilter,
+          GestureDetector(
+            onLongPress: () => showHelp(42), // ID 42 for apply filter button (same as in filters.dart)
+            child: IconButton(
+              icon: Icon(Icons.check),
+              tooltip: lw('Apply filter'),
+              onPressed: _applyFilter,
+            ),
           ),
           // Cancel button
-          IconButton(
-            icon: Icon(Icons.cancel),
-            tooltip: lw('Cancel'),
-            onPressed: () {
-              Navigator.pop(context, false);
-            },
+          GestureDetector(
+            onLongPress: () => showHelp(43), // ID 43 for cancel button (same as in filters.dart)
+            child: IconButton(
+              icon: Icon(Icons.cancel),
+              tooltip: lw('Cancel'),
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+            ),
           ),
         ],
       ),
@@ -217,28 +236,34 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Fixed height container for selected tags information (smaller height)
-          Container(
-            height: 24, // Reduced fixed height
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: _selectedTags.isEmpty
-                ? Container() // Empty container when no tags selected
-                : Text(
-              lw('Selected tags') + ': ${_selectedTags.join(", ")}',
-              style: TextStyle(
-                color: clText,
-                fontSize: fsMedium,
-                fontWeight: FontWeight.bold,
+          GestureDetector(
+            onLongPress: () => showHelp(52), // ID 52 for selected tags indicator
+            child: Container(
+              height: 24, // Reduced fixed height
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: _selectedTags.isEmpty
+                  ? Container() // Empty container when no tags selected
+                  : Text(
+                lw('Selected tags') + ': ${_selectedTags.join(", ")}',
+                style: TextStyle(
+                  color: clText,
+                  fontSize: fsMedium,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           // Tags cloud - using Expanded to take remaining space
           Expanded(
-            child: Container(
-              width: double.infinity,
-              alignment: Alignment.topLeft,
-              padding: EdgeInsets.all(16),
-              child: _buildTagCloud(),
+            child: GestureDetector(
+              onLongPress: () => showHelp(53), // ID 53 for tag cloud
+              child: Container(
+                width: double.infinity,
+                alignment: Alignment.topLeft,
+                padding: EdgeInsets.all(16),
+                child: _buildTagCloud(),
+              ),
             ),
           ),
         ],
