@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'dart:io' show Platform;
 import 'globals.dart';
 import 'settings.dart';
 import 'additem.dart';
@@ -35,7 +36,6 @@ Future<void> initDatabases() async {
       ''');
     },
   );
-
   // Initialize settings database
   settDb = await openDatabase(
     join(databasesPath, settDbFile),
@@ -46,13 +46,6 @@ Future<void> initDatabases() async {
       );
     },
   );
-
-  // Initialize default settings
-  await initDefaultSettings();
-
-  // Initialize theme colors
-  final themeName = await getSetting("Color theme") ?? defSettings["Color theme"];
-  setThemeColors(themeName);
 }
 
 // Функция для получения текста состояния фильтра
@@ -236,12 +229,17 @@ Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
 }
 
 void main() async {
-  // Initialize FFI for Linux and other desktop platforms
-  sqfliteFfiInit();
-  databaseFactory = databaseFactoryFfi;
-
   WidgetsFlutterBinding.ensureInitialized();
+  // Используем FFI только на десктопных платформах
+  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
   await initDatabases();
+  // Initialize default settings
+  await initDefaultSettings();
+  final themeName = await getSetting("Color theme") ?? defSettings["Color theme"];
+  setThemeColors(themeName);
   // Загрузка локализации
   final languageSetting = await getSetting("Language") ?? defSettings["Language"];
   await readLocale(languageSetting.toLowerCase());
@@ -414,13 +412,11 @@ class _HomePageState extends State<HomePage> {
             await vacuumDatabases();
             // Close the app when X button is pressed from main screen
             Navigator.of(context).canPop()
-                ? Navigator.of(context).pop()
-                : SystemNavigator.pop();
+                ? Navigator.of(context).pop() : SystemNavigator.pop();
           },
         ),
         actions: [
           // Индикатор состояния фильтра
-          // Индикатор состояния фильтра - на том же уровне что и другие элементы
           Center(
             child: Text(
               _filterStatus,
