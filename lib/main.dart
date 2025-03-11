@@ -365,7 +365,6 @@ class _HomePageState extends State<HomePage> {
 
 // Диалог для создания нового PIN-кода
   void _showCreatePinDialog() {
-    String enteredPin = '';
     final TextEditingController pinController = TextEditingController();
     final FocusNode focusNode = FocusNode();
 
@@ -408,9 +407,6 @@ class _HomePageState extends State<HomePage> {
                   filled: true,
                   border: OutlineInputBorder(),
                 ),
-                onChanged: (value) {
-                  enteredPin = value;
-                },
               ),
             ],
           ),
