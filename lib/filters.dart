@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'globals.dart';
 
-// Класс для хранения данных фильтра
+// Class for storing filter data
 class FilterData {
   DateTime? dateFrom;
   DateTime? dateTo;
@@ -19,7 +19,7 @@ class FilterData {
     this.tags,
   });
 
-  // Проверка, есть ли активные фильтры
+  // Check if any filters are active
   bool get isActive =>
       dateFrom != null ||
           dateTo != null ||
@@ -27,13 +27,13 @@ class FilterData {
           hasReminder != null ||
           (tags != null && tags!.isNotEmpty);
 
-  // Преобразование в строку для отладки
+  // Convert to string for debugging
   @override
   String toString() {
     return 'FilterData(dateFrom: $dateFrom, dateTo: $dateTo, priority: $priority, hasReminder: $hasReminder, tags: $tags)';
   }
 
-  // Сброс всех фильтров
+  // Reset all filters
   void reset() {
     dateFrom = null;
     dateTo = null;
@@ -49,26 +49,26 @@ class FiltersScreen extends StatefulWidget {
 }
 
 class _FiltersScreenState extends State<FiltersScreen> {
-  // Данные фильтра
+  // Filter data
   FilterData _filterData = FilterData();
 
-  // Контроллеры для текстовых полей
+  // Controllers for text fields
   late TextEditingController _dateFromController;
   late TextEditingController _dateToController;
   late TextEditingController _tagsController;
 
-  // Временные переменные для UI
-  int _selectedPriority = -1; // -1 означает "любой приоритет"
-  bool? _selectedHasReminder; // null означает "любое значение"
+  // Temporary variables for UI
+  int _selectedPriority = -1; // -1 means "any priority"
+  bool? _selectedHasReminder; // null means "any value"
 
   @override
   void initState() {
     super.initState();
 
-    // Инициализация данных фильтра из глобальной переменной
+    // Initialize filter data from global variable
     _parseFilterString();
 
-    // Инициализация контроллеров
+    // Initialize controllers
     _dateFromController = TextEditingController(
         text: _filterData.dateFrom != null
             ? DateFormat(ymdDateFormat).format(_filterData.dateFrom!)
@@ -97,7 +97,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     super.dispose();
   }
 
-  // Преобразование строки фильтра в объект FilterData
+  // Convert filter string to FilterData object
   void _parseFilterString() {
     if (xvFilter.isEmpty) {
       _filterData = FilterData();
@@ -105,7 +105,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
 
     try {
-      // Формат: "dateFrom:YYYY-MM-DD|dateTo:YYYY-MM-DD|priority:N|hasReminder:true/false|tags:tag1,tag2"
+      // Format: "dateFrom:YYYY-MM-DD|dateTo:YYYY-MM-DD|priority:N|hasReminder:true/false|tags:tag1,tag2"
       final parts = xvFilter.split('|');
 
       for (final part in parts) {
@@ -149,7 +149,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
   }
 
-  // Преобразование объекта FilterData в строку фильтра
+  // Convert FilterData object to filter string
   String _buildFilterString() {
     List<String> parts = [];
 
@@ -176,30 +176,30 @@ class _FiltersScreenState extends State<FiltersScreen> {
     return parts.join('|');
   }
 
-  // Применение фильтров
+  // Apply filters
   void _applyFilters() {
-    // Обновление данных фильтра из UI
+    // Update filter data from UI
     _filterData.priority = _selectedPriority >= 0 ? _selectedPriority : null;
     _filterData.hasReminder = _selectedHasReminder;
     _filterData.tags = _tagsController.text.trim().isEmpty ? null : _tagsController.text.trim();
 
-    // Обновление глобальной строки фильтра
+    // Update global filter string
     xvFilter = _buildFilterString();
 
     myPrint('Filter applied: $xvFilter');
 
-    // Показать сообщение о применении фильтра
+    // Show confirmation message
     if (_filterData.isActive) {
       okInfoBarGreen(lw('Filter applied'));
     } else {
       okInfoBarBlue(lw('All filters cleared'));
     }
 
-    // Вернуться на предыдущий экран с сигналом обновления
+    // Return to previous screen with refresh signal
     Navigator.pop(context, true);
   }
 
-  // Сброс всех фильтров
+  // Reset all filters
   void _resetFilters() {
     setState(() {
       _filterData.reset();
@@ -211,7 +211,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     });
   }
 
-  // Выбор даты "с"
+  // Select "date from"
   Future<void> _selectDateFrom(BuildContext context) async {
     final DateTime initialDate = _filterData.dateFrom ?? DateTime.now();
 
@@ -256,7 +256,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
   }
 
-  // Выбор даты "по"
+  // Select "date to"
   Future<void> _selectDateTo(BuildContext context) async {
     final DateTime initialDate = _filterData.dateTo ?? DateTime.now();
 
@@ -301,128 +301,134 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
   }
 
-  // Построение виджета выбора приоритета
+  // Build priority selector widget
   Widget _buildPrioritySelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          lw('Priority filter'),
-          style: TextStyle(
-            color: clText,
-            fontSize: fsMedium,
-          ),
-        ),
-        SizedBox(height: 8),
-        Row(
-          children: [
-            // Кнопка "минус"
-            ElevatedButton(
-              onPressed: _selectedPriority > -1
-                  ? () => setState(() => _selectedPriority--)
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: clUpBar,
-                foregroundColor: clText,
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(8),
-                minimumSize: Size(36, 36),
-              ),
-              child: Icon(Icons.remove, size: 20),
+    return GestureDetector(
+      onLongPress: () => showHelp(34), // ID 34 for priority controls
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            lw('Priority filter'),
+            style: TextStyle(
+              color: clText,
+              fontSize: fsMedium,
             ),
-
-            // Отображение текущего значения
-            Container(
-              width: 40,
-              height: 40,
-              margin: EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                color: clFill,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: clUpBar),
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              // Minus button
+              ElevatedButton(
+                onPressed: _selectedPriority > -1
+                    ? () => setState(() => _selectedPriority--)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: clUpBar,
+                  foregroundColor: clText,
+                  shape: CircleBorder(),
+                  padding: EdgeInsets.all(8),
+                  minimumSize: Size(36, 36),
+                ),
+                child: Icon(Icons.remove, size: 20),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                _selectedPriority == -1 ? lw('Any') : _selectedPriority.toString(),
-                style: TextStyle(
-                  color: clText,
-                  fontSize: fsMedium,
-                  fontWeight: FontWeight.bold,
+
+              // Display current value
+              Container(
+                width: 40,
+                height: 40,
+                margin: EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: clFill,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: clUpBar),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _selectedPriority == -1 ? lw('Any') : _selectedPriority.toString(),
+                  style: TextStyle(
+                    color: clText,
+                    fontSize: fsMedium,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
 
-            // Кнопка "плюс"
-            ElevatedButton(
-              onPressed: _selectedPriority < 3
-                  ? () => setState(() => _selectedPriority++)
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: clUpBar,
-                foregroundColor: clText,
-                shape: CircleBorder(),
-                padding: EdgeInsets.all(8),
-                minimumSize: Size(36, 36),
+              // Plus button
+              ElevatedButton(
+                onPressed: _selectedPriority < 3
+                    ? () => setState(() => _selectedPriority++)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: clUpBar,
+                  foregroundColor: clText,
+                  shape: CircleBorder(),
+                  padding: EdgeInsets.all(8),
+                  minimumSize: Size(36, 36),
+                ),
+                child: Icon(Icons.add, size: 20),
               ),
-              child: Icon(Icons.add, size: 20),
-            ),
 
-            // Звездочки для визуализации
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(3, (index) {
-                  return Icon(
-                    Icons.star,
-                    color: (_selectedPriority >= 0 && index < _selectedPriority) ? clUpBar : clFill,
-                    size: 34,
-                  );
-                }),
+              // Stars for visualization
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (index) {
+                    return Icon(
+                      Icons.star,
+                      color: (_selectedPriority >= 0 && index < _selectedPriority) ? clUpBar : clFill,
+                      size: 34,
+                    );
+                  }),
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  // Построение селектора напоминаний
+  // Build reminder selector
   Widget _buildReminderSelector() {
-    return Row(
-      children: [
-        Text(
-          lw('Reminder filter'),
-          style: TextStyle(
-            color: clText,
-            fontSize: fsMedium,
+    return GestureDetector(
+      onLongPress: () => showHelp(35), // ID 35 for reminder selector
+      child: Row(
+        children: [
+          Text(
+            lw('Reminder filter'),
+            style: TextStyle(
+              color: clText,
+              fontSize: fsMedium,
+            ),
           ),
-        ),
-        SizedBox(width: 16),
-        DropdownButton<bool?>(
-          value: _selectedHasReminder,
-          dropdownColor: clMenu,
-          hint: Text(lw('Any'), style: TextStyle(color: clText)),
-          items: [
-            DropdownMenuItem<bool?>(
-              value: null,
-              child: Text(lw('Any'), style: TextStyle(color: clText)),
-            ),
-            DropdownMenuItem<bool?>(
-              value: true,
-              child: Text(lw('Yes'), style: TextStyle(color: clText)),
-            ),
-            DropdownMenuItem<bool?>(
-              value: false,
-              child: Text(lw('No'), style: TextStyle(color: clText)),
-            ),
-          ],
-          onChanged: (value) {
-            setState(() {
-              _selectedHasReminder = value;
-            });
-          },
-        ),
-      ],
+          SizedBox(width: 16),
+          DropdownButton<bool?>(
+            value: _selectedHasReminder,
+            dropdownColor: clMenu,
+            hint: Text(lw('Any'), style: TextStyle(color: clText)),
+            items: [
+              DropdownMenuItem<bool?>(
+                value: null,
+                child: Text(lw('Any'), style: TextStyle(color: clText)),
+              ),
+              DropdownMenuItem<bool?>(
+                value: true,
+                child: Text(lw('Yes'), style: TextStyle(color: clText)),
+              ),
+              DropdownMenuItem<bool?>(
+                value: false,
+                child: Text(lw('No'), style: TextStyle(color: clText)),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _selectedHasReminder = value;
+              });
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -432,27 +438,46 @@ class _FiltersScreenState extends State<FiltersScreen> {
       appBar: AppBar(
         backgroundColor: clUpBar,
         foregroundColor: clText,
-        title: Text(lw('Filters')),
+        title: GestureDetector(
+          onLongPress: () => showHelp(40), // ID 40 for screen title
+          child: Text(lw('Filters')),
+        ),
+        leading: GestureDetector(
+          onLongPress: () => showHelp(10), // ID 10 for back button
+          child: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+        ),
         actions: [
-          // Кнопка сброса
-          IconButton(
-            icon: Icon(Icons.clear_all),
-            tooltip: lw('Reset all filters'),
-            onPressed: _resetFilters,
+          // Reset button
+          GestureDetector(
+            onLongPress: () => showHelp(41), // ID 41 for reset button
+            child: IconButton(
+              icon: Icon(Icons.clear_all),
+              tooltip: lw('Reset all filters'),
+              onPressed: _resetFilters,
+            ),
           ),
-          // Кнопка применения
-          IconButton(
-            icon: Icon(Icons.check),
-            tooltip: lw('Apply filters'),
-            onPressed: _applyFilters,
+          // Apply button
+          GestureDetector(
+            onLongPress: () => showHelp(42), // ID 42 for apply button
+            child: IconButton(
+              icon: Icon(Icons.check),
+              tooltip: lw('Apply filters'),
+              onPressed: _applyFilters,
+            ),
           ),
-          // Кнопка отмены
-          IconButton(
-            icon: Icon(Icons.cancel),
-            tooltip: lw('Cancel'),
-            onPressed: () {
-              Navigator.pop(context, false);
-            },
+          // Cancel button
+          GestureDetector(
+            onLongPress: () => showHelp(43), // ID 43 for cancel button
+            child: IconButton(
+              icon: Icon(Icons.cancel),
+              tooltip: lw('Cancel'),
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+            ),
           ),
         ],
       ),
@@ -461,116 +486,140 @@ class _FiltersScreenState extends State<FiltersScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Фильтр по дате "с"
-            Text(
-              lw('Date from'),
-              style: TextStyle(
-                color: clText,
-                fontSize: fsMedium,
-              ),
-            ),
-            SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _dateFromController,
-                    style: TextStyle(color: clText),
-                    readOnly: true,
-                    decoration: InputDecoration(
-                      labelText: lw('Date from'),
-                      labelStyle: TextStyle(color: clText),
-                      fillColor: clFill,
-                      filled: true,
-                      border: OutlineInputBorder(),
+            // "Date from" filter
+            GestureDetector(
+              onLongPress: () => showHelp(36), // ID 36 for date field
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lw('Date from'),
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsMedium,
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.calendar_today, color: clText),
-                  onPressed: () => _selectDateFrom(context),
-                ),
-                IconButton(
-                  icon: Icon(Icons.clear, color: clText),
-                  onPressed: () {
-                    setState(() {
-                      _dateFromController.clear();
-                      _filterData.dateFrom = null;
-                    });
-                  },
-                ),
-              ],
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _dateFromController,
+                          style: TextStyle(color: clText),
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: lw('Date from'),
+                            labelStyle: TextStyle(color: clText),
+                            fillColor: clFill,
+                            filled: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.calendar_today, color: clText),
+                        onPressed: () => _selectDateFrom(context),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.clear, color: clText),
+                        onPressed: () {
+                          setState(() {
+                            _dateFromController.clear();
+                            _filterData.dateFrom = null;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             SizedBox(height: 16),
 
-            // Фильтр по дате "по"
-            Text(
-              lw('Date to'),
-              style: TextStyle(
-                color: clText,
-                fontSize: fsMedium,
-              ),
-            ),
-            SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _dateToController,
-                    style: TextStyle(color: clText),
-                    readOnly: true,
-                    decoration: InputDecoration(
-                      labelText: lw('Date to'),
-                      labelStyle: TextStyle(color: clText),
-                      fillColor: clFill,
-                      filled: true,
-                      border: OutlineInputBorder(),
+            // "Date to" filter
+            GestureDetector(
+              onLongPress: () => showHelp(36), // ID 36 for date field (same as date from)
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lw('Date to'),
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsMedium,
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.calendar_today, color: clText),
-                  onPressed: () => _selectDateTo(context),
-                ),
-                IconButton(
-                  icon: Icon(Icons.clear, color: clText),
-                  onPressed: () {
-                    setState(() {
-                      _dateToController.clear();
-                      _filterData.dateTo = null;
-                    });
-                  },
-                ),
-              ],
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _dateToController,
+                          style: TextStyle(color: clText),
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: lw('Date to'),
+                            labelStyle: TextStyle(color: clText),
+                            fillColor: clFill,
+                            filled: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.calendar_today, color: clText),
+                        onPressed: () => _selectDateTo(context),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.clear, color: clText),
+                        onPressed: () {
+                          setState(() {
+                            _dateToController.clear();
+                            _filterData.dateTo = null;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             SizedBox(height: 16),
 
-            // Фильтр по приоритету
+            // Priority filter
             _buildPrioritySelector(),
             SizedBox(height: 16),
 
-            // Фильтр по напоминаниям
+            // Reminder filter
             _buildReminderSelector(),
             SizedBox(height: 16),
 
-            // Фильтр по тегам
-            Text(
-              lw('Tags (comma separated)'),
-              style: TextStyle(
-                color: clText,
-                fontSize: fsMedium,
-              ),
-            ),
-            SizedBox(height: 8),
-            TextField(
-              controller: _tagsController,
-              style: TextStyle(color: clText),
-              decoration: InputDecoration(
-                labelText: lw('Tags'),
-                labelStyle: TextStyle(color: clText),
-                fillColor: clFill,
-                filled: true,
-                border: OutlineInputBorder(),
+            // Tags filter
+            GestureDetector(
+              onLongPress: () => showHelp(33), // ID 33 for tags field (same as in additem.dart)
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lw('Tags (comma separated)'),
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsMedium,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  TextField(
+                    controller: _tagsController,
+                    style: TextStyle(color: clText),
+                    decoration: InputDecoration(
+                      labelText: lw('Tags'),
+                      labelStyle: TextStyle(color: clText),
+                      fillColor: clFill,
+                      filled: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -580,12 +629,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
   }
 }
 
-// Функция для получения текста состояния фильтра
+// Function to get filter status text
 Future<String> getFilterStatusText() async {
   bool hasTagFilter = xvTagFilter.isNotEmpty;
   bool hasMainFilter = xvFilter.isNotEmpty;
 
-  // Получаем значение настройки Last items
+  // Get "Last items" setting value
   final lastItemsStr = await getSetting("Last items") ?? defSettings["Last items"];
   final lastItems = int.tryParse(lastItemsStr) ?? 0;
   bool hasLastItems = lastItems > 0;
