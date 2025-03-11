@@ -21,6 +21,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentLanguage;
   bool _newestFirst = true;
   int _lastItems = 0; // Last items setting
+  String _remindTime = "10:00"; // Default remind time
   bool _isLoading = true;
 
   // Temporary values to track changes
@@ -28,10 +29,14 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _newLanguage;
   bool? _newNewestFirst;
   int? _newLastItems; // Temporary value for Last items
+  String? _newRemindTime; // Temporary remind time
   bool _hasChanges = false;
 
   // Controller for Last items input field
   late TextEditingController _lastItemsController;
+
+  // Controller for remind time input field
+  late TextEditingController _remindTimeController;
 
   @override
   void initState() {
@@ -42,6 +47,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   @override
   void dispose() {
     _lastItemsController.dispose();
+    _remindTimeController.dispose();
     super.dispose();
   }
 
@@ -60,7 +66,11 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     final lastItemsValue = await getSetting("Last items") ?? defSettings["Last items"];
     final lastItems = int.tryParse(lastItemsValue) ?? 0;
 
+    // Load remind time setting
+    final remindTimeValue = await getSetting("Remind time") ?? "10:00";
+
     _lastItemsController = TextEditingController(text: lastItems.toString());
+    _remindTimeController = TextEditingController(text: remindTimeValue);
 
     if (mounted) {
       setState(() {
@@ -68,12 +78,14 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _currentLanguage = languageValue.toLowerCase();
         _newestFirst = isNewestFirst;
         _lastItems = lastItems; // Initialize current value
+        _remindTime = remindTimeValue; // Initialize remind time
 
         // Initialize temporary values
         _newTheme = themeValue;
         _newLanguage = languageValue.toLowerCase();
         _newNewestFirst = isNewestFirst;
         _newLastItems = lastItems; // Initialize temporary value
+        _newRemindTime = remindTimeValue; // Initialize temporary remind time
 
         _isLoading = false;
         _hasChanges = false;
@@ -87,7 +99,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _hasChanges = _newTheme != _currentTheme ||
           _newLanguage != _currentLanguage ||
           _newNewestFirst != _newestFirst ||
-          _newLastItems != _lastItems;
+          _newLastItems != _lastItems ||
+          _newRemindTime != _remindTime;
     });
   }
 
@@ -127,12 +140,19 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       savedSettings.add('last items');
     }
 
+    // Save remind time setting if changed
+    if (_newRemindTime != _remindTime && _newRemindTime != null) {
+      await saveSetting("Remind time", _newRemindTime.toString());
+      savedSettings.add('remind time');
+    }
+
     // Update current values
     setState(() {
       _currentTheme = _newTheme;
       _currentLanguage = _newLanguage;
       _newestFirst = _newNewestFirst ?? _newestFirst;
       _lastItems = _newLastItems ?? _lastItems;
+      _remindTime = _newRemindTime ?? _remindTime;
       _hasChanges = false;
     });
 
@@ -269,6 +289,15 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                 label: lw('Last items'),
                 child: _buildLastItemsField(),
                 helpId: 103, // Keep existing ID 103 for last items setting
+              ),
+
+              SizedBox(height: 10),
+
+              // Remind time row
+              _buildSettingsRow(
+                label: lw('Remind time'),
+                child: _buildRemindTimeField(),
+                helpId: 104, // New ID 104 for remind time setting
               ),
 
               // Add new settings here - they will scroll
@@ -425,5 +454,121 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         },
       ),
     );
+  }
+
+  // Function for Remind time input field and clock button outside
+  Widget _buildRemindTimeField() {
+    return Row(
+      children: [
+        // Text input field (takes most of the space)
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: clFill,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: clUpBar),
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: TextField(
+              controller: _remindTimeController,
+              keyboardType: TextInputType.text,
+              textAlign: TextAlign.left,
+              style: TextStyle(color: clText),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: '10:00',
+                hintStyle: TextStyle(color: clText),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _newRemindTime = value;
+                });
+                _checkForChanges();
+              },
+            ),
+          ),
+        ),
+        // Clock icon button (outside the text field)
+        Container(
+          margin: EdgeInsets.only(left: 8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(4),
+            onTap: () => _selectTime(context),
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+//                color: clUpBar,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Icon(
+                Icons.access_time,
+                color: clText,
+                size: 24,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Time picker function with styled buttons
+  Future<void> _selectTime(BuildContext context) async {
+    // Parse current time or use default
+    final List<String> timeParts = (_newRemindTime ?? "10:00").split(":");
+    final int hour = int.tryParse(timeParts[0]) ?? 10;
+    final int minute = int.tryParse(timeParts[1]) ?? 0;
+
+    final TimeOfDay initialTime = TimeOfDay(hour: hour, minute: minute);
+
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            timePickerTheme: TimePickerThemeData(
+              backgroundColor: clMenu,
+              hourMinuteTextColor: clText,
+              dayPeriodTextColor: clText,
+              dialHandColor: clUpBar,
+              dialBackgroundColor: clFill,
+              dialTextColor: clText,
+              entryModeIconColor: clText,
+            ),
+            colorScheme: ColorScheme.dark(
+              primary: clUpBar,
+              onPrimary: clText,
+              surface: clMenu,
+              onSurface: clText,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: clText,
+                backgroundColor: clUpBar,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      // Format to HH:MM
+      final String hour = picked.hour.toString().padLeft(2, '0');
+      final String minute = picked.minute.toString().padLeft(2, '0');
+      final String formattedTime = "$hour:$minute";
+
+      setState(() {
+        _newRemindTime = formattedTime;
+        _remindTimeController.text = formattedTime;
+      });
+      _checkForChanges();
+    }
   }
 }
