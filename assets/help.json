@@ -1,8 +1,8 @@
 {
   "1": {
-    "en": "",
-    "ru": "",
-    "ua": ""
+    "en": "xxx",
+    "ru": "aaa",
+    "ua": "bbb"
   },
   "10": {
     "en": "Back button returns to the previous screen. If you have unsaved changes, you will be asked if you want to save them before exiting.",
@@ -163,5 +163,10 @@
     "en": "Last items setting. Limits the number of items shown in the main list. Enter 0 to show all items.",
     "ru": "Настройка показа последних записей. Ограничивает количество отображаемых записей в основном списке. Введите 0, чтобы показать все записи.",
     "ua": "Налаштування останніх записів. Обмежує кількість записів, що відображаються в основному списку. Введіть 0, щоб показати всі записи."
+  },
+  "104": {
+    "en": "Set the time when daily reminders will be sent. Format: HH:MM (24-hour format).",
+    "ru": "Установите время ежедневных напоминаний. Формат: ЧЧ:ММ (24-часовой формат).",
+    "ua": "Встановіть час щоденних нагадувань. Формат: ГГ:ХХ (24-годинний формат)."
   }
 }
