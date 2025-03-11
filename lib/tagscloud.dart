@@ -168,7 +168,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
               label: Text(
                 '${tag.name} (${tag.count})',
                 style: TextStyle(
-                  color: isSelected ? clText : clText.withOpacity(0.8),
+                  color: isSelected ? clText : clText,
                   fontSize: fontSize,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),

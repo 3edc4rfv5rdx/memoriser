@@ -10,7 +10,7 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<Scaffol
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-const String progVersion = '0.0.250310';
+const String progVersion = '0.0.250311';
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -18,7 +18,6 @@ const String helpFile = 'assets/help.json';
 const String mainDbFile = 'memorizer.db';  // Changed from mainDbFile
 const String settDbFile = 'settings.db';
 
-// Global variables
 late Database mainDb;
 late Database settDb;
 late BuildContext globalContext;
@@ -37,7 +36,7 @@ const double fsHeader = 22;
 const double fsSHeader = 24;
 
 // Theme names
-const List<String> appTHEMES = ['Light', 'Dark', 'Blue'];
+const List<String> appTHEMES = ['Light', 'Dark', 'Blue', 'Green'];
 
 // Global color variables that will be set based on selected theme
 late Color clText;
@@ -50,32 +49,33 @@ late Color clMenu;
 // Color themes - array of arrays
 List<List<Color>> colorThemes = [
   // Theme 0 - Light (Mustard)
-  [
-    Color(0xFF000000),  // clText - black
+  [ Color(0xFF000000),  // clText - black
     Color(0xFFF5EFD5),  // clBgrnd - pale mustard
     Color(0xFFE6C94C),  // clUpBar - mustard
     Color(0xFFF9F3E3),  // clFill - light mustard
     Color(0xFFFFCC80),  // clSel - light orange
-    Color(0xFFADD8E6),  // clMenu - light blue
-  ],
-  // Theme 1 - Dark
-  [
-    Color(0xFFFFFFFF),  // clText - white
+    Color(0xFFADD8E6),],  // clMenu - light blue
+    // Theme 1 - Dark
+  [ Color(0xFFFFFFFF),  // clText - white
     Color(0xFF212121),  // clBgrnd - dark gray
     Color(0xFF424242),  // clUpBar - medium gray
     Color(0xFF303030),  // clFill - darker gray
     Color(0xFF616161),  // clSel - lighter gray
-    Color(0xFF263238),  // clMenu - dark blue-gray
-  ],
-  // Theme 2 - Blue
-  [
-    Color(0xFF000000),  // clText - black
+    Color(0xFF263238),],  // clMenu - dark blue-gray
+    // Theme 2 - Blue
+  [ Color(0xFF000000),  // clText - black
     Color(0xFFE3F2FD),  // clBgrnd - very light blue
     Color(0xFF2196F3),  // clUpBar - blue
     Color(0xFFBBDEFB),  // clFill - light blue
     Color(0xFF90CAF9),  // clSel - medium light blue
-    Color(0xFFCFD8DC),  // clMenu - blue-gray
-  ],
+    Color(0xFFCFD8DC),],  // clMenu - blue-gray
+    // Green theme, 3
+  [ Color(0xFF121E0A),      // text - темно-зеленый
+    Color(0xFFF3F7ED),      // fon clBgrnd - светлый фисташковый
+    Color(0xFF97BA60),      // upBar - глубокий оливковый
+    Color(0xFFFFFFFF),      // fill
+    Color(0x4D4C6B3D),      // selected - оливковый с прозрачностью
+    Color(0xFFD4E2C6),],    // menu - шалфейный
 ];
 
 // Default settings
@@ -145,10 +145,7 @@ Future<void> readLocale(String locale) async {
   }
 }
 
-
-void myPrint(String msg) {
-  if (xvDebug) print('>>> $msg');
-}
+void myPrint(String msg) {if (xvDebug) print('>>> $msg');}
 
 // Get theme index from name
 int getThemeIndex(String themeName) {
@@ -202,6 +199,16 @@ Future<void> initDefaultSettings() async {
   }
 }
 
+Future<String?> getSetting(String key) async {
+  final List<Map<String, dynamic>> result = await settDb.query(
+    'settings',
+    columns: ['value'],
+    where: 'key = ?',
+    whereArgs: [key],
+  );
+  return result.isNotEmpty ? result.first['value'] as String : null;
+}
+
 // Settings functions
 Future<void> saveSetting(String key, String value) async {
   await settDb.insert(
@@ -213,16 +220,6 @@ Future<void> saveSetting(String key, String value) async {
   if (key == "Color theme") {
     setThemeColors(value);
   }
-}
-
-Future<String?> getSetting(String key) async {
-  final List<Map<String, dynamic>> result = await settDb.query(
-    'settings',
-    columns: ['value'],
-    where: 'key = ?',
-    whereArgs: [key],
-  );
-  return result.isNotEmpty ? result.first['value'] as String : null;
 }
 
 // Navigation helpers
