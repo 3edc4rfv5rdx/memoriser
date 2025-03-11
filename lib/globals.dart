@@ -88,6 +88,8 @@ Map<String, dynamic> defSettings = {
   "Auto-backup": "false",
 };
 
+const ymdDateFormat = 'yyyy-MM-dd';
+
 // Карта поддерживаемых языков с их названиями
 Map<String, String> langNames = {
   'en': 'English',
