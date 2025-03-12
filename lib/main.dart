@@ -397,7 +397,7 @@ class _HomePageState extends State<HomePage> {
                 obscureText: true,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: fsGiga,
+                  fontSize: fsLarge,
                   color: clText,
                 ),
                 decoration: InputDecoration(
@@ -496,7 +496,7 @@ class _HomePageState extends State<HomePage> {
                 obscureText: true,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: fsGiga,
+                  fontSize: fsLarge,
                   color: clText,
                 ),
                 decoration: InputDecoration(
@@ -731,7 +731,7 @@ class _HomePageState extends State<HomePage> {
                 _filterStatus,
                 style: TextStyle(
                   color: clText,
-                  fontSize: fsXLarge,
+                  fontSize: fsLarge,
                   fontWeight: FontWeight.bold,
                 ),
               ),

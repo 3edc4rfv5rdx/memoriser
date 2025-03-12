@@ -143,15 +143,15 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
 
     // Use font size based primarily on frequency
     if (relativeSize < 0.3) {
-      return 14.0; // Smallest size
+      return 15.0; // Smallest size
     } else if (relativeSize < 0.5) {
-      return 18.0; // Small-medium size
+      return 17.0; // Small-medium size
     } else if (relativeSize < 0.7) {
-      return 22.0; // Medium size
+      return 19.0; // Medium size
     } else if (relativeSize < 0.9) {
-      return 26.0; // Large size
+      return 22.0; // Large size
     } else {
-      return 30.0; // Extra large size
+      return 26.0; // Extra large size
     }
   }
 

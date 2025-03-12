@@ -110,14 +110,39 @@ class _EditItemPageState extends State<EditItemPage> {
 
   // Save function that directly interacts with the database
   Future<void> _saveItem() async {
-    if (titleController.text.trim().isEmpty) {
+    if (titleController.text
+        .trim()
+        .isEmpty) {
       okInfoBarRed(lw('Title cannot be empty'), duration: Duration(seconds: 4));
       return;
     }
 
-    if (_remind && _date == null) {
-      okInfoBarRed(lw('Set a date for the reminder'), duration: Duration(seconds: 4));
-      return;
+    if (_remind) {
+      // Check if date is set
+      if (_date == null) {
+        okInfoBarRed(
+            lw('Set a date for the reminder'), duration: Duration(seconds: 4));
+        return;
+      }
+
+      // Validate the reminder date is in the future
+      final tomorrow = DateTime(
+        DateTime
+            .now()
+            .year,
+        DateTime
+            .now()
+            .month,
+        DateTime
+            .now()
+            .day + 1,
+      );
+
+      if (_date!.isBefore(tomorrow)) {
+        okInfoBarRed(lw('Reminder date must be at least tomorrow'),
+            duration: Duration(seconds: 4));
+        return;
+      }
     }
 
     // Convert date to milliseconds for storage
@@ -167,7 +192,9 @@ class _EditItemPageState extends State<EditItemPage> {
             'date': dateMillis,
             'remind': remindValue,
             'hidden': hiddenValue,
-            'created': DateTime.now().millisecondsSinceEpoch,
+            'created': DateTime
+                .now()
+                .millisecondsSinceEpoch,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
@@ -232,7 +259,7 @@ class _EditItemPageState extends State<EditItemPage> {
   // Build priority selector with + and - buttons
   Widget _buildPrioritySelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(34), // ID 34 для всех элементов приоритета
+      onLongPress: () => showHelp(34), // ID 34 for priority elements
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -309,33 +336,73 @@ class _EditItemPageState extends State<EditItemPage> {
                   }),
                 ),
               ),
-
-              // RIGHT SIDE: Checkbox and reminder text
-              GestureDetector(
-                onLongPress: () => showHelp(35), // ID 35 для чекбокса и текста напоминания
-                child: Row(
-                  children: [
-                    Checkbox(
-                      value: _remind,
-                      activeColor: clUpBar,
-                      checkColor: clText,
-                      onChanged: (value) {
-                        setState(() {
-                          _remind = value ?? false;
-                        });
-                      },
-                    ),
-                    Text(
-                      lw('Set reminder'),
-                      style: TextStyle(
-                        color: clText,
-                        fontSize: fsMedium,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// Add date validation function
+  void _validateReminderDate() {
+    // Check if date is set
+    if (_date == null) {
+      okInfoBarOrange(lw('Please set a date for the reminder'));
+      setState(() {
+        _remind = false;
+      });
+      return;
+    }
+
+    // Get tomorrow's date (start of day)
+    final tomorrow = DateTime(
+      DateTime
+          .now()
+          .year,
+      DateTime
+          .now()
+          .month,
+      DateTime
+          .now()
+          .day + 1,
+    );
+
+    // Check if date is at least tomorrow
+    if (_date!.isBefore(tomorrow)) {
+      okInfoBarOrange(lw('Reminder date must be at least tomorrow'));
+      // Optional: automatically uncheck the reminder if date is invalid
+       setState(() {
+         _remind = false;
+       });
+    }
+  }
+
+  Widget _buildReminderSelector() {
+    return GestureDetector(
+      onLongPress: () => showHelp(35), // ID 35 for reminder checkbox
+      child: Row(
+        children: [
+          Checkbox(
+            value: _remind,
+            activeColor: clUpBar,
+            checkColor: clText,
+            onChanged: (value) {
+              setState(() {
+                _remind = value ?? false;
+
+                // If turning on reminder, validate the date
+                if (_remind) {
+                  _validateReminderDate();
+                }
+              });
+            },
+          ),
+          Text(
+            lw('Set reminder'),
+            style: TextStyle(
+              color: clText,
+              fontSize: fsMedium,
+            ),
           ),
         ],
       ),
@@ -376,9 +443,10 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   // Build date field with date picker button
+// Build date field with date picker button
   Widget _buildDateField() {
     return GestureDetector(
-      onLongPress: () => showHelp(36), // ID 36 для поля даты и кнопок
+      onLongPress: () => showHelp(36), // ID 36 for date field and buttons
       child: Row(
         children: [
           Expanded(
@@ -406,7 +474,11 @@ class _EditItemPageState extends State<EditItemPage> {
               setState(() {
                 dateController.clear();
                 _date = null;
+                // Also clear the reminder checkbox when date is cleared
+                _remind = false;
               });
+              // Optionally show a message that reminder was cleared
+              okInfoBarBlue(lw('Date and reminder cleared'));
             },
           ),
         ],
@@ -416,20 +488,20 @@ class _EditItemPageState extends State<EditItemPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.itemId != null; // Проверяем наличие ID
+    final isEditing = widget.itemId != null;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: xvHiddenMode ? Color(0xFFf29238) : clUpBar,
         foregroundColor: clText,
         title: GestureDetector(
-          onLongPress: () => showHelp(30), // ID 30 для заголовка
+          onLongPress: () => showHelp(30), // ID 30 for title
           child: Text(
             isEditing ? lw('Edit Item') : lw('New Item'),
           ),
         ),
         leading: GestureDetector(
-          onLongPress: () => showHelp(10), // ID 10 для кнопки назад
+          onLongPress: () => showHelp(10), // ID 10 for back button
           child: IconButton(
             icon: Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
@@ -437,7 +509,7 @@ class _EditItemPageState extends State<EditItemPage> {
         ),
         actions: [
           GestureDetector(
-            onLongPress: () => showHelp(12), // ID 12 для кнопки сохранения
+            onLongPress: () => showHelp(12), // ID 12 for save button
             child: IconButton(
               icon: Icon(Icons.save),
               onPressed: _saveItem,
@@ -454,7 +526,7 @@ class _EditItemPageState extends State<EditItemPage> {
           children: [
             // Title field
             GestureDetector(
-              onLongPress: () => showHelp(31), // ID 31 для поля заголовка
+              onLongPress: () => showHelp(31), // ID 31 for title field
               child: TextField(
                 controller: titleController,
                 style: TextStyle(color: clText),
@@ -467,11 +539,11 @@ class _EditItemPageState extends State<EditItemPage> {
                 ),
               ),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 10),
 
             // Content field
             GestureDetector(
-              onLongPress: () => showHelp(32), // ID 32 для поля содержимого
+              onLongPress: () => showHelp(32), // ID 32 for content field
               child: TextField(
                 controller: contentController,
                 style: TextStyle(color: clText),
@@ -485,11 +557,11 @@ class _EditItemPageState extends State<EditItemPage> {
                 maxLines: 5,
               ),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 10),
 
             // Tags field
             GestureDetector(
-              onLongPress: () => showHelp(33), // ID 33 для поля тегов
+              onLongPress: () => showHelp(33), // ID 33 for tags field
               child: TextField(
                 controller: tagsController,
                 style: TextStyle(color: clText),
@@ -502,18 +574,22 @@ class _EditItemPageState extends State<EditItemPage> {
                 ),
               ),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 10),
 
             // Priority section
             _buildPrioritySelector(),
-            SizedBox(height: 16),
-
-            // Hidden checkbox (only in hidden mode)
-            _buildHiddenSelector(),
-            if (xvHiddenMode) SizedBox(height: 16),
+            SizedBox(height: 10),
 
             // Date field
             _buildDateField(),
+            SizedBox(height: 10),
+
+            // Reminder checkbox - now placed after the date field
+            _buildReminderSelector(),
+            SizedBox(height: 10),
+
+            // Hidden checkbox (only in hidden mode)
+            _buildHiddenSelector(),
           ],
         ),
       ),
