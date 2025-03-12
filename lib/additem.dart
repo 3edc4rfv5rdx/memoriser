@@ -510,7 +510,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 return ListTile(
                   title: Text('${tag['name']} (${tag['count']})',
                       style: TextStyle(color: clText)),
-                  tileColor: index % 2 == 0 ? clFill : clSel.withOpacity(0.3),
+                  tileColor: index % 2 == 0 ? clFill : clSel,
                   onTap: () {
                     _addTagToField(tag['name']);
                     Navigator.pop(context);
