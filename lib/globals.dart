@@ -12,7 +12,7 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<Scaffol
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-const String progVersion = '0.0.250311';
+const String progVersion = '0.2.250312';
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -35,14 +35,10 @@ const String hiddPinKey = 'hiddpin';
 const hidModeColor = Color(0xFFf29238);
 
 // Font sizes
-const double fsSmall = 11;
-const double fsNormal = 12;
-const double fsMedium = 14;
-const double fsLarge = 16;
-const double fsXLarge = 18;
-const double fsHeader = 22;
-const double fsSHeader = 24;
-const double fsGiga = 28;
+const double fsSmall = 13;
+const double fsNormal = 15;
+const double fsMedium = 17;
+const double fsLarge = 19;
 
 // Theme names
 const List<String> appTHEMES = ['Light', 'Dark', 'Blue', 'Green'];
@@ -131,7 +127,6 @@ Future<void> readLocale(String locale) async {
   } else {
     currentLocale = locale;
   }
-
   // Для английского языка кеш не нужен
   if (currentLocale == 'en') {
     _uiLocale = {};
