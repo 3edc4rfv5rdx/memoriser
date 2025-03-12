@@ -601,3 +601,75 @@ void resetHiddenModeTimer() {
     });
   }
 }
+
+// В globals.dart:
+
+// Основная функция для получения всех тегов с их частотами
+Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
+  try {
+    // Запрашиваем все записи для извлечения тегов
+    List<Map<String, dynamic>> allItems = [];
+
+    // В скрытом режиме нам нужны все записи
+    if (xvHiddenMode) {
+      // Получаем все записи
+      final items = await mainDb.query('items');
+      // Обрабатываем каждую запись (деобфускация)
+      allItems = items.map((item) => processItemForView(item)).toList();
+    } else {
+      // Обычный режим - получаем только нескрытые записи
+      allItems = await mainDb.query('items', where: 'hidden = 0 OR hidden IS NULL');
+    }
+
+    Map<String, int> tagCounts = {};
+
+    // Считаем встречаемость каждого тега
+    for (var item in allItems) {
+      final tagsString = item['tags'] as String?;
+      if (tagsString != null && tagsString.isNotEmpty) {
+        // Разделяем теги по запятой и убираем лишние пробелы
+        List<String> itemTags = tagsString.split(',')
+            .map((tag) => tag.trim())
+            .where((tag) => tag.isNotEmpty)
+            .toList();
+
+        // Подсчитываем вхождения каждого тега
+        for (var tag in itemTags) {
+          tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+        }
+      }
+    }
+
+    // Преобразуем Map в список Map
+    List<Map<String, dynamic>> result = tagCounts.entries.map((entry) {
+      return {
+        'name': entry.key,
+        'count': entry.value,
+      };
+    }).toList();
+
+    // Сортируем по количеству (по убыванию), затем по имени (по алфавиту)
+    result.sort((a, b) {
+      // Сначала сравниваем по количеству (по убыванию)
+      int countComparison = b['count'].compareTo(a['count']);
+
+      // Если количество одинаковое, сортируем по имени
+      if (countComparison == 0) {
+        return a['name'].compareTo(b['name']);
+      }
+
+      return countComparison;
+    });
+
+    return result;
+  } catch (e) {
+    myPrint('Error getting tags with counts: $e');
+    return [];
+  }
+}
+
+// Вспомогательная функция для получения только имен тегов
+Future<List<String>> getAllUniqueTags() async {
+  final tagsWithCounts = await getTagsWithCounts();
+  return tagsWithCounts.map((tag) => tag['name'] as String).toList();
+}

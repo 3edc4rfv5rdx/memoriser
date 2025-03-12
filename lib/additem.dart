@@ -28,6 +28,9 @@ class _EditItemPageState extends State<EditItemPage> {
   bool _hidden = false; // Default hidden value for privacy feature
   bool _isLoading = false; // Индикатор загрузки
 
+  // Список тегов для выпадающего списка
+  List<Map<String, dynamic>> _tagsWithCounts = [];
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +46,31 @@ class _EditItemPageState extends State<EditItemPage> {
       // Если ID не передан, это новая запись
       _hidden = xvHiddenMode; // По умолчанию скрываем в скрытом режиме
     }
+
+    // Загружаем все теги при инициализации
+    _loadTagsData();
+  }
+
+  // Функция для загрузки данных тегов
+  Future<void> _loadTagsData() async {
+    try {
+      // Получаем отсортированные теги с их частотами
+      List<Map<String, dynamic>> tags = await getTagsWithCounts();
+      setState(() {
+        _tagsWithCounts = tags;
+      });
+    } catch (e) {
+      myPrint('Error loading tags data: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    contentController.dispose();
+    tagsController.dispose();
+    dateController.dispose();
+    super.dispose();
   }
 
   // Метод для загрузки записи по ID
@@ -99,20 +127,9 @@ class _EditItemPageState extends State<EditItemPage> {
     }
   }
 
-  @override
-  void dispose() {
-    titleController.dispose();
-    contentController.dispose();
-    tagsController.dispose();
-    dateController.dispose();
-    super.dispose();
-  }
-
   // Save function that directly interacts with the database
   Future<void> _saveItem() async {
-    if (titleController.text
-        .trim()
-        .isEmpty) {
+    if (titleController.text.trim().isEmpty) {
       okInfoBarRed(lw('Title cannot be empty'), duration: Duration(seconds: 4));
       return;
     }
@@ -120,27 +137,19 @@ class _EditItemPageState extends State<EditItemPage> {
     if (_remind) {
       // Check if date is set
       if (_date == null) {
-        okInfoBarRed(
-            lw('Set a date for the reminder'), duration: Duration(seconds: 4));
+        okInfoBarRed(lw('Set a date for the reminder'), duration: Duration(seconds: 4));
         return;
       }
 
       // Validate the reminder date is in the future
       final tomorrow = DateTime(
-        DateTime
-            .now()
-            .year,
-        DateTime
-            .now()
-            .month,
-        DateTime
-            .now()
-            .day + 1,
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day + 1,
       );
 
       if (_date!.isBefore(tomorrow)) {
-        okInfoBarRed(lw('Reminder date must be at least tomorrow'),
-            duration: Duration(seconds: 4));
+        okInfoBarRed(lw('Reminder date must be at least tomorrow'), duration: Duration(seconds: 4));
         return;
       }
     }
@@ -192,9 +201,7 @@ class _EditItemPageState extends State<EditItemPage> {
             'date': dateMillis,
             'remind': remindValue,
             'hidden': hiddenValue,
-            'created': DateTime
-                .now()
-                .millisecondsSinceEpoch,
+            'created': DateTime.now().millisecondsSinceEpoch,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
@@ -259,7 +266,7 @@ class _EditItemPageState extends State<EditItemPage> {
   // Build priority selector with + and - buttons
   Widget _buildPrioritySelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(34), // ID 34 for priority elements
+      onLongPress: () => showHelp(34), // ID 34 для всех элементов приоритета
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -343,43 +350,10 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-// Add date validation function
-  void _validateReminderDate() {
-    // Check if date is set
-    if (_date == null) {
-      okInfoBarOrange(lw('Please set a date for the reminder'));
-      setState(() {
-        _remind = false;
-      });
-      return;
-    }
-
-    // Get tomorrow's date (start of day)
-    final tomorrow = DateTime(
-      DateTime
-          .now()
-          .year,
-      DateTime
-          .now()
-          .month,
-      DateTime
-          .now()
-          .day + 1,
-    );
-
-    // Check if date is at least tomorrow
-    if (_date!.isBefore(tomorrow)) {
-      okInfoBarOrange(lw('Reminder date must be at least tomorrow'));
-      // Optional: automatically uncheck the reminder if date is invalid
-       setState(() {
-         _remind = false;
-       });
-    }
-  }
-
+  // Build reminder checkbox
   Widget _buildReminderSelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(35), // ID 35 for reminder checkbox
+      onLongPress: () => showHelp(35), // ID 35 для чекбокса и текста напоминания
       child: Row(
         children: [
           Checkbox(
@@ -407,6 +381,34 @@ class _EditItemPageState extends State<EditItemPage> {
         ],
       ),
     );
+  }
+
+  // Validate reminder date is in the future
+  void _validateReminderDate() {
+    // Check if date is set
+    if (_date == null) {
+      okInfoBarOrange(lw('Please set a date for the reminder'));
+      setState(() {
+        _remind = false;
+      });
+      return;
+    }
+
+    // Get tomorrow's date (start of day)
+    final tomorrow = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day + 1,
+    );
+
+    // Check if date is at least tomorrow
+    if (_date!.isBefore(tomorrow)) {
+      okInfoBarOrange(lw('Reminder date must be at least tomorrow'));
+      // Automatically uncheck the reminder if date is invalid
+      setState(() {
+        _remind = false;
+      });
+    }
   }
 
   // Build hidden checkbox (only shown in hidden mode)
@@ -443,10 +445,9 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   // Build date field with date picker button
-// Build date field with date picker button
   Widget _buildDateField() {
     return GestureDetector(
-      onLongPress: () => showHelp(36), // ID 36 for date field and buttons
+      onLongPress: () => showHelp(36), // ID 36 для поля даты и кнопок
       child: Row(
         children: [
           Expanded(
@@ -486,22 +487,123 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
+  // Функция для показа диалога выбора тегов
+  void _showTagsDialog() {
+    if (_tagsWithCounts.isEmpty) {
+      okInfoBarBlue(lw('No tags found'));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: clFill,
+          title: Text(lw('Select tag'), style: TextStyle(color: clText)),
+          content: Container(
+            width: double.maxFinite,
+            height: 300,
+            child: ListView.builder(
+              itemCount: _tagsWithCounts.length,
+              itemBuilder: (context, index) {
+                final tag = _tagsWithCounts[index];
+                return ListTile(
+                  title: Text('${tag['name']} (${tag['count']})',
+                      style: TextStyle(color: clText)),
+                  tileColor: index % 2 == 0 ? clFill : clSel.withOpacity(0.3),
+                  onTap: () {
+                    _addTagToField(tag['name']);
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw('Cancel')),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Функция для добавления тега в поле ввода
+  void _addTagToField(String tag) {
+    // Получаем текущее значение поля
+    String currentTags = tagsController.text.trim();
+
+    // Если поле пустое, просто добавляем тег
+    if (currentTags.isEmpty) {
+      tagsController.text = tag;
+    } else {
+      // Проверяем, содержит ли уже тег
+      List<String> existingTags = currentTags.split(',')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+
+      if (!existingTags.contains(tag)) {
+        // Добавляем тег с запятой
+        tagsController.text = currentTags + ', ' + tag;
+      } else {
+        // Тег уже есть, показываем сообщение
+        okInfoBarBlue(lw('Tag already added'));
+      }
+    }
+  }
+
+  // Модифицируем существующий виджет для поля тегов
+  Widget _buildTagsField() {
+    return GestureDetector(
+      onLongPress: () => showHelp(33), // ID 33 для поля тегов
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: tagsController,
+              style: TextStyle(color: clText),
+              decoration: InputDecoration(
+                labelText: lw('Tags (comma separated)'),
+                labelStyle: TextStyle(color: clText),
+                fillColor: clFill,
+                filled: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.tag, color: clText),
+            tooltip: lw('Select from existing tags'),
+            onPressed: _showTagsDialog,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.itemId != null;
+    final isEditing = widget.itemId != null; // Проверяем наличие ID
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: xvHiddenMode ? Color(0xFFf29238) : clUpBar,
         foregroundColor: clText,
         title: GestureDetector(
-          onLongPress: () => showHelp(30), // ID 30 for title
+          onLongPress: () => showHelp(30), // ID 30 для заголовка
           child: Text(
             isEditing ? lw('Edit Item') : lw('New Item'),
           ),
         ),
         leading: GestureDetector(
-          onLongPress: () => showHelp(10), // ID 10 for back button
+          onLongPress: () => showHelp(10), // ID 10 для кнопки назад
           child: IconButton(
             icon: Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
@@ -509,7 +611,7 @@ class _EditItemPageState extends State<EditItemPage> {
         ),
         actions: [
           GestureDetector(
-            onLongPress: () => showHelp(12), // ID 12 for save button
+            onLongPress: () => showHelp(12), // ID 12 для кнопки сохранения
             child: IconButton(
               icon: Icon(Icons.save),
               onPressed: _saveItem,
@@ -526,7 +628,7 @@ class _EditItemPageState extends State<EditItemPage> {
           children: [
             // Title field
             GestureDetector(
-              onLongPress: () => showHelp(31), // ID 31 for title field
+              onLongPress: () => showHelp(31), // ID 31 для поля заголовка
               child: TextField(
                 controller: titleController,
                 style: TextStyle(color: clText),
@@ -543,7 +645,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
             // Content field
             GestureDetector(
-              onLongPress: () => showHelp(32), // ID 32 for content field
+              onLongPress: () => showHelp(32), // ID 32 для поля содержимого
               child: TextField(
                 controller: contentController,
                 style: TextStyle(color: clText),
@@ -559,21 +661,8 @@ class _EditItemPageState extends State<EditItemPage> {
             ),
             SizedBox(height: 10),
 
-            // Tags field
-            GestureDetector(
-              onLongPress: () => showHelp(33), // ID 33 for tags field
-              child: TextField(
-                controller: tagsController,
-                style: TextStyle(color: clText),
-                decoration: InputDecoration(
-                  labelText: lw('Tags (comma separated)'),
-                  labelStyle: TextStyle(color: clText),
-                  fillColor: clFill,
-                  filled: true,
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
+            // Tags field - используем новый метод
+            _buildTagsField(),
             SizedBox(height: 10),
 
             // Priority section
@@ -584,7 +673,7 @@ class _EditItemPageState extends State<EditItemPage> {
             _buildDateField(),
             SizedBox(height: 10),
 
-            // Reminder checkbox - now placed after the date field
+            // Reminder checkbox - moved to after the date field
             _buildReminderSelector(),
             SizedBox(height: 10),
 

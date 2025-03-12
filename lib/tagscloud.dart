@@ -1,4 +1,4 @@
-// tagscloud.dart
+// tagscloud.dart (упрощенная версия)
 import 'package:flutter/material.dart';
 import 'globals.dart';
 
@@ -18,69 +18,25 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
     _loadAllTags();
   }
 
-  // Load all tags from the database
+  // Загрузка тегов с использованием общей функции
   Future<void> _loadAllTags() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Query all items to extract tags
-      List<Map<String, dynamic>> allItems = [];
+      // Используем общую функцию для получения тегов с частотами
+      final tagsWithCounts = await getTagsWithCounts();
 
-      // In hidden mode, we need to filter items and deobfuscate tags
-      if (xvHiddenMode) {
-        // Get items with hidden=1 when in hidden mode
-        final items = await mainDb.query('items', where: 'hidden = 1');
+      // Преобразуем результат в объекты TagData
+      final tags = tagsWithCounts.map((tag) =>
+          TagData(
+            name: tag['name'],
+            count: tag['count'],
+          )
+      ).toList();
 
-        // Process each item for view (deobfuscate)
-        allItems = items.map((item) => processItemForView(item)).toList();
-      } else {
-        // Normal mode - only get non-hidden items
-        allItems = await mainDb.query('items', where: 'hidden = 0 OR hidden IS NULL');
-      }
-
-      Map<String, int> tagCounts = {};
-
-      // Process each item's tags
-      for (var item in allItems) {
-        final tagsString = item['tags'] as String?;
-        if (tagsString != null && tagsString.isNotEmpty) {
-          // Split tags by comma and trim whitespace
-          List<String> itemTags = tagsString.split(',')
-              .map((tag) => tag.trim())
-              .where((tag) => tag.isNotEmpty)
-              .toList();
-
-          // Count occurrences of each tag
-          for (var tag in itemTags) {
-            tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
-          }
-        }
-      }
-
-      // Convert to TagData objects
-      List<TagData> tags = tagCounts.entries.map((entry) {
-        return TagData(
-          name: entry.key,
-          count: entry.value,
-        );
-      }).toList();
-
-      // Sort by count (descending) and then by name (alphabetically) for equal counts
-      tags.sort((a, b) {
-        // First compare by count (descending)
-        int countComparison = b.count.compareTo(a.count);
-
-        // If counts are equal, sort alphabetically by name
-        if (countComparison == 0) {
-          return a.name.compareTo(b.name);
-        }
-
-        return countComparison;
-      });
-
-      // Initialize selected tags based on current filter (if any)
+      // Инициализируем выбранные теги на основе текущего фильтра
       List<String> initialSelectedTags = [];
       if (xvTagFilter.isNotEmpty) {
         initialSelectedTags = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
