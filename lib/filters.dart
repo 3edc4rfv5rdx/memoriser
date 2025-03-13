@@ -250,45 +250,35 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
 // В методе _applyFilters добавляем полную проверку
   void _applyFilters() async {
-    // Проверка корректности формата даты
-    bool datesValid = true;
-
-    if (_dateFromController.text.isNotEmpty) {
+     if (_dateFromController.text.isNotEmpty) {
       if (!validateDateInput(_dateFromController.text)) {
         okInfoBarOrange(lw('Invalid date format in From field. Use YYYY-MM-DD'));
         return;
       }
     }
-
     if (_dateToController.text.isNotEmpty) {
       if (!validateDateInput(_dateToController.text)) {
         okInfoBarOrange(lw('Invalid date format in To field. Use YYYY-MM-DD'));
         return;
       }
     }
-
-    // Проверка, что начальная дата не позже конечной
+    // Проверка, что начальная дата не позже конечной & swap
     if (_filterData.dateFrom != null && _filterData.dateTo != null) {
       if (_filterData.dateFrom!.isAfter(_filterData.dateTo!)) {
-        // Показываем диалог смены дат и выходим
         await _showSwapDatesDialog();
         return; // Выходим без применения фильтра
       }
     }
-
     // Код применения фильтра выполнится только если даты корректны
     _filterData.priority = _selectedPriority >= 0 ? _selectedPriority : null;
     _filterData.hasReminder = _selectedHasReminder;
     _filterData.tags = _tagsController.text.trim().isEmpty ? null : _tagsController.text.trim();
-
     xvFilter = _buildFilterString();
-
     if (_filterData.isActive) {
       okInfoBarGreen(lw('Filter applied'));
     } else {
       okInfoBarBlue(lw('All filters cleared'));
     }
-
     Navigator.pop(context, true);
   }
 
@@ -633,7 +623,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               labelText: label,
               labelStyle: TextStyle(color: clText),
               hintText: 'YYYY-MM-DD',
-              hintStyle: TextStyle(color: clText.withOpacity(0.5)),
+              hintStyle: TextStyle(color: clText),
               fillColor: clFill,
               filled: true,
               border: OutlineInputBorder(),

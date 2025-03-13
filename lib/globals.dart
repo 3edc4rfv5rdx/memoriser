@@ -5,7 +5,6 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:convert'; // Для работы с JSON (json.decode) and base64
 import 'package:flutter/services.dart'; // Для доступа к rootBundle
 import 'dart:async'; // Для Timer
-import 'package:intl/intl.dart'; // Для DateFormat
 
 
 // Глобальные ключи для доступа к основным компонентам Flutter
