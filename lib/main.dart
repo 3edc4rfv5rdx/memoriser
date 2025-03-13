@@ -13,6 +13,7 @@ import 'settings.dart';
 import 'additem.dart';
 import 'tagscloud.dart';
 import 'filters.dart';
+import 'reminders.dart';
 
 
 // Initialize databases
@@ -271,7 +272,17 @@ void main() async {
   // Загрузка локализации
   final languageSetting = await getSetting("Language") ?? defSettings["Language"];
   await readLocale(languageSetting.toLowerCase());
-
+  // Инициализация системы уведомлений
+  await SimpleNotifications.initNotifications();
+  // Проверяем, включены ли напоминания перед планированием
+  final enableReminders = await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
+  if (enableReminders == "true") {
+    // Планируем ежедневную проверку напоминаний
+    await SimpleNotifications.scheduleReminderCheck();
+    myPrint('Напоминания включены, запланирована ежедневная проверка');
+  } else {
+    myPrint('Напоминания отключены, планирование пропущено');
+  }
   runApp(memorizerApp());
 }
 
@@ -328,6 +339,11 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _tapTimer?.cancel();
     super.dispose();
+  }
+
+  // Метод для ручной проверки напоминаний
+  Future<void> _checkReminders() async {
+    await SimpleNotifications.manualCheckReminders();
   }
 
   // Обработчик множественного тапа
@@ -723,6 +739,15 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         actions: [
+          // Добавляем кнопку проверки напоминаний
+          GestureDetector(
+            onLongPress: () => showHelp(40), // ID 40 для кнопки проверки напоминаний
+            child: IconButton(
+              icon: Icon(Icons.notifications),
+              tooltip: lw('Check reminders'),
+              onPressed: _checkReminders,
+            ),
+          ),
           // Индикатор состояния фильтра
           GestureDetector(
             onLongPress: () => showHelp(22), // ID 22 для индикатора фильтра
