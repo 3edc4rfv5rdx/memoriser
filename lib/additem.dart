@@ -141,15 +141,15 @@ class _EditItemPageState extends State<EditItemPage> {
         return;
       }
 
-      // Validate the reminder date is in the future
-      final tomorrow = DateTime(
+      // Validate the reminder date is not in the past
+      final today = DateTime(
         DateTime.now().year,
         DateTime.now().month,
-        DateTime.now().day + 1,
+        DateTime.now().day,
       );
 
-      if (_date!.isBefore(tomorrow)) {
-        okInfoBarRed(lw('Reminder date must be at least tomorrow'), duration: Duration(seconds: 4));
+      if (_date!.isBefore(today)) {
+        okInfoBarRed(lw('Reminder date cannot be in the past'), duration: Duration(seconds: 4));
         return;
       }
     }
@@ -394,16 +394,16 @@ class _EditItemPageState extends State<EditItemPage> {
       return;
     }
 
-    // Get tomorrow's date (start of day)
-    final tomorrow = DateTime(
+    // Get today's date (start of day)
+    final today = DateTime(
       DateTime.now().year,
       DateTime.now().month,
-      DateTime.now().day + 1,
+      DateTime.now().day,
     );
 
-    // Check if date is at least tomorrow
-    if (_date!.isBefore(tomorrow)) {
-      okInfoBarOrange(lw('Reminder date must be at least tomorrow'));
+    // Check if date is at least today (not in the past)
+    if (_date!.isBefore(today)) {
+      okInfoBarOrange(lw('Reminder date cannot be in the past'));
       // Automatically uncheck the reminder if date is invalid
       setState(() {
         _remind = false;

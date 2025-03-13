@@ -90,7 +90,8 @@ Map<String, dynamic> defSettings = {
   "Newest first": "true",
   "Last items": "0",
   "Notification time": "10:00",
-  "Auto-backup": "false",
+  "Enable reminders": "true",
+//  "Auto-backup": "false",
 };
 
 const ymdDateFormat = 'yyyy-MM-dd';

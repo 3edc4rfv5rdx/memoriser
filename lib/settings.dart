@@ -1,7 +1,7 @@
 // settings.dart
 import 'package:flutter/material.dart';
 import 'globals.dart';
-
+import 'reminders.dart'; // Добавляем импорт
 
 // Function to create settings screen
 Widget buildSettingsScreen() {
@@ -22,6 +22,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   bool _newestFirst = true;
   int _lastItems = 0; // Last items setting
   String _remindTime = "10:00"; // Default remind time
+  bool _enableReminders = true; // Add this for reminders setting
   bool _isLoading = true;
 
   // Temporary values to track changes
@@ -30,6 +31,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   bool? _newNewestFirst;
   int? _newLastItems; // Temporary value for Last items
   String? _newRemindTime; // Temporary remind time
+  bool? _newEnableReminders; // Add this for temporary reminders value
   bool _hasChanges = false;
 
   // Controller for Last items input field
@@ -69,6 +71,10 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     // Load remind time setting
     final remindTimeValue = await getSetting("Remind time") ?? "10:00";
 
+    // Load enable reminders setting
+    final enableRemindersValue = await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
+    final enableReminders = enableRemindersValue == "true";
+
     _lastItemsController = TextEditingController(text: lastItems.toString());
     _remindTimeController = TextEditingController(text: remindTimeValue);
 
@@ -77,15 +83,17 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _currentTheme = themeValue;
         _currentLanguage = languageValue.toLowerCase();
         _newestFirst = isNewestFirst;
-        _lastItems = lastItems; // Initialize current value
-        _remindTime = remindTimeValue; // Initialize remind time
+        _lastItems = lastItems;
+        _remindTime = remindTimeValue;
+        _enableReminders = enableReminders; // Initialize the checkbox state
 
         // Initialize temporary values
         _newTheme = themeValue;
         _newLanguage = languageValue.toLowerCase();
         _newNewestFirst = isNewestFirst;
-        _newLastItems = lastItems; // Initialize temporary value
-        _newRemindTime = remindTimeValue; // Initialize temporary remind time
+        _newLastItems = lastItems;
+        _newRemindTime = remindTimeValue;
+        _newEnableReminders = enableReminders; // Initialize the temporary value
 
         _isLoading = false;
         _hasChanges = false;
@@ -100,7 +108,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           _newLanguage != _currentLanguage ||
           _newNewestFirst != _newestFirst ||
           _newLastItems != _lastItems ||
-          _newRemindTime != _remindTime;
+          _newRemindTime != _remindTime ||
+          _newEnableReminders != _enableReminders; // Add this to the check
     });
   }
 
@@ -112,6 +121,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     }
 
     bool languageOrThemeChanged = false;
+    bool reminderSettingsChanged = false;
     List<String> savedSettings = [];
 
     // Save new language settings if changed
@@ -144,6 +154,14 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     if (_newRemindTime != _remindTime && _newRemindTime != null) {
       await saveSetting("Remind time", _newRemindTime.toString());
       savedSettings.add('remind time');
+      reminderSettingsChanged = true;
+    }
+
+    // Save enable reminders setting if changed
+    if (_newEnableReminders != _enableReminders && _newEnableReminders != null) {
+      await saveSetting("Enable reminders", _newEnableReminders.toString());
+      savedSettings.add('enable reminders');
+      reminderSettingsChanged = true;
     }
 
     // Update current values
@@ -153,8 +171,21 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _newestFirst = _newNewestFirst ?? _newestFirst;
       _lastItems = _newLastItems ?? _lastItems;
       _remindTime = _newRemindTime ?? _remindTime;
+      _enableReminders = _newEnableReminders ?? _enableReminders;
       _hasChanges = false;
     });
+
+// Reschedule reminders if reminder settings changed
+    if (reminderSettingsChanged) {
+      if (_newEnableReminders == true) {
+        await SimpleNotifications.scheduleReminderCheck();
+        okInfoBarBlue(lw('Reminder schedule updated'));
+      } else {
+        // If reminders are disabled, cancel all scheduled notifications
+        await SimpleNotifications.cancelAllNotifications();
+        okInfoBarBlue(lw('Reminders disabled'));
+      }
+    }
 
     // Show one common notification for all saved settings
     if (savedSettings.isNotEmpty) {
@@ -293,14 +324,22 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
               SizedBox(height: 10),
 
-              // Remind time row
+              // Enable reminders checkbox row
               _buildSettingsRow(
-                label: lw('Remind time'),
-                child: _buildRemindTimeField(),
-                helpId: 104, // New ID 104 for remind time setting
+                label: lw('Enable reminders'),
+                child: _buildEnableRemindersCheckbox(),
+                helpId: 105, // New ID 105 for enable reminders setting
               ),
 
-              // Add new settings here - they will scroll
+              SizedBox(height: 10),
+
+              // Remind time row (only show if reminders enabled)
+              if (_newEnableReminders == true)
+                _buildSettingsRow(
+                  label: lw('Remind time'),
+                  child: _buildRemindTimeField(),
+                  helpId: 104, // Keep existing ID 104 for remind time setting
+                ),
             ],
           ),
         ),
@@ -448,6 +487,26 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           if (parsedValue >= 0) { // Check that value is non-negative
             setState(() {
               _newLastItems = parsedValue;
+            });
+            _checkForChanges();
+          }
+        },
+      ),
+    );
+  }
+
+  // Function for enable reminders checkbox
+  Widget _buildEnableRemindersCheckbox() {
+    return Container(
+      alignment: Alignment.centerLeft,
+      child: Checkbox(
+        value: _newEnableReminders,
+        activeColor: clUpBar,
+        checkColor: clText,
+        onChanged: (bool? value) {
+          if (value != null && value != _newEnableReminders) {
+            setState(() {
+              _newEnableReminders = value;
             });
             _checkForChanges();
           }
