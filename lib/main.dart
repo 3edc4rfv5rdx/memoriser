@@ -704,6 +704,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+// In the _HomePageState class, we need to modify the AppBar and PopupMenuButton
+
   @override
   Widget build(BuildContext context) {
     globalContext = context;
@@ -762,46 +764,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          // Кнопка фильтра
-          GestureDetector(
-            onLongPress: () => showHelp(23), // ID 23 для кнопки фильтра
-            child: IconButton(
-              icon: Icon(Icons.filter_alt),
-              tooltip: lw('Filters'),
-              onPressed: () {
-                Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => FiltersScreen(),
-                  ),
-                ).then((needsRefresh) {
-                  if (needsRefresh == true) {
-                    _refreshItems();
-                  }
-                });
-              },
-            ),
-          ),
-          // Кнопка тег-фильтра
-          GestureDetector(
-            onLongPress: () => showHelp(24), // ID 24 для кнопки тег-фильтра
-            child: IconButton(
-              icon: Icon(Icons.filter_list),
-              tooltip: lw('Tag filter'),
-              onPressed: () {
-                Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TagsCloudScreen(),
-                  ),
-                ).then((needsRefresh) {
-                  if (needsRefresh == true) {
-                    _refreshItems();
-                  }
-                });
-              },
-            ),
-          ),
+          // Removed Filter and Tag filter buttons here
           // Меню
           GestureDetector(
             onLongPress: () => showHelp(25), // ID 25 для кнопки меню
@@ -823,6 +786,30 @@ class _HomePageState extends State<HomePage> {
                   _showAbout();
                 } else if (result == 'clear_filters') {
                   _clearAllFilters();
+                } else if (result == 'filters') {
+                  // Added handler for Filters option
+                  Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FiltersScreen(),
+                    ),
+                  ).then((needsRefresh) {
+                    if (needsRefresh == true) {
+                      _refreshItems();
+                    }
+                  });
+                } else if (result == 'tag_filter') {
+                  // Added handler for Tag filter option
+                  Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TagsCloudScreen(),
+                    ),
+                  ).then((needsRefresh) {
+                    if (needsRefresh == true) {
+                      _refreshItems();
+                    }
+                  });
                 } else if (result == 'exit_private') {
                   setState(() {
                     xvHiddenMode = false;
@@ -840,6 +827,28 @@ class _HomePageState extends State<HomePage> {
                       onLongPress: () => showHelp(26), // ID 26 для пункта меню очистки фильтров
                       child: Text(
                         lw('Clear all filters'),
+                        style: TextStyle(color: clText),
+                      ),
+                    ),
+                  ),
+                  // Added Filter option
+                  PopupMenuItem<String>(
+                    value: 'filters',
+                    child: GestureDetector(
+                      onLongPress: () => showHelp(23), // Reusing ID 23 from former filter button
+                      child: Text(
+                        lw('Filters'),
+                        style: TextStyle(color: clText),
+                      ),
+                    ),
+                  ),
+                  // Added Tag filter option
+                  PopupMenuItem<String>(
+                    value: 'tag_filter',
+                    child: GestureDetector(
+                      onLongPress: () => showHelp(24), // Reusing ID 24 from former tag filter button
+                      child: Text(
+                        lw('Tag filter'),
                         style: TextStyle(color: clText),
                       ),
                     ),
@@ -873,7 +882,7 @@ class _HomePageState extends State<HomePage> {
                       value: 'exit_private',
                       child: Text(
                         lw('Exit private mode'),
-                        style: TextStyle(color: clText), // Изменено с Colors.orange
+                        style: TextStyle(color: clText),
                       ),
                     ),
                   );
@@ -1030,7 +1039,6 @@ class _HomePageState extends State<HomePage> {
           );
         },
       ),
-// В методе build класса _HomePageState
       floatingActionButton: GestureDetector(
         onLongPress: () => showHelp(29), // ID 29 для кнопки добавления
         child: FloatingActionButton(
