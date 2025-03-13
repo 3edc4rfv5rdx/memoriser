@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:convert'; // Для работы с JSON (json.decode) and base64
 import 'package:flutter/services.dart'; // Для доступа к rootBundle
 import 'dart:async'; // Для Timer
+import 'package:intl/intl.dart'; // Для DateFormat
 
 
 // Глобальные ключи для доступа к основным компонентам Flutter
@@ -674,3 +675,51 @@ Future<List<String>> getAllUniqueTags() async {
   final tagsWithCounts = await getTagsWithCounts();
   return tagsWithCounts.map((tag) => tag['name'] as String).toList();
 }
+
+// Function to validate the date format (YYYY-MM-DD)
+bool isValidDateFormat(String input) {
+  final RegExp dateRegex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+  return dateRegex.hasMatch(input);
+}
+
+// Function to check if the date is valid (e.g., not February 30)
+bool isValidDate(String input) {
+  try {
+    final parts = input.split('-');
+    if (parts.length != 3) return false;
+
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final day = int.parse(parts[2]);
+
+    final date = DateTime(year, month, day);
+    return date.year == year && date.month == month && date.day == day;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Function to validate the date input (format and validity)
+bool validateDateInput(String input) {
+  if (input.isEmpty) {
+    return true; // Allow empty date
+  }
+  if (!isValidDateFormat(input)) {
+    return false; // Invalid format
+  }
+  if (!isValidDate(input)) {
+    return false; // Invalid date
+  }
+  return true; // Date is valid
+}
+
+bool isDateFromBeforeDateTo(String dateFrom, String dateTo) {
+  try {
+    final from = DateTime.parse(dateFrom);
+    final to = DateTime.parse(dateTo);
+    return from.isBefore(to) || from.isAtSameMomentAs(to);
+  } catch (e) {
+    return false;
+  }
+}
+

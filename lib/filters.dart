@@ -61,6 +61,9 @@ class _FiltersScreenState extends State<FiltersScreen> {
   int _selectedPriority = -1; // -1 means "any priority"
   bool? _selectedHasReminder; // null means "any value"
 
+  // Список тегов для выпадающего списка
+  List<Map<String, dynamic>> _tagsWithCounts = [];
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +90,22 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
     _selectedPriority = _filterData.priority ?? -1;
     _selectedHasReminder = _filterData.hasReminder;
+
+    // Загружаем теги при инициализации
+    _loadTagsData();
+  }
+
+  // Функция для загрузки данных тегов
+  Future<void> _loadTagsData() async {
+    try {
+      // Получаем отсортированные теги с их частотами
+      List<Map<String, dynamic>> tags = await getTagsWithCounts();
+      setState(() {
+        _tagsWithCounts = tags;
+      });
+    } catch (e) {
+      myPrint('Error loading tags data: $e');
+    }
   }
 
   @override
@@ -176,26 +195,100 @@ class _FiltersScreenState extends State<FiltersScreen> {
     return parts.join('|');
   }
 
-  // Apply filters
-  void _applyFilters() {
-    // Update filter data from UI
+// Функция для показа диалога обмена дат
+  Future<void> _showSwapDatesDialog() async {
+    bool swapDates = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: clFill,
+          title: Text(lw('Invalid Date Range'), style: TextStyle(color: clText)),
+          content: Text(
+            lw('Date from is after Date to. Would you like to swap the dates?'),
+            style: TextStyle(color: clText),
+          ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw('Cancel')),
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw('Swap Dates')),
+              onPressed: () {
+                Navigator.pop(context, true);
+              },
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+
+    if (swapDates) {
+      setState(() {
+        // Меняем даты местами
+        final tempDate = _filterData.dateFrom;
+        _filterData.dateFrom = _filterData.dateTo;
+        _filterData.dateTo = tempDate;
+
+        // Также обновляем текст в полях
+        final tempText = _dateFromController.text;
+        _dateFromController.text = _dateToController.text;
+        _dateToController.text = tempText;
+      });
+    }
+  }
+
+// В методе _applyFilters добавляем полную проверку
+  void _applyFilters() async {
+    // Проверка корректности формата даты
+    bool datesValid = true;
+
+    if (_dateFromController.text.isNotEmpty) {
+      if (!validateDateInput(_dateFromController.text)) {
+        okInfoBarOrange(lw('Invalid date format in From field. Use YYYY-MM-DD'));
+        return;
+      }
+    }
+
+    if (_dateToController.text.isNotEmpty) {
+      if (!validateDateInput(_dateToController.text)) {
+        okInfoBarOrange(lw('Invalid date format in To field. Use YYYY-MM-DD'));
+        return;
+      }
+    }
+
+    // Проверка, что начальная дата не позже конечной
+    if (_filterData.dateFrom != null && _filterData.dateTo != null) {
+      if (_filterData.dateFrom!.isAfter(_filterData.dateTo!)) {
+        // Показываем диалог смены дат и выходим
+        await _showSwapDatesDialog();
+        return; // Выходим без применения фильтра
+      }
+    }
+
+    // Код применения фильтра выполнится только если даты корректны
     _filterData.priority = _selectedPriority >= 0 ? _selectedPriority : null;
     _filterData.hasReminder = _selectedHasReminder;
     _filterData.tags = _tagsController.text.trim().isEmpty ? null : _tagsController.text.trim();
 
-    // Update global filter string
     xvFilter = _buildFilterString();
 
-    myPrint('Filter applied: $xvFilter');
-
-    // Show confirmation message
     if (_filterData.isActive) {
       okInfoBarGreen(lw('Filter applied'));
     } else {
       okInfoBarBlue(lw('All filters cleared'));
     }
 
-    // Return to previous screen with refresh signal
     Navigator.pop(context, true);
   }
 
@@ -298,6 +391,78 @@ class _FiltersScreenState extends State<FiltersScreen> {
         _filterData.dateTo = picked;
         _dateToController.text = DateFormat(ymdDateFormat).format(picked);
       });
+    }
+  }
+
+  // Функция для показа диалога выбора тегов
+  void _showTagsDialog() {
+    if (_tagsWithCounts.isEmpty) {
+      okInfoBarBlue(lw('No tags found'));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: clFill,
+          title: Text(lw('Select tag'), style: TextStyle(color: clText)),
+          content: Container(
+            width: double.maxFinite,
+            height: 300,
+            child: ListView.builder(
+              itemCount: _tagsWithCounts.length,
+              itemBuilder: (context, index) {
+                final tag = _tagsWithCounts[index];
+                return ListTile(
+                  title: Text('${tag['name']} (${tag['count']})',
+                      style: TextStyle(color: clText)),
+                  tileColor: index % 2 == 0 ? clFill : clSel,
+                  onTap: () {
+                    _addTagToField(tag['name']);
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+              ),
+              child: Text(lw('Cancel')),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Функция для добавления тега в поле ввода
+  void _addTagToField(String tag) {
+    // Получаем текущее значение поля
+    String currentTags = _tagsController.text.trim();
+
+    // Если поле пустое, просто добавляем тег
+    if (currentTags.isEmpty) {
+      _tagsController.text = tag;
+    } else {
+      // Проверяем, содержит ли уже тег
+      List<String> existingTags = currentTags.split(',')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+
+      if (!existingTags.contains(tag)) {
+        // Добавляем тег с запятой
+        _tagsController.text = currentTags + ', ' + tag;
+      } else {
+        // Тег уже есть, показываем сообщение
+        okInfoBarBlue(lw('Tag already added'));
+      }
     }
   }
 
@@ -432,6 +597,102 @@ class _FiltersScreenState extends State<FiltersScreen> {
     );
   }
 
+  Widget _buildDateField(String label, TextEditingController controller, Future<void> Function() onSelectDate) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: controller,
+            style: TextStyle(color: clText),
+            readOnly: false, // Разрешаем ручной ввод
+            onChanged: (value) {
+              if (value.isEmpty) {
+                // Если поле пустое, сбрасываем соответствующую дату
+                if (label == lw('Date from')) {
+                  _filterData.dateFrom = null;
+                } else {
+                  _filterData.dateTo = null;
+                }
+              } else {
+                // Проверяем формат и корректность даты
+                if (isValidDateFormat(value) && isValidDate(value)) {
+                  try {
+                    final date = DateFormat(ymdDateFormat).parse(value);
+                    if (label == lw('Date from')) {
+                      _filterData.dateFrom = date;
+                    } else {
+                      _filterData.dateTo = date;
+                    }
+                  } catch (e) {
+                    myPrint('Error parsing date: $e');
+                  }
+                }
+              }
+            },
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: TextStyle(color: clText),
+              hintText: 'YYYY-MM-DD',
+              hintStyle: TextStyle(color: clText.withOpacity(0.5)),
+              fillColor: clFill,
+              filled: true,
+              border: OutlineInputBorder(),
+              floatingLabelBehavior: FloatingLabelBehavior.auto,
+            ),
+          ),
+        ),
+        IconButton(
+          icon: Icon(Icons.calendar_today, color: clText),
+          onPressed: onSelectDate,
+        ),
+        IconButton(
+          icon: Icon(Icons.clear, color: clText),
+          onPressed: () {
+            setState(() {
+              controller.clear();
+              if (label == lw('Date from')) {
+                _filterData.dateFrom = null;
+              } else {
+                _filterData.dateTo = null;
+              }
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  // Build tags field with tag picker button
+  Widget _buildTagsField() {
+    return GestureDetector(
+      onLongPress: () => showHelp(33), // ID 33 for tags field
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _tagsController,
+              style: TextStyle(color: clText),
+              decoration: InputDecoration(
+                labelText: lw('Tags (comma separated)'),
+                labelStyle: TextStyle(color: clText),
+                fillColor: clFill,
+                filled: true,
+                border: OutlineInputBorder(),
+                floatingLabelBehavior: FloatingLabelBehavior.auto,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.tag, color: clText),
+            tooltip: lw('Select from existing tags'),
+            onPressed: _showTagsDialog,
+          ),
+        ],
+      ),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -486,104 +747,16 @@ class _FiltersScreenState extends State<FiltersScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // "Date from" filter
-            GestureDetector(
-              onLongPress: () => showHelp(36), // ID 36 for date field
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lw('Date from'),
-                    style: TextStyle(
-                      color: clText,
-                      fontSize: fsMedium,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _dateFromController,
-                          style: TextStyle(color: clText),
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText: lw('Date from'),
-                            labelStyle: TextStyle(color: clText),
-                            fillColor: clFill,
-                            filled: true,
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.calendar_today, color: clText),
-                        onPressed: () => _selectDateFrom(context),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.clear, color: clText),
-                        onPressed: () {
-                          setState(() {
-                            _dateFromController.clear();
-                            _filterData.dateFrom = null;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            // "Date from" field
+            _buildDateField(lw('Date from'), _dateFromController, () => _selectDateFrom(context)),
             SizedBox(height: 16),
 
-            // "Date to" filter
-            GestureDetector(
-              onLongPress: () => showHelp(36), // ID 36 for date field (same as date from)
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lw('Date to'),
-                    style: TextStyle(
-                      color: clText,
-                      fontSize: fsMedium,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _dateToController,
-                          style: TextStyle(color: clText),
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText: lw('Date to'),
-                            labelStyle: TextStyle(color: clText),
-                            fillColor: clFill,
-                            filled: true,
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.calendar_today, color: clText),
-                        onPressed: () => _selectDateTo(context),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.clear, color: clText),
-                        onPressed: () {
-                          setState(() {
-                            _dateToController.clear();
-                            _filterData.dateTo = null;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            // "Date to" field
+            _buildDateField(lw('Date to'), _dateToController, () => _selectDateTo(context)),
+            SizedBox(height: 16),
+
+            // Tags field - now using the new method with tag button
+            _buildTagsField(),
             SizedBox(height: 16),
 
             // Priority filter
@@ -592,42 +765,11 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
             // Reminder filter
             _buildReminderSelector(),
-            SizedBox(height: 16),
-
-            // Tags filter
-            GestureDetector(
-              onLongPress: () => showHelp(33), // ID 33 for tags field (same as in additem.dart)
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    lw('Tags (comma separated)'),
-                    style: TextStyle(
-                      color: clText,
-                      fontSize: fsMedium,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  TextField(
-                    controller: _tagsController,
-                    style: TextStyle(color: clText),
-                    decoration: InputDecoration(
-                      labelText: lw('Tags'),
-                      labelStyle: TextStyle(color: clText),
-                      fillColor: clFill,
-                      filled: true,
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
     );
   }
-}
 
 // Function to get filter status text
 Future<String> getFilterStatusText() async {
@@ -650,4 +792,5 @@ Future<String> getFilterStatusText() async {
   } else {
     return '(All) ';
   }
+ }
 }
