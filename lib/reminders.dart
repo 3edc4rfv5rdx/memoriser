@@ -1,8 +1,6 @@
 // reminders.dart
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'globals.dart';
-import 'additem.dart';
 
 // A simple notification system using direct platform channels
 class SimpleNotifications {
