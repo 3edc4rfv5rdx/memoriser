@@ -146,7 +146,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
                 style: TextStyle(
                   color: isSelected ? clText : clText,
                   fontSize: fontSize,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: isSelected ? fwBold : fwNormal,
                 ),
               ),
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4), // Reduced vertical padding
@@ -167,7 +167,12 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
           onLongPress: () => showHelp(50), // ID 50 for Tags Cloud screen title
           child: Row(
             children: [
-              Text(lw('Tags Cloud')),
+              Text(lw('Tags'),
+                  style: TextStyle(
+                    fontSize: fsLarge,
+                    color: clText,
+                    fontWeight: fwBold,)
+              ),
               if (xvHiddenMode)
                 Padding(
                   padding: const EdgeInsets.only(left: 8.0),
@@ -233,7 +238,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
                 style: TextStyle(
                   color: clText,
                   fontSize: fsMedium,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: fwBold,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),

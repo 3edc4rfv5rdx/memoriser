@@ -34,11 +34,13 @@ String currentPin = '';
 const String hiddPinKey = 'hiddpin';
 const hidModeColor = Color(0xFFf29238);
 
-// Font sizes
+// Font setups
 const double fsSmall = 13;
 const double fsNormal = 15;
 const double fsMedium = 17;
 const double fsLarge = 19;
+const fwNormal = FontWeight.normal;
+const fwBold = FontWeight.bold;
 
 // Theme names
 const List<String> appTHEMES = ['Light', 'Dark', 'Blue', 'Green'];
@@ -272,8 +274,8 @@ Future<dynamic> showCustomDialog({
           borderRadius: BorderRadius.circular(8.0),
           side: BorderSide(color: clUpBar, width: 2.0),
         ),
-        title: Text(title, style: TextStyle(color: clText)),
-        content: Text(content, style: TextStyle(color: clText)),
+        title: Text(title, style: TextStyle(color: clText, fontSize: fsLarge, fontWeight: fwBold,),),
+        content: Text(content, style: TextStyle(color: clText, fontSize: fsNormal, fontWeight: fwNormal,),),
         actions: actions?.map((action) =>
             TextButton(
               style: TextButton.styleFrom(
@@ -529,19 +531,6 @@ String obfuscateText(String text) {
   // Используем простой Base64 для обфускации
   return base64Encode(utf8.encode(text));
 }
-
-// Функция для деобфускации текста - просто Base64
-// String deobfuscateText(String encodedText) {
-//   if (encodedText.isEmpty) return encodedText;
-//
-//   try {
-//     // Декодируем из Base64
-//     return utf8.decode(base64Decode(encodedText));
-//   } catch (e) {
-//     myPrint('Error deobfuscating text: $e');
-//     return 'Error: Corrupted data';
-//   }
-// }
 
 String deobfuscateText(String encodedText) {
   if (encodedText.isEmpty) return encodedText;

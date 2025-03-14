@@ -268,7 +268,12 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           ),
           title: GestureDetector(
             onLongPress: () => showHelp(60), // ID 60 for settings screen title
-            child: Text(lw('Settings')),
+            child: Text(lw('Settings'),
+                style: TextStyle(
+                  fontSize: fsLarge,
+                  color: clText,
+                  fontWeight: fwBold,)
+            ),
           ),
           actions: [
             // Save button in AppBar (disk icon) with long press handler

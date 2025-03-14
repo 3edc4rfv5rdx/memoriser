@@ -504,7 +504,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
                   style: TextStyle(
                     color: clText,
                     fontSize: fsMedium,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: fwBold,
                   ),
                 ),
               ),
@@ -691,7 +691,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
         foregroundColor: clText,
         title: GestureDetector(
           onLongPress: () => showHelp(40), // ID 40 for screen title
-          child: Text(lw('Filters')),
+          child: Text(lw('Filters'),
+            style: TextStyle(
+            fontSize: fsLarge,
+            color: clText,
+            fontWeight: fwBold,)
+        ),
         ),
         leading: GestureDetector(
           onLongPress: () => showHelp(10), // ID 10 for back button

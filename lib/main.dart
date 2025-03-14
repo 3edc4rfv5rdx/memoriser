@@ -718,7 +718,13 @@ class _HomePageState extends State<HomePage> {
           onTap: _handleMultipleTap, // Добавляем обработчик множественного тапа
           child: Row(
             children: [
-              Text(lw('Memorizer')),
+              Text(
+                lw('Memorizer'),
+                style: TextStyle(
+                  fontSize: fsLarge,
+                  fontWeight: fwBold,
+                ),
+              ),
               if (xvHiddenMode)
                 Padding(
                   padding: const EdgeInsets.only(left: 8.0),
@@ -758,8 +764,8 @@ class _HomePageState extends State<HomePage> {
                 _filterStatus,
                 style: TextStyle(
                   color: clText,
-                  fontSize: fsLarge,
-                  fontWeight: FontWeight.bold,
+                  fontSize: fsNormal,
+                  fontWeight: fwBold,
                 ),
               ),
             ),
@@ -930,7 +936,7 @@ class _HomePageState extends State<HomePage> {
                   child: Text(
                     item['title'],
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: fwBold,
                       color: clText,
                     ),
                   ),
@@ -977,7 +983,7 @@ class _HomePageState extends State<HomePage> {
                         style: TextStyle(
                           fontSize: fsNormal,
                           color: isReminder ? Colors.red : clText,
-                          fontWeight: isReminder ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isReminder ? fwBold : fwNormal,
                         ),
                       ),
                     ],
@@ -1006,7 +1012,7 @@ class _HomePageState extends State<HomePage> {
                       priorityValue.toString(),
                       style: TextStyle(
                         color: clText,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: fwBold,
                         fontSize: fsSmall,
                       ),
                     ),
@@ -1014,8 +1020,7 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             trailing: isReminder
-                ? Icon(Icons.notifications_active, color: Colors.red)
-                : null,
+                ? Icon(Icons.notifications_active, color: Colors.red) : null,
             onTap: () {
               // Just select the item and highlight it
               setState(() {
