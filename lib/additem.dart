@@ -311,7 +311,7 @@ class _EditItemPageState extends State<EditItemPage> {
                   style: TextStyle(
                     color: clText,
                     fontSize: fsMedium,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: fwBold,
                   ),
                 ),
               ),
@@ -600,6 +600,10 @@ class _EditItemPageState extends State<EditItemPage> {
           onLongPress: () => showHelp(30), // ID 30 для заголовка
           child: Text(
             isEditing ? lw('Edit Item') : lw('New Item'),
+              style: TextStyle(
+                fontSize: fsLarge,
+                color: clText,
+                fontWeight: fwBold,)
           ),
         ),
         leading: GestureDetector(
