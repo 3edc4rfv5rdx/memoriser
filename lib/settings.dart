@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'globals.dart';
 import 'reminders.dart'; // Добавляем импорт
+import 'backup.dart';
 
 // Function to create settings screen
 Widget buildSettingsScreen() {
@@ -21,7 +22,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentLanguage;
   bool _newestFirst = true;
   int _lastItems = 0; // Last items setting
-  String _remindTime = "10:00"; // Default remind time
+  String _remindTime = "08:00"; // Default remind time
   bool _enableReminders = true; // Add this for reminders setting
   bool _isLoading = true;
 
@@ -251,7 +252,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           foregroundColor: clText,
           // Customize back button with long press handler
           leading: GestureDetector(
-            onLongPress: () => showHelp(10), // ID 10 for back button (same as in other screens)
+            onLongPress: () => showHelp(10), // ID 10 for back button
             child: IconButton(
               icon: Icon(Icons.arrow_back),
               onPressed: () {
@@ -276,9 +277,79 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             ),
           ),
           actions: [
+            // Добавляем кнопку бэкапа
+            GestureDetector(
+              onLongPress: () => showHelp(44), // ID 44 для кнопки бэкапа
+              child: PopupMenuButton<String>(
+                icon: Icon(Icons.backup),
+                tooltip: lw('Backup'),
+                color: clMenu,
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<String>(
+                      value: 'create_backup',
+                      child: GestureDetector(
+                        onLongPress: () => showHelp(45), // ID 45 для пункта меню создания бэкапа
+                        child: Text(
+                          lw('Create backup'),
+                          style: TextStyle(color: clText),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'restore_backup',
+                      child: GestureDetector(
+                        onLongPress: () => showHelp(46), // ID 46 для пункта меню восстановления
+                        child: Text(
+                          lw('Restore from backup'),
+                          style: TextStyle(color: clText),
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+                onSelected: (String result) async {
+                  if (result == 'create_backup') {
+                    final result = await createBackup();
+                    if (result.contains('Error')) {
+                      okInfoBarRed(result);
+                    } else {
+                      okInfoBarGreen(result);
+                    }
+                  } else if (result == 'restore_backup') {
+                    // Показать предупреждение перед восстановлением
+                    final shouldRestore = await showCustomDialog(
+                      title: lw('Warning'),
+                      content: lw('Restore will replace all data'),
+                      actions: [
+                        {
+                          'label': lw('Cancel'),
+                          'value': false,
+                          'isDestructive': false,
+                        },
+                        {
+                          'label': lw('Restore'),
+                          'value': true,
+                          'isDestructive': true,
+                        },
+                      ],
+                    );
+
+                    if (shouldRestore == true) {
+                      final result = await restoreBackup();
+                      if (result.contains('Error')) {
+                        okInfoBarRed(result);
+                      } else {
+                        okInfoBarGreen(result);
+                      }
+                    }
+                  }
+                },
+              ),
+            ),
             // Save button in AppBar (disk icon) with long press handler
             GestureDetector(
-              onLongPress: () => showHelp(12), // ID 12 for save button (same as in additem.dart)
+              onLongPress: () => showHelp(12), // ID 12 for save button
               child: IconButton(
                 icon: Icon(Icons.save),
                 tooltip: lw('Save'),

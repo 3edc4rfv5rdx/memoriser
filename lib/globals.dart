@@ -91,7 +91,7 @@ Map<String, dynamic> defSettings = {
   "Color theme": "Light",
   "Newest first": "true",
   "Last items": "0",
-  "Notification time": "10:00",
+  "Notification time": "08:00",
   "Enable reminders": "true",
 //  "Auto-backup": "false",
 };
