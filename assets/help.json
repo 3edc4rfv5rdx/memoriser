@@ -124,6 +124,21 @@
     "ru": "Кнопка отмены. Отменяет любые изменения фильтров и возвращает на предыдущий экран.",
     "ua": "Кнопка скасування. Скасовує будь-які зміни фільтрів і повертає на попередній екран."
   },
+  "44": {
+    "en": "Backup button. Opens a menu with options to create backups of your database or restore from previously created backups.",
+    "ru": "Кнопка бэкапа. Открывает меню с опциями создания резервных копий базы данных или восстановления из ранее созданных копий.",
+    "ua": "Кнопка бекапу. Відкриває меню з опціями створення резервних копій бази даних або відновлення з раніше створених копій."
+  },
+  "45": {
+    "en": "Create backup option. Creates a backup of your database and saves it to the Download/Memorizer folder with the current date in the filename.",
+    "ru": "Опция создания резервной копии. Создает резервную копию базы данных и сохраняет её в папке Download/Memorizer с текущей датой в имени файла.",
+    "ua": "Опція створення резервної копії. Створює резервну копію бази даних і зберігає її в папці Download/Memorizer з поточною датою в імені файлу."
+  },
+  "46": {
+    "en": "Restore from backup option. Allows you to select a previously created backup file to restore your database. Warning: this will replace all current data with the data from the backup.",
+    "ru": "Опция восстановления из резервной копии. Позволяет выбрать ранее созданный файл резервной копии для восстановления базы данных. Внимание: это заменит все текущие данные данными из резервной копии.",
+    "ua": "Опція відновлення з резервної копії. Дозволяє вибрати раніше створений файл резервної копії для відновлення бази даних. Увага: це замінить всі поточні дані даними з резервної копії."
+  },
   "50": {
     "en": "Tags Cloud screen. Visual representation of all tags in your items. Larger tags appear more frequently in your items.",
     "ru": "Экран облака тегов. Визуальное представление всех тегов в ваших записях. Более крупные теги встречаются чаще в ваших записях.",

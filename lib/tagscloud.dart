@@ -229,7 +229,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
           GestureDetector(
             onLongPress: () => showHelp(52), // ID 52 for selected tags indicator
             child: Container(
-              height: 24, // Reduced fixed height
+              height: 48, // Reduced fixed height
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: _selectedTags.isEmpty
                   ? Container() // Empty container when no tags selected
@@ -251,7 +251,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
               child: Container(
                 width: double.infinity,
                 alignment: Alignment.topLeft,
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(16, 25, 16, 16), // Added 25px padding at the top
                 child: _buildTagCloud(),
               ),
             ),
