@@ -45,7 +45,7 @@ class NotificationReceiver : BroadcastReceiver() {
             )
 
             // Цвет оранжевый
-            val orangeColor = 0xFFF29238.toInt()
+            val orangeColor = 0xFFfb8500.toInt()
 
             // Создаем стиль для текста
             val bigTextStyle = NotificationCompat.BigTextStyle()
