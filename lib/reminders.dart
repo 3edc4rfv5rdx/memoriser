@@ -36,7 +36,7 @@ class SimpleNotifications {
 
     try {
       // Get reminder time from settings
-      final remindTime = await getSetting("Remind time") ?? "10:00";
+      final remindTime = await getSetting("Remind time") ?? "08:00";
 
       await platform.invokeMethod('scheduleDaily', {
         'time': remindTime,
