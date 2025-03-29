@@ -1,8 +1,9 @@
 // settings.dart
 import 'package:flutter/material.dart';
+
+import 'backup.dart';
 import 'globals.dart';
 import 'reminders.dart'; // Добавляем импорт
-import 'backup.dart';
 
 // Function to create settings screen
 Widget buildSettingsScreen() {
@@ -56,24 +57,29 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
   Future<void> _loadSettings() async {
     // Load current theme
-    final themeValue = await getSetting("Color theme") ?? defSettings["Color theme"];
+    final themeValue =
+        await getSetting("Color theme") ?? defSettings["Color theme"];
 
     // Load current language
-    final languageValue = await getSetting("Language") ?? defSettings["Language"];
+    final languageValue =
+        await getSetting("Language") ?? defSettings["Language"];
 
     // Load sort order setting
-    final newestFirstValue = await getSetting("Newest first") ?? defSettings["Newest first"];
+    final newestFirstValue =
+        await getSetting("Newest first") ?? defSettings["Newest first"];
     final isNewestFirst = newestFirstValue == "true";
 
     // Load Last items setting
-    final lastItemsValue = await getSetting("Last items") ?? defSettings["Last items"];
+    final lastItemsValue =
+        await getSetting("Last items") ?? defSettings["Last items"];
     final lastItems = int.tryParse(lastItemsValue) ?? 0;
 
     // Load remind time setting
     final remindTimeValue = await getSetting("Remind time") ?? "08:00";
 
     // Load enable reminders setting
-    final enableRemindersValue = await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
+    final enableRemindersValue =
+        await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
     final enableReminders = enableRemindersValue == "true";
 
     _lastItemsController = TextEditingController(text: lastItems.toString());
@@ -105,7 +111,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   // Function to check for changes
   void _checkForChanges() {
     setState(() {
-      _hasChanges = _newTheme != _currentTheme ||
+      _hasChanges =
+          _newTheme != _currentTheme ||
           _newLanguage != _currentLanguage ||
           _newNewestFirst != _newestFirst ||
           _newLastItems != _lastItems ||
@@ -159,7 +166,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     }
 
     // Save enable reminders setting if changed
-    if (_newEnableReminders != _enableReminders && _newEnableReminders != null) {
+    if (_newEnableReminders != _enableReminders &&
+        _newEnableReminders != null) {
       await saveSetting("Enable reminders", _newEnableReminders.toString());
       savedSettings.add('enable reminders');
       reminderSettingsChanged = true;
@@ -176,7 +184,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _hasChanges = false;
     });
 
-// Reschedule reminders if reminder settings changed
+    // Reschedule reminders if reminder settings changed
     if (reminderSettingsChanged) {
       if (_newEnableReminders == true) {
         await SimpleNotifications.scheduleReminderCheck();
@@ -224,16 +232,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             title: lw('Unsaved Changes'),
             content: lw('Do you want to save changes before exiting?'),
             actions: [
-              {
-                'label': lw('No'),
-                'value': false,
-                'isDestructive': false,
-              },
+              {'label': lw('No'), 'value': false, 'isDestructive': false},
               {
                 'label': lw('Yes'),
                 'value': true,
                 'isDestructive': false,
-                'onPressed': null, // No additional actions, just return value
+                'onPressed': null,
+                // No additional actions, just return value
               },
             ],
           );
@@ -269,11 +274,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           ),
           title: GestureDetector(
             onLongPress: () => showHelp(60), // ID 60 for settings screen title
-            child: Text(lw('Settings'),
-                style: TextStyle(
-                  fontSize: fsLarge,
-                  color: clText,
-                  fontWeight: fwBold,)
+            child: Text(
+              lw('Settings'),
+              style: TextStyle(
+                fontSize: fsLarge,
+                color: clText,
+                fontWeight: fwBold,
+              ),
             ),
           ),
           actions: [
@@ -289,7 +296,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     PopupMenuItem<String>(
                       value: 'create_backup',
                       child: GestureDetector(
-                        onLongPress: () => showHelp(45), // ID 45 для пункта меню создания бэкапа
+                        onLongPress: () => showHelp(45),
+                        // ID 45 для пункта меню создания бэкапа
                         child: Text(
                           lw('Create backup'),
                           style: TextStyle(color: clText),
@@ -299,7 +307,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     PopupMenuItem<String>(
                       value: 'restore_backup',
                       child: GestureDetector(
-                        onLongPress: () => showHelp(46), // ID 46 для пункта меню восстановления
+                        onLongPress: () => showHelp(46),
+                        // ID 46 для пункта меню восстановления
                         child: Text(
                           lw('Restore from backup'),
                           style: TextStyle(color: clText),
@@ -358,73 +367,82 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             ),
           ],
         ),
-        body: _isLoading
-            ? Center(child: CircularProgressIndicator())
-            : Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ListView(
-            children: [
-              // Language selector row
-              _buildSettingsRow(
-                label: lw('App language'),
-                child: _buildLanguageDropdown(),
-                helpId: 100, // Keep existing ID 100 for language setting
-              ),
+        body:
+            _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ListView(
+                    children: [
+                      // Language selector row
+                      _buildSettingsRow(
+                        label: lw('App language'),
+                        child: _buildLanguageDropdown(),
+                        helpId:
+                            100, // Keep existing ID 100 for language setting
+                      ),
 
-              SizedBox(height: 10),
+                      SizedBox(height: 10),
 
-              // Color theme selector row
-              _buildSettingsRow(
-                label: lw('Color theme'),
-                child: _buildThemeDropdown(),
-                helpId: 101, // Keep existing ID 101 for theme setting
-              ),
+                      // Color theme selector row
+                      _buildSettingsRow(
+                        label: lw('Color theme'),
+                        child: _buildThemeDropdown(),
+                        helpId: 101, // Keep existing ID 101 for theme setting
+                      ),
 
-              SizedBox(height: 10),
+                      SizedBox(height: 10),
 
-              // Newest first checkbox row
-              _buildSettingsRow(
-                label: lw('Newest first'),
-                child: _buildSortOrderCheckbox(),
-                helpId: 102, // Keep existing ID 102 for sort order setting
-              ),
+                      // Newest first checkbox row
+                      _buildSettingsRow(
+                        label: lw('Newest first'),
+                        child: _buildSortOrderCheckbox(),
+                        helpId:
+                            102, // Keep existing ID 102 for sort order setting
+                      ),
 
-              SizedBox(height: 10),
+                      SizedBox(height: 10),
 
-              // Last items row
-              _buildSettingsRow(
-                label: lw('Last items'),
-                child: _buildLastItemsField(),
-                helpId: 103, // Keep existing ID 103 for last items setting
-              ),
+                      // Last items row
+                      _buildSettingsRow(
+                        label: lw('Last items'),
+                        child: _buildLastItemsField(),
+                        helpId:
+                            103, // Keep existing ID 103 for last items setting
+                      ),
 
-              SizedBox(height: 10),
+                      SizedBox(height: 10),
 
-              // Enable reminders checkbox row
-              _buildSettingsRow(
-                label: lw('Enable reminders'),
-                child: _buildEnableRemindersCheckbox(),
-                helpId: 105, // New ID 105 for enable reminders setting
-              ),
+                      // Enable reminders checkbox row
+                      _buildSettingsRow(
+                        label: lw('Enable reminders'),
+                        child: _buildEnableRemindersCheckbox(),
+                        helpId: 105, // New ID 105 for enable reminders setting
+                      ),
 
-              SizedBox(height: 10),
+                      SizedBox(height: 10),
 
-              // Remind time row (only show if reminders enabled)
-              if (_newEnableReminders == true)
-                _buildSettingsRow(
-                  label: lw('Remind time'),
-                  child: _buildRemindTimeField(),
-                  helpId: 104, // Keep existing ID 104 for remind time setting
+                      // Remind time row (only show if reminders enabled)
+                      if (_newEnableReminders == true)
+                        _buildSettingsRow(
+                          label: lw('Remind time'),
+                          child: _buildRemindTimeField(),
+                          helpId:
+                              104, // Keep existing ID 104 for remind time setting
+                        ),
+                    ],
+                  ),
                 ),
-            ],
-          ),
-        ),
       ),
     );
   }
 
   // Function to build a settings row with label and control
-  Widget _buildSettingsRow({required String label, required Widget child, int helpId = 11}) {
+  Widget _buildSettingsRow({
+    required String label,
+    required Widget child,
+    int helpId = 11,
+  }) {
     return GestureDetector(
       onLongPress: () => showHelp(helpId),
       child: Row(
@@ -434,17 +452,11 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             flex: 60,
             child: Text(
               label,
-              style: TextStyle(
-                color: clText,
-                fontSize: fsMedium,
-              ),
+              style: TextStyle(color: clText, fontSize: fsMedium),
             ),
           ),
           // Right side - Control (40%)
-          Expanded(
-            flex: 40,
-            child: child,
-          ),
+          Expanded(flex: 40, child: child),
         ],
       ),
     );
@@ -474,12 +486,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             _checkForChanges();
           }
         },
-        items: langNames.entries.map<DropdownMenuItem<String>>((entry) {
-          return DropdownMenuItem<String>(
-            value: entry.key,
-            child: Text(entry.value),
-          );
-        }).toList(),
+        items:
+            langNames.entries.map<DropdownMenuItem<String>>((entry) {
+              return DropdownMenuItem<String>(
+                value: entry.key,
+                child: Text(entry.value),
+              );
+            }).toList(),
       ),
     );
   }
@@ -508,12 +521,10 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             _checkForChanges();
           }
         },
-        items: appTHEMES.map<DropdownMenuItem<String>>((String value) {
-          return DropdownMenuItem<String>(
-            value: value,
-            child: Text(value),
-          );
-        }).toList(),
+        items:
+            appTHEMES.map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(value: value, child: Text(value));
+            }).toList(),
       ),
     );
   }
@@ -560,7 +571,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         ),
         onChanged: (value) {
           final parsedValue = int.tryParse(value) ?? 0;
-          if (parsedValue >= 0) { // Check that value is non-negative
+          if (parsedValue >= 0) {
+            // Check that value is non-negative
             setState(() {
               _newLastItems = parsedValue;
             });
@@ -622,8 +634,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               },
             ),
           ),
-        ),
-        // Clock icon button (outside the text field)
+        ), // Clock icon button (outside the text field)
         Container(
           margin: EdgeInsets.only(left: 8),
           child: InkWell(
@@ -631,14 +642,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             onTap: () => _selectTime(context),
             child: Container(
               padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Icon(
-                Icons.access_time,
-                color: clText,
-                size: 24,
-              ),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(4)),
+              child: Icon(Icons.access_time, color: clText, size: 24),
             ),
           ),
         ),

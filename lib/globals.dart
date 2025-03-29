@@ -1,14 +1,15 @@
 // globals.dart
+import 'dart:async'; // Для Timer
+import 'dart:convert'; // Для работы с JSON (json.decode) and base64
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Для доступа к rootBundle
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'dart:convert'; // Для работы с JSON (json.decode) and base64
-import 'package:flutter/services.dart'; // Для доступа к rootBundle
-import 'dart:async'; // Для Timer
-
 
 // Глобальные ключи для доступа к основным компонентам Flutter
-final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
@@ -17,7 +18,7 @@ const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
 const String helpFile = 'assets/help.json';
-const String mainDbFile = 'memorizer.db';  // Changed from mainDbFile
+const String mainDbFile = 'memorizer.db'; // Changed from mainDbFile
 const String settDbFile = 'settings.db';
 
 late Database mainDb;
@@ -56,33 +57,41 @@ late Color clMenu;
 // Color themes - array of arrays
 List<List<Color>> colorThemes = [
   // Theme 0 - Light (Mustard)
-  [ Color(0xFF000000),  // clText - black
-    Color(0xFFF5EFD5),  // clBgrnd - pale mustard
-    Color(0xFFE6C94C),  // clUpBar - mustard
-    Color(0xFFF9F3E3),  // clFill - light mustard
-    Color(0xFFFFCC80),  // clSel - light orange
-    Color(0xFFADD8E6),],  // clMenu - light blue
-    // Theme 1 - Dark
-  [ Color(0xFFFFFFFF),  // clText - white
-    Color(0xFF212121),  // clBgrnd - dark gray
-    Color(0xFF424242),  // clUpBar - medium gray
-    Color(0xFF303030),  // clFill - darker gray
-    Color(0xFF616161),  // clSel - lighter gray
-    Color(0xFF263238),],  // clMenu - dark blue-gray
-    // Theme 2 - Blue
-  [ Color(0xFF000000),  // clText - black
-    Color(0xFFE3F2FD),  // clBgrnd - very light blue
-    Color(0xFF2196F3),  // clUpBar - blue
-    Color(0xFFBBDEFB),  // clFill - light blue
-    Color(0xFF90CAF9),  // clSel - medium light blue
-    Color(0xFFCFD8DC),],  // clMenu - blue-gray
-    // Green theme, 3
-  [ Color(0xFF121E0A),      // text - темно-зеленый
-    Color(0xFFF3F7ED),      // fon clBgrnd - светлый фисташковый
-    Color(0xFF97BA60),      // upBar - глубокий оливковый
-    Color(0xFFFFFFFF),      // fill
-    Color(0x4D4C6B3D),      // selected - оливковый с прозрачностью
-    Color(0xFFD4E2C6),],    // menu - шалфейный
+  [
+    Color(0xFF000000), // clText - black
+    Color(0xFFF5EFD5), // clBgrnd - pale mustard
+    Color(0xFFE6C94C), // clUpBar - mustard
+    Color(0xFFF9F3E3), // clFill - light mustard
+    Color(0xFFFFCC80), // clSel - light orange
+    Color(0xFFADD8E6),
+  ], // clMenu - light blue
+  // Theme 1 - Dark
+  [
+    Color(0xFFFFFFFF), // clText - white
+    Color(0xFF212121), // clBgrnd - dark gray
+    Color(0xFF424242), // clUpBar - medium gray
+    Color(0xFF303030), // clFill - darker gray
+    Color(0xFF616161), // clSel - lighter gray
+    Color(0xFF263238),
+  ], // clMenu - dark blue-gray
+  // Theme 2 - Blue
+  [
+    Color(0xFF000000), // clText - black
+    Color(0xFFE3F2FD), // clBgrnd - very light blue
+    Color(0xFF2196F3), // clUpBar - blue
+    Color(0xFFBBDEFB), // clFill - light blue
+    Color(0xFF90CAF9), // clSel - medium light blue
+    Color(0xFFCFD8DC),
+  ], // clMenu - blue-gray
+  // Green theme, 3
+  [
+    Color(0xFF121E0A), // text - темно-зеленый
+    Color(0xFFF3F7ED), // fon clBgrnd - светлый фисташковый
+    Color(0xFF97BA60), // upBar - глубокий оливковый
+    Color(0xFFFFFFFF), // fill
+    Color(0x4D4C6B3D), // selected - оливковый с прозрачностью
+    Color(0xFFD4E2C6),
+  ], // menu - шалфейный
 ];
 
 // Default settings
@@ -93,7 +102,7 @@ Map<String, dynamic> defSettings = {
   "Last items": "0",
   "Notification time": "08:00",
   "Enable reminders": "true",
-//  "Auto-backup": "false",
+  //  "Auto-backup": "false",
 };
 
 const ymdDateFormat = 'yyyy-MM-dd';
@@ -116,7 +125,9 @@ bool isLanguageSupported(String locale) {
 }
 
 String lw(String text) {
-  if (currentLocale == 'en') {return text;}
+  if (currentLocale == 'en') {
+    return text;
+  }
   return _uiLocale[text] ?? text;
 }
 
@@ -154,7 +165,9 @@ Future<void> readLocale(String locale) async {
   }
 }
 
-void myPrint(String msg) {if (xvDebug) print('>>> $msg');}
+void myPrint(String msg) {
+  if (xvDebug) print('>>> $msg');
+}
 
 // Get theme index from name
 int getThemeIndex(String themeName) {
@@ -181,15 +194,10 @@ ThemeData getAppTheme() {
     primarySwatch: Colors.blue,
     visualDensity: VisualDensity.adaptivePlatformDensity,
     scaffoldBackgroundColor: clBgrnd,
-    appBarTheme: AppBarTheme(
-      backgroundColor: clUpBar,
-      foregroundColor: clText,
-    ),
+    appBarTheme: AppBarTheme(backgroundColor: clUpBar, foregroundColor: clText),
     cardColor: clFill,
     // Вместо устаревшего dialogBackgroundColor используем DialogTheme
-    dialogTheme: DialogTheme(
-      backgroundColor: clFill,
-    ),
+    dialogTheme: DialogTheme(backgroundColor: clFill),
     textTheme: TextTheme(
       bodyMedium: TextStyle(color: clText),
       bodyLarge: TextStyle(color: clText),
@@ -220,11 +228,10 @@ Future<String?> getSetting(String key) async {
 
 // Settings functions
 Future<void> saveSetting(String key, String value) async {
-  await settDb.insert(
-    'settings',
-    {'key': key, 'value': value},
-    conflictAlgorithm: ConflictAlgorithm.replace,
-  );
+  await settDb.insert('settings', {
+    'key': key,
+    'value': value,
+  }, conflictAlgorithm: ConflictAlgorithm.replace);
   // Update theme colors if changing theme
   if (key == "Color theme") {
     setThemeColors(value);
@@ -274,35 +281,56 @@ Future<dynamic> showCustomDialog({
           borderRadius: BorderRadius.circular(8.0),
           side: BorderSide(color: clUpBar, width: 2.0),
         ),
-        title: Text(title, style: TextStyle(color: clText, fontSize: fsLarge, fontWeight: fwBold,),),
-        content: Text(content, style: TextStyle(color: clText, fontSize: fsNormal, fontWeight: fwNormal,),),
-        actions: actions?.map((action) =>
-            TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: action['isDestructive'] == true ? Colors.red : clUpBar,
-                foregroundColor: clText,
-              ),
-              child: Text(action['label']),
-              onPressed: () {
-                Navigator.of(context).pop(action['value']);
-                if (action['onPressed'] != null) {
-                  action['onPressed']();
-                }
-              },
-            )
-        ).toList() ?? [
-          // Default OK button if no actions provided
-          TextButton(
-            style: TextButton.styleFrom(
-              backgroundColor: clUpBar,
-              foregroundColor: clText,
-            ),
-            child: Text(lw('Ok')),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
+        title: Text(
+          title,
+          style: TextStyle(
+            color: clText,
+            fontSize: fsLarge,
+            fontWeight: fwBold,
           ),
-        ],
+        ),
+        content: Text(
+          content,
+          style: TextStyle(
+            color: clText,
+            fontSize: fsNormal,
+            fontWeight: fwNormal,
+          ),
+        ),
+        actions:
+            actions
+                ?.map(
+                  (action) => TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor:
+                          action['isDestructive'] == true
+                              ? Colors.red
+                              : clUpBar,
+                      foregroundColor: clText,
+                    ),
+                    child: Text(action['label']),
+                    onPressed: () {
+                      Navigator.of(context).pop(action['value']);
+                      if (action['onPressed'] != null) {
+                        action['onPressed']();
+                      }
+                    },
+                  ),
+                )
+                .toList() ??
+            [
+              // Default OK button if no actions provided
+              TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor: clUpBar,
+                  foregroundColor: clText,
+                ),
+                child: Text(lw('Ok')),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
       );
     },
   );
@@ -310,10 +338,7 @@ Future<dynamic> showCustomDialog({
 
 // Simple information dialog using the universal dialog
 void okInfo(String message) {
-  showCustomDialog(
-    title: lw('Information'),
-    content: message,
-  );
+  showCustomDialog(title: lw('Information'), content: message);
 }
 
 // Function to vacuum databases for better performance
@@ -336,10 +361,7 @@ void okInfoBarRed(String message, {Duration? duration}) {
     SnackBar(
       content: Text(
         message,
-        style: TextStyle(
-          fontSize: fsSmall,
-          color: Colors.white,
-        ),
+        style: TextStyle(fontSize: fsSmall, color: Colors.white),
       ),
       backgroundColor: Colors.red,
       duration: duration ?? Duration(seconds: 7),
@@ -357,10 +379,7 @@ void okInfoBarGreen(String message, {Duration? duration}) {
     SnackBar(
       content: Text(
         message,
-        style: TextStyle(
-          fontSize: fsSmall,
-          color: Colors.white,
-        ),
+        style: TextStyle(fontSize: fsSmall, color: Colors.white),
       ),
       backgroundColor: Colors.green,
       duration: duration ?? Duration(seconds: 3),
@@ -378,10 +397,7 @@ void okInfoBarBlue(String message, {Duration? duration}) {
     SnackBar(
       content: Text(
         message,
-        style: TextStyle(
-          fontSize: fsSmall,
-          color: Colors.white,
-        ),
+        style: TextStyle(fontSize: fsSmall, color: Colors.white),
       ),
       backgroundColor: Colors.blue,
       duration: duration ?? Duration(seconds: 3),
@@ -398,10 +414,7 @@ void okInfoBarOrange(String message, {Duration? duration}) {
     SnackBar(
       content: Text(
         message,
-        style: TextStyle(
-          fontSize: fsSmall,
-          color: Colors.black,
-        ),
+        style: TextStyle(fontSize: fsSmall, color: Colors.black),
       ),
       backgroundColor: Colors.orange,
       duration: duration ?? Duration(seconds: 4),
@@ -417,10 +430,7 @@ void okInfoBarPurple(String message) {
     SnackBar(
       content: Text(
         message,
-        style: TextStyle(
-          fontSize: fsSmall,
-          color: clFill,
-        ),
+        style: TextStyle(fontSize: fsSmall, color: clFill),
       ),
       behavior: SnackBarBehavior.floating,
       backgroundColor: Colors.purple,
@@ -470,11 +480,7 @@ void showHelp(int id) async {
       title: lw('Help'),
       content: helpText,
       actions: [
-        {
-          'label': lw('Ok'),
-          'value': null,
-          'isDestructive': false,
-        },
+        {'label': lw('Ok'), 'value': null, 'isDestructive': false},
       ],
     );
     myPrint('Showing help for ID: $helpId');
@@ -488,13 +494,13 @@ void showHelp(int id) async {
 String getLocaleCode(String language) {
   // Dictionary for exceptions where country code differs from language code
   final Map<String, String> exceptions = {
-    'ua': 'uk',  // Ukrainian
-    'gr': 'el',  // Greek
-    'cn': 'zh',  // Chinese
-    'jp': 'ja',  // Japanese
-    'se': 'sv',  // Swedish
-    'dk': 'da',  // Danish
-    'cz': 'cs',  // Czech
+    'ua': 'uk', // Ukrainian
+    'gr': 'el', // Greek
+    'cn': 'zh', // Chinese
+    'jp': 'ja', // Japanese
+    'se': 'sv', // Swedish
+    'dk': 'da', // Danish
+    'cz': 'cs', // Czech
   };
 
   // Make sure input is lowercase to match our exception map keys
@@ -608,7 +614,10 @@ Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
       allItems = items.map((item) => processItemForView(item)).toList();
     } else {
       // Обычный режим - получаем только нескрытые записи
-      allItems = await mainDb.query('items', where: 'hidden = 0 OR hidden IS NULL');
+      allItems = await mainDb.query(
+        'items',
+        where: 'hidden = 0 OR hidden IS NULL',
+      );
     }
 
     Map<String, int> tagCounts = {};
@@ -618,10 +627,12 @@ Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
       final tagsString = item['tags'] as String?;
       if (tagsString != null && tagsString.isNotEmpty) {
         // Разделяем теги по запятой и убираем лишние пробелы
-        List<String> itemTags = tagsString.split(',')
-            .map((tag) => tag.trim())
-            .where((tag) => tag.isNotEmpty)
-            .toList();
+        List<String> itemTags =
+            tagsString
+                .split(',')
+                .map((tag) => tag.trim())
+                .where((tag) => tag.isNotEmpty)
+                .toList();
 
         // Подсчитываем вхождения каждого тега
         for (var tag in itemTags) {
@@ -631,12 +642,10 @@ Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
     }
 
     // Преобразуем Map в список Map
-    List<Map<String, dynamic>> result = tagCounts.entries.map((entry) {
-      return {
-        'name': entry.key,
-        'count': entry.value,
-      };
-    }).toList();
+    List<Map<String, dynamic>> result =
+        tagCounts.entries.map((entry) {
+          return {'name': entry.key, 'count': entry.value};
+        }).toList();
 
     // Сортируем по количеству (по убыванию), затем по имени (по алфавиту)
     result.sort((a, b) {
@@ -711,3 +720,21 @@ bool isDateFromBeforeDateTo(String dateFrom, String dateTo) {
   }
 }
 
+// Convert DateTime to YYYYMMDD format (int)
+int dateTimeToYYYYMMDD(DateTime date) {
+  return int.parse(
+    '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}',
+  );
+}
+
+// Convert YYYYMMDD (int) back to DateTime
+DateTime yyyymmddToDateTime(int yyyymmdd) {
+  final String dateStr = yyyymmdd.toString();
+  if (dateStr.length != 8) return DateTime.now(); // Default fallback
+
+  final year = int.parse(dateStr.substring(0, 4));
+  final month = int.parse(dateStr.substring(4, 6));
+  final day = int.parse(dateStr.substring(6, 8));
+
+  return DateTime(year, month, day);
+}

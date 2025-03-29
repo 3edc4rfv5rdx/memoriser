@@ -1,16 +1,14 @@
 // additem.dart
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:intl/intl.dart'; // For date formatting
+import 'package:sqflite/sqflite.dart';
+
 import 'globals.dart';
 
 class EditItemPage extends StatefulWidget {
   final int? itemId; // Используем ID вместо целой записи
 
-  const EditItemPage({
-    Key? key,
-    this.itemId,
-  }) : super(key: key);
+  const EditItemPage({Key? key, this.itemId}) : super(key: key);
 
   @override
   _EditItemPageState createState() => _EditItemPageState();
@@ -27,6 +25,8 @@ class _EditItemPageState extends State<EditItemPage> {
   bool _remind = false; // Default remind value
   bool _hidden = false; // Default hidden value for privacy feature
   bool _isLoading = false; // Индикатор загрузки
+  // Add this field next to the other boolean fields
+  bool _removeAfterReminder = false; // Default value for auto-remove
 
   // Список тегов для выпадающего списка
   List<Map<String, dynamic>> _tagsWithCounts = [];
@@ -73,14 +73,14 @@ class _EditItemPageState extends State<EditItemPage> {
     super.dispose();
   }
 
-  // Метод для загрузки записи по ID
+  // Method to load an item by ID
   Future<void> _loadItem(int itemId) async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Получаем запись из базы данных
+      // Get the record from the database
       final List<Map<String, dynamic>> result = await mainDb.query(
         'items',
         where: 'id = ?',
@@ -90,7 +90,7 @@ class _EditItemPageState extends State<EditItemPage> {
       if (result.isNotEmpty) {
         final item = result.first;
 
-        // Если запись скрытая и мы в режиме скрытых записей, декодируем данные
+        // If the record is hidden and we're in hidden mode, decode the data
         if (item['hidden'] == 1 && xvHiddenMode) {
           final decodedTitle = deobfuscateText(item['title'] ?? '');
           final decodedContent = deobfuscateText(item['content'] ?? '');
@@ -100,20 +100,21 @@ class _EditItemPageState extends State<EditItemPage> {
           contentController.text = decodedContent;
           tagsController.text = decodedTags;
         } else {
-          // Обычные записи используем как есть
+          // Regular records are used as is
           titleController.text = item['title'] ?? '';
           contentController.text = item['content'] ?? '';
           tagsController.text = item['tags'] ?? '';
         }
 
-        // Инициализируем остальные поля
+        // Initialize the other fields
         _priority = item['priority'] ?? 0;
         _remind = item['remind'] == 1;
         _hidden = item['hidden'] == 1;
+        _removeAfterReminder = item['remove'] == 1;
 
-        // Инициализируем дату, если она есть
+        // Initialize the date if it exists
         if (item['date'] != null) {
-          _date = DateTime.fromMillisecondsSinceEpoch(item['date']);
+          _date = yyyymmddToDateTime(item['date']);
           dateController.text = DateFormat(ymdDateFormat).format(_date!);
         }
       }
@@ -137,7 +138,10 @@ class _EditItemPageState extends State<EditItemPage> {
     if (_remind) {
       // Check if date is set
       if (_date == null) {
-        okInfoBarRed(lw('Set a date for the reminder'), duration: Duration(seconds: 4));
+        okInfoBarRed(
+          lw('Set a date for the reminder'),
+          duration: Duration(seconds: 4),
+        );
         return;
       }
 
@@ -149,22 +153,26 @@ class _EditItemPageState extends State<EditItemPage> {
       );
 
       if (_date!.isBefore(today)) {
-        okInfoBarRed(lw('Reminder date cannot be in the past'), duration: Duration(seconds: 4));
+        okInfoBarRed(
+          lw('Reminder date cannot be in the past'),
+          duration: Duration(seconds: 4),
+        );
         return;
       }
     }
 
-    // Convert date to milliseconds for storage
-    final dateMillis = _date?.millisecondsSinceEpoch;
+    // Convert date to YYYYMMDD format for storage
+    final dateValue = _date != null ? dateTimeToYYYYMMDD(_date!) : null;
     final remindValue = _remind ? 1 : 0;
     final hiddenValue = _hidden ? 1 : 0;
+    final removeValue = _removeAfterReminder ? 1 : 0;
 
-    // Подготавливаем данные для сохранения
+    // Prepare data for saving
     String titleText = titleController.text.trim();
     String contentText = contentController.text.trim();
     String tagsText = tagsController.text.trim();
 
-    // Обфусцируем данные, если запись скрытая и мы в режиме скрытых записей
+    // Obfuscate data if the record is hidden and we're in hidden mode
     if (hiddenValue == 1 && xvHiddenMode) {
       titleText = obfuscateText(titleText);
       contentText = obfuscateText(contentText);
@@ -181,9 +189,10 @@ class _EditItemPageState extends State<EditItemPage> {
             'content': contentText,
             'tags': tagsText,
             'priority': _priority,
-            'date': dateMillis,
+            'date': dateValue,
             'remind': remindValue,
             'hidden': hiddenValue,
+            'remove': removeValue,
           },
           where: 'id = ?',
           whereArgs: [widget.itemId],
@@ -191,20 +200,17 @@ class _EditItemPageState extends State<EditItemPage> {
         myPrint("Item updated: ${widget.itemId} - $titleText");
       } else {
         // Insert new item
-        await mainDb.insert(
-          'items',
-          {
-            'title': titleText,
-            'content': contentText,
-            'tags': tagsText,
-            'priority': _priority,
-            'date': dateMillis,
-            'remind': remindValue,
-            'hidden': hiddenValue,
-            'created': DateTime.now().millisecondsSinceEpoch,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await mainDb.insert('items', {
+          'title': titleText,
+          'content': contentText,
+          'tags': tagsText,
+          'priority': _priority,
+          'date': dateValue,
+          'remind': remindValue,
+          'hidden': hiddenValue,
+          'remove': removeValue,
+          'created': DateTime.now().millisecondsSinceEpoch,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
         myPrint("Item inserted: $titleText");
       }
 
@@ -235,9 +241,7 @@ class _EditItemPageState extends State<EditItemPage> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            dialogTheme: DialogTheme(
-              backgroundColor: clFill,
-            ),
+            dialogTheme: DialogTheme(backgroundColor: clFill),
             // Add custom button styling
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
@@ -273,10 +277,7 @@ class _EditItemPageState extends State<EditItemPage> {
           // Label for priority
           Text(
             lw('Priority (0-3)'),
-            style: TextStyle(
-              color: clText,
-              fontSize: fsMedium,
-            ),
+            style: TextStyle(color: clText, fontSize: fsMedium),
           ),
           SizedBox(height: 8),
           // Single row containing all elements
@@ -284,9 +285,8 @@ class _EditItemPageState extends State<EditItemPage> {
             children: [
               // LEFT SIDE: Minus button with upbar color
               ElevatedButton(
-                onPressed: _priority > 0
-                    ? () => setState(() => _priority--)
-                    : null,
+                onPressed:
+                    _priority > 0 ? () => setState(() => _priority--) : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: clUpBar,
                   foregroundColor: clText,
@@ -317,9 +317,8 @@ class _EditItemPageState extends State<EditItemPage> {
               ),
               // Plus button with upbar color
               ElevatedButton(
-                onPressed: _priority < 3
-                    ? () => setState(() => _priority++)
-                    : null,
+                onPressed:
+                    _priority < 3 ? () => setState(() => _priority++) : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: clUpBar,
                   foregroundColor: clText,
@@ -350,33 +349,58 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  // Build reminder checkbox
+  // Build reminder and remove checkboxes in a single row
   Widget _buildReminderSelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(35), // ID 35 для чекбокса и текста напоминания
+      onLongPress: () => showHelp(35),
+      // ID 35 для чекбокса и текста напоминания
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // This spreads the elements
         children: [
-          Checkbox(
-            value: _remind,
-            activeColor: clUpBar,
-            checkColor: clText,
-            onChanged: (value) {
-              setState(() {
-                _remind = value ?? false;
+          // Left side - Reminder checkbox
+          Row(
+            children: [
+              Checkbox(
+                value: _remind,
+                activeColor: clUpBar,
+                checkColor: clText,
+                onChanged: (value) {
+                  setState(() {
+                    _remind = value ?? false;
 
-                // If turning on reminder, validate the date
-                if (_remind) {
-                  _validateReminderDate();
-                }
-              });
-            },
+                    // If turning on reminder, validate the date
+                    if (_remind) {
+                      _validateReminderDate();
+                    }
+                  });
+                },
+              ),
+              Text(
+                lw('Set reminder'),
+                style: TextStyle(color: clText, fontSize: fsMedium),
+              ),
+            ],
           ),
-          Text(
-            lw('Set reminder'),
-            style: TextStyle(
-              color: clText,
-              fontSize: fsMedium,
-            ),
+
+          // Right side - Remove checkbox
+          Row(
+            children: [
+              Text(
+                lw('Remove'),
+                style: TextStyle(color: clText, fontSize: fsMedium),
+              ),
+              Checkbox(
+                value: _removeAfterReminder,
+                activeColor: Colors.red,
+                checkColor: clText,
+                onChanged: (value) {
+                  setState(() {
+                    _removeAfterReminder = value ?? false;
+                  });
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -432,10 +456,7 @@ class _EditItemPageState extends State<EditItemPage> {
           ),
           Text(
             lw('Private item'),
-            style: TextStyle(
-              color: clText,
-              fontSize: fsMedium,
-            ),
+            style: TextStyle(color: clText, fontSize: fsMedium),
           ),
           SizedBox(width: 4),
           Icon(Icons.lock, color: Color(0xFFf29238), size: 16),
@@ -454,7 +475,20 @@ class _EditItemPageState extends State<EditItemPage> {
             child: TextField(
               controller: dateController,
               style: TextStyle(color: clText),
-              readOnly: true, // Make the field read-only
+              readOnly: false,
+              // Allow manual input
+              onChanged: (value) {
+                if (value.isEmpty) {
+                  setState(() {
+                    _date = null;
+                  });
+                } else if (validateDateInput(value)) {
+                  // If valid date input, update _date
+                  setState(() {
+                    _date = DateFormat(ymdDateFormat).parse(value);
+                  });
+                }
+              },
               decoration: InputDecoration(
                 labelText: lw('Date (YYYY-MM-DD)'),
                 labelStyle: TextStyle(color: clText),
@@ -508,8 +542,10 @@ class _EditItemPageState extends State<EditItemPage> {
               itemBuilder: (context, index) {
                 final tag = _tagsWithCounts[index];
                 return ListTile(
-                  title: Text('${tag['name']} (${tag['count']})',
-                      style: TextStyle(color: clText)),
+                  title: Text(
+                    '${tag['name']} (${tag['count']})',
+                    style: TextStyle(color: clText),
+                  ),
                   tileColor: index % 2 == 0 ? clFill : clSel,
                   onTap: () {
                     _addTagToField(tag['name']);
@@ -544,10 +580,12 @@ class _EditItemPageState extends State<EditItemPage> {
       tagsController.text = tag;
     } else {
       // Проверяем, содержит ли уже тег
-      List<String> existingTags = currentTags.split(',')
-          .map((t) => t.trim())
-          .where((t) => t.isNotEmpty)
-          .toList();
+      List<String> existingTags =
+          currentTags
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty)
+              .toList();
 
       if (!existingTags.contains(tag)) {
         // Добавляем тег с запятой
@@ -600,10 +638,11 @@ class _EditItemPageState extends State<EditItemPage> {
           onLongPress: () => showHelp(30), // ID 30 для заголовка
           child: Text(
             isEditing ? lw('Edit Item') : lw('New Item'),
-              style: TextStyle(
-                fontSize: fsLarge,
-                color: clText,
-                fontWeight: fwBold,)
+            style: TextStyle(
+              fontSize: fsLarge,
+              color: clText,
+              fontWeight: fwBold,
+            ),
           ),
         ),
         leading: GestureDetector(
@@ -616,76 +655,72 @@ class _EditItemPageState extends State<EditItemPage> {
         actions: [
           GestureDetector(
             onLongPress: () => showHelp(12), // ID 12 для кнопки сохранения
-            child: IconButton(
-              icon: Icon(Icons.save),
-              onPressed: _saveItem,
-            ),
+            child: IconButton(icon: Icon(Icons.save), onPressed: _saveItem),
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title field
-            GestureDetector(
-              onLongPress: () => showHelp(31), // ID 31 для поля заголовка
-              child: TextField(
-                controller: titleController,
-                style: TextStyle(color: clText),
-                decoration: InputDecoration(
-                  labelText: lw('Title'),
-                  labelStyle: TextStyle(color: clText),
-                  fillColor: clFill,
-                  filled: true,
-                  border: OutlineInputBorder(),
+      body:
+          _isLoading
+              ? Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title field
+                    GestureDetector(
+                      onLongPress:
+                          () => showHelp(31), // ID 31 для поля заголовка
+                      child: TextField(
+                        controller: titleController,
+                        style: TextStyle(color: clText),
+                        decoration: InputDecoration(
+                          labelText: lw('Title'),
+                          labelStyle: TextStyle(color: clText),
+                          fillColor: clFill,
+                          filled: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+
+                    // Content field
+                    GestureDetector(
+                      onLongPress:
+                          () => showHelp(32), // ID 32 для поля содержимого
+                      child: TextField(
+                        controller: contentController,
+                        style: TextStyle(color: clText),
+                        decoration: InputDecoration(
+                          labelText: lw('Content'),
+                          labelStyle: TextStyle(color: clText),
+                          fillColor: clFill,
+                          filled: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 5,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+
+                    // Tags field - используем новый метод
+                    _buildTagsField(), SizedBox(height: 10),
+
+                    // Priority section
+                    _buildPrioritySelector(), SizedBox(height: 10),
+
+                    // Date field
+                    _buildDateField(), SizedBox(height: 10),
+
+                    // Reminder checkbox - moved to after the date field
+                    _buildReminderSelector(), SizedBox(height: 10),
+
+                    // Hidden checkbox (only in hidden mode)
+                    _buildHiddenSelector(),
+                  ],
                 ),
               ),
-            ),
-            SizedBox(height: 10),
-
-            // Content field
-            GestureDetector(
-              onLongPress: () => showHelp(32), // ID 32 для поля содержимого
-              child: TextField(
-                controller: contentController,
-                style: TextStyle(color: clText),
-                decoration: InputDecoration(
-                  labelText: lw('Content'),
-                  labelStyle: TextStyle(color: clText),
-                  fillColor: clFill,
-                  filled: true,
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 5,
-              ),
-            ),
-            SizedBox(height: 10),
-
-            // Tags field - используем новый метод
-            _buildTagsField(),
-            SizedBox(height: 10),
-
-            // Priority section
-            _buildPrioritySelector(),
-            SizedBox(height: 10),
-
-            // Date field
-            _buildDateField(),
-            SizedBox(height: 10),
-
-            // Reminder checkbox - moved to after the date field
-            _buildReminderSelector(),
-            SizedBox(height: 10),
-
-            // Hidden checkbox (only in hidden mode)
-            _buildHiddenSelector(),
-          ],
-        ),
-      ),
     );
   }
 }
