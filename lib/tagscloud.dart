@@ -1,5 +1,6 @@
 // tagscloud.dart (упрощенная версия)
 import 'package:flutter/material.dart';
+
 import 'globals.dart';
 
 class TagsCloudScreen extends StatefulWidget {
@@ -29,17 +30,16 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
       final tagsWithCounts = await getTagsWithCounts();
 
       // Преобразуем результат в объекты TagData
-      final tags = tagsWithCounts.map((tag) =>
-          TagData(
-            name: tag['name'],
-            count: tag['count'],
-          )
-      ).toList();
+      final tags =
+          tagsWithCounts
+              .map((tag) => TagData(name: tag['name'], count: tag['count']))
+              .toList();
 
       // Инициализируем выбранные теги на основе текущего фильтра
       List<String> initialSelectedTags = [];
       if (xvTagFilter.isNotEmpty) {
-        initialSelectedTags = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
+        initialSelectedTags =
+            xvTagFilter.split(',').map((tag) => tag.trim()).toList();
       }
 
       setState(() {
@@ -131,28 +131,37 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
         alignment: WrapAlignment.start, // Start from the top-left
         spacing: 12.0, // Gap between tags horizontally
         runSpacing: 8.0, // Reduced gap between lines
-        children: _tags.asMap().entries.map((entry) {
-          final index = entry.key;
-          final tag = entry.value;
-          final fontSize = _getTagFontSize(tag.count, maxCount, index, _tags.length);
-          final isSelected = _selectedTags.contains(tag.name);
+        children:
+            _tags.asMap().entries.map((entry) {
+              final index = entry.key;
+              final tag = entry.value;
+              final fontSize = _getTagFontSize(
+                tag.count,
+                maxCount,
+                index,
+                _tags.length,
+              );
+              final isSelected = _selectedTags.contains(tag.name);
 
-          return GestureDetector(
-            onTap: () => _toggleTag(tag.name),
-            child: Chip(
-              backgroundColor: isSelected ? clUpBar : clFill,
-              label: Text(
-                '${tag.name} (${tag.count})',
-                style: TextStyle(
-                  color: isSelected ? clText : clText,
-                  fontSize: fontSize,
-                  fontWeight: isSelected ? fwBold : fwNormal,
+              return GestureDetector(
+                onTap: () => _toggleTag(tag.name),
+                child: Chip(
+                  backgroundColor: isSelected ? clUpBar : clFill,
+                  label: Text(
+                    '${tag.name} (${tag.count})',
+                    style: TextStyle(
+                      color: isSelected ? clText : clText,
+                      fontSize: fontSize,
+                      fontWeight: isSelected ? fwBold : fwNormal,
+                    ),
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ), // Reduced vertical padding
                 ),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4), // Reduced vertical padding
-            ),
-          );
-        }).toList(),
+              );
+            }).toList(),
       ),
     );
   }
@@ -167,11 +176,13 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
           onLongPress: () => showHelp(50), // ID 50 for Tags Cloud screen title
           child: Row(
             children: [
-              Text(lw('Tags'),
-                  style: TextStyle(
-                    fontSize: fsLarge,
-                    color: clText,
-                    fontWeight: fwBold,)
+              Text(
+                lw('Tags'),
+                style: TextStyle(
+                  fontSize: fsLarge,
+                  color: clText,
+                  fontWeight: fwBold,
+                ),
               ),
               if (xvHiddenMode)
                 Padding(
@@ -182,7 +193,8 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
           ),
         ),
         leading: GestureDetector(
-          onLongPress: () => showHelp(10), // ID 10 for back button (same as in filters.dart)
+          onLongPress: () => showHelp(10),
+          // ID 10 for back button (same as in filters.dart)
           child: IconButton(
             icon: Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context, false),
@@ -197,19 +209,19 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
               tooltip: lw('Clear selection'),
               onPressed: _clearSelection,
             ),
-          ),
-          // Apply button
+          ), // Apply button
           GestureDetector(
-            onLongPress: () => showHelp(42), // ID 42 for apply filter button (same as in filters.dart)
+            onLongPress: () => showHelp(42),
+            // ID 42 for apply filter button (same as in filters.dart)
             child: IconButton(
               icon: Icon(Icons.check),
               tooltip: lw('Apply filter'),
               onPressed: _applyFilter,
             ),
-          ),
-          // Cancel button
+          ), // Cancel button
           GestureDetector(
-            onLongPress: () => showHelp(43), // ID 43 for cancel button (same as in filters.dart)
+            onLongPress: () => showHelp(43),
+            // ID 43 for cancel button (same as in filters.dart)
             child: IconButton(
               icon: Icon(Icons.cancel),
               tooltip: lw('Cancel'),
@@ -220,44 +232,53 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Fixed height container for selected tags information (smaller height)
-          GestureDetector(
-            onLongPress: () => showHelp(52), // ID 52 for selected tags indicator
-            child: Container(
-              height: 48, // Reduced fixed height
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: _selectedTags.isEmpty
-                  ? Container() // Empty container when no tags selected
-                  : Text(
-                lw('Selected tags') + ': ${_selectedTags.join(", ")}',
-                style: TextStyle(
-                  color: clText,
-                  fontSize: fsMedium,
-                  fontWeight: fwBold,
-                ),
-                overflow: TextOverflow.ellipsis,
+      body:
+          _isLoading
+              ? Center(child: CircularProgressIndicator())
+              : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Fixed height container for selected tags information (smaller height)
+                  GestureDetector(
+                    onLongPress:
+                        () => showHelp(52), // ID 52 for selected tags indicator
+                    child: Container(
+                      height: 48,
+                      // Reduced fixed height
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      child:
+                          _selectedTags.isEmpty
+                              ? Container() // Empty container when no tags selected
+                              : Text(
+                                lw('Selected tags') +
+                                    ': ${_selectedTags.join(", ")}',
+                                style: TextStyle(
+                                  color: clText,
+                                  fontSize: fsMedium,
+                                  fontWeight: fwBold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                    ),
+                  ),
+                  // Tags cloud - using Expanded to take remaining space
+                  Expanded(
+                    child: GestureDetector(
+                      onLongPress: () => showHelp(53), // ID 53 for tag cloud
+                      child: Container(
+                        width: double.infinity,
+                        alignment: Alignment.topLeft,
+                        padding: EdgeInsets.fromLTRB(16, 25, 16, 16),
+                        // Added 25px padding at the top
+                        child: _buildTagCloud(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
-          // Tags cloud - using Expanded to take remaining space
-          Expanded(
-            child: GestureDetector(
-              onLongPress: () => showHelp(53), // ID 53 for tag cloud
-              child: Container(
-                width: double.infinity,
-                alignment: Alignment.topLeft,
-                padding: EdgeInsets.fromLTRB(16, 25, 16, 16), // Added 25px padding at the top
-                child: _buildTagCloud(),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -267,8 +288,5 @@ class TagData {
   final String name;
   final int count;
 
-  TagData({
-    required this.name,
-    required this.count,
-  });
+  TagData({required this.name, required this.count});
 }

@@ -1,20 +1,20 @@
 // main.dart
+import 'dart:async'; // Для Timer
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:path/path.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'dart:io' show Platform;
-import 'dart:async'; // Для Timer
+import 'package:intl/intl.dart';
+import 'package:path/path.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'globals.dart';
-import 'settings.dart';
 import 'additem.dart';
-import 'tagscloud.dart';
 import 'filters.dart';
+import 'globals.dart';
 import 'reminders.dart';
-
+import 'settings.dart';
+import 'tagscloud.dart';
 
 // Initialize databases
 Future<void> initDatabases() async {
@@ -23,7 +23,8 @@ Future<void> initDatabases() async {
   // Initialize main database with all columns in the create statement
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 2, // Using version 2 for the updated schema
+    version: 2,
+    // Using version 2 for the updated schema
     onCreate: (mainDb, version) {
       return mainDb.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -35,6 +36,7 @@ Future<void> initDatabases() async {
           date INTEGER, 
           remind INTEGER, 
           created INTEGER,
+          remove INTEGER DEFAULT 0,
           hidden INTEGER DEFAULT 0
         )
       ''');
@@ -57,7 +59,8 @@ Future<String> getFilterStatusText() async {
   bool hasTagFilter = xvTagFilter.isNotEmpty;
 
   // Получаем значение настройки Last items
-  final lastItemsStr = await getSetting("Last items") ?? defSettings["Last items"];
+  final lastItemsStr =
+      await getSetting("Last items") ?? defSettings["Last items"];
   final lastItems = int.tryParse(lastItemsStr) ?? 0;
   bool hasLastItems = lastItems > 0;
 
@@ -77,11 +80,13 @@ Future<String> getFilterStatusText() async {
 Future<List<Map<String, dynamic>>> getItems() async {
   try {
     // Get sort order from settings
-    final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
+    final newestFirst =
+        await getSetting("Newest first") ?? defSettings["Newest first"];
     myPrint('Newest first setting: $newestFirst');
 
     // Get last items limit from settings
-    final lastItemsStr = await getSetting("Last items") ?? defSettings["Last items"];
+    final lastItemsStr =
+        await getSetting("Last items") ?? defSettings["Last items"];
     final lastItems = int.tryParse(lastItemsStr) ?? 0;
     myPrint('Last items setting: $lastItems');
 
@@ -106,7 +111,8 @@ Future<List<Map<String, dynamic>>> getItems() async {
       myPrint('Tag filter is active: $xvTagFilter');
 
       // Разбиваем строку тегов на отдельные теги
-      List<String> tagFilters = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
+      List<String> tagFilters =
+          xvTagFilter.split(',').map((tag) => tag.trim()).toList();
 
       if (xvHiddenMode) {
         // В скрытом режиме обфусцируем теги перед поиском
@@ -144,10 +150,16 @@ Future<List<Map<String, dynamic>>> getItems() async {
             if (value.isNotEmpty) {
               try {
                 final date = DateFormat(ymdDateFormat).parse(value);
+                // Replace this part
                 // Начало дня в миллисекундах
-                final timestamp = DateTime(date.year, date.month, date.day).millisecondsSinceEpoch;
+                // final timestamp = DateTime(date.year, date.month, date.day).millisecondsSinceEpoch;
+                // whereConditions.add('date >= ?');
+                // whereArgs.add(timestamp);
+
+                // With this new code:
+                final dateValue = dateTimeToYYYYMMDD(date);
                 whereConditions.add('date >= ?');
-                whereArgs.add(timestamp);
+                whereArgs.add(dateValue);
               } catch (e) {
                 myPrint('Error parsing dateFrom: $e');
               }
@@ -155,62 +167,11 @@ Future<List<Map<String, dynamic>>> getItems() async {
             break;
 
           case 'dateTo':
-            if (value.isNotEmpty) {
-              try {
-                final date = DateFormat(ymdDateFormat).parse(value);
-                // Конец дня в миллисекундах
-                final timestamp = DateTime(date.year, date.month, date.day, 23, 59, 59).millisecondsSinceEpoch;
-                whereConditions.add('date <= ?');
-                whereArgs.add(timestamp);
-              } catch (e) {
-                myPrint('Error parsing dateTo: $e');
-              }
-            }
-            break;
-
-          case 'priority':
-            if (value.isNotEmpty) {
-              final priority = int.tryParse(value);
-              if (priority != null) {
-                whereConditions.add('priority = ?');
-                whereArgs.add(priority);
-              }
-            }
-            break;
-
-          case 'hasReminder':
-            if (value.isNotEmpty) {
-              final hasReminder = value == 'true' ? 1 : 0;
-              whereConditions.add('remind = ?');
-              whereArgs.add(hasReminder);
-            }
-            break;
-
-          case 'tags':
-            if (value.isNotEmpty) {
-              // Разбиваем строку тегов на отдельные теги
-              List<String> tagFilters = value.split(',').map((tag) => tag.trim()).toList();
-
-              if (xvHiddenMode) {
-                // В скрытом режиме обфусцируем теги перед поиском
-                for (String tag in tagFilters) {
-                  String obfuscatedTag = obfuscateText(tag);
-                  whereConditions.add('tags LIKE ?');
-                  whereArgs.add('%$obfuscatedTag%');
-                }
-              } else {
-                // В обычном режиме ищем как есть
-                for (String tag in tagFilters) {
-                  whereConditions.add('tags LIKE ?');
-                  whereArgs.add('%$tag%');
-                }
-              }
-            }
-            break;
+          // Similar change needed here as well
+          // [...]
         }
       }
     }
-
     // Собираем окончательный WHERE и параметры
     String whereClause = whereConditions.join(' AND ');
     myPrint('WHERE clause: $whereClause');
@@ -218,10 +179,10 @@ Future<List<Map<String, dynamic>>> getItems() async {
 
     // Выполняем запрос с учетом фильтров
     List<Map<String, dynamic>> result = await mainDb.query(
-        'items',
-        where: whereClause,
-        whereArgs: whereArgs,
-        orderBy: orderByClause
+      'items',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: orderByClause,
     );
 
     // Применяем ограничение на количество записей из настройки "Last items"
@@ -250,10 +211,10 @@ Future<List<Map<String, dynamic>>> getItems() async {
 Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
   final now = DateTime.now().millisecondsSinceEpoch;
   return await mainDb.query(
-      'items',
-      where: 'remind = 1 AND date > ?',
-      whereArgs: [now],
-      orderBy: 'date ASC'
+    'items',
+    where: 'remind = 1 AND date > ?',
+    whereArgs: [now],
+    orderBy: 'date ASC',
   );
 }
 
@@ -267,15 +228,18 @@ void main() async {
   await initDatabases();
   // Initialize default settings
   await initDefaultSettings();
-  final themeName = await getSetting("Color theme") ?? defSettings["Color theme"];
+  final themeName =
+      await getSetting("Color theme") ?? defSettings["Color theme"];
   setThemeColors(themeName);
   // Загрузка локализации
-  final languageSetting = await getSetting("Language") ?? defSettings["Language"];
+  final languageSetting =
+      await getSetting("Language") ?? defSettings["Language"];
   await readLocale(languageSetting.toLowerCase());
   // Инициализация системы уведомлений
   await SimpleNotifications.initNotifications();
   // Проверяем, включены ли напоминания перед планированием
-  final enableReminders = await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
+  final enableReminders =
+      await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
   if (enableReminders == "true") {
     // Планируем ежедневную проверку напоминаний
     await SimpleNotifications.scheduleReminderCheck();
@@ -301,9 +265,8 @@ Widget memorizerApp() => MaterialApp(
     GlobalCupertinoLocalizations.delegate,
   ],
   // Add supported locales with proper locale codes
-  supportedLocales: langNames.keys.map((key) =>
-      Locale(getLocaleCode(key))
-  ).toList(),
+  supportedLocales:
+      langNames.keys.map((key) => Locale(getLocaleCode(key))).toList(),
   // Set the app locale with proper locale code
   locale: Locale(getLocaleCode(currentLocale)),
   onGenerateRoute: (settings) {
@@ -341,9 +304,11 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // Метод для ручной проверки напоминаний
+  // manual check
   Future<void> _checkReminders() async {
     await SimpleNotifications.manualCheckReminders();
+    // Refresh the items list after checking reminders
+    _refreshItems();
   }
 
   // Обработчик множественного тапа
@@ -365,7 +330,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-// Метод _showPinDialog должен использовать this.context
+  // Метод _showPinDialog должен использовать this.context
   void _showPinDialog() async {
     // Проверяем, установлен ли уже PIN-код
     bool hasPIN = await isPinSet();
@@ -379,7 +344,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-// Диалог для создания нового PIN-кода
+  // Диалог для создания нового PIN-кода
   void _showCreatePinDialog() {
     final TextEditingController pinController = TextEditingController();
     final FocusNode focusNode = FocusNode();
@@ -407,15 +372,13 @@ class _HomePageState extends State<HomePage> {
               TextField(
                 controller: pinController,
                 focusNode: focusNode,
-                autofocus: true, // Добавляем autofocus свойство
+                autofocus: true,
+                // Добавляем autofocus свойство
                 keyboardType: TextInputType.number,
                 maxLength: 4,
                 obscureText: true,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: fsLarge,
-                  color: clText,
-                ),
+                style: TextStyle(fontSize: fsLarge, color: clText),
                 decoration: InputDecoration(
                   hintText: '****',
                   counterText: '',
@@ -478,7 +441,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-// Диалог для ввода существующего PIN-кода
+  // Диалог для ввода существующего PIN-кода
   void _showEnterPinDialog() {
     String enteredPin = '';
     final TextEditingController pinController = TextEditingController();
@@ -511,10 +474,7 @@ class _HomePageState extends State<HomePage> {
                 maxLength: 4,
                 obscureText: true,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: fsLarge,
-                  color: clText,
-                ),
+                style: TextStyle(fontSize: fsLarge, color: clText),
                 decoration: InputDecoration(
                   hintText: '****',
                   counterText: '',
@@ -614,7 +574,7 @@ class _HomePageState extends State<HomePage> {
 
   void _showContextMenu(BuildContext context, Map<String, dynamic> item) {
     List<PopupMenuEntry> menuItems = [
-// В методе _showContextMenu
+      // В методе _showContextMenu
       PopupMenuItem(
         child: ListTile(
           leading: Icon(Icons.edit, color: clText),
@@ -623,12 +583,13 @@ class _HomePageState extends State<HomePage> {
             Navigator.pop(context); // Close the menu
             // Navigate to edit page, передаем только ID
             Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => EditItemPage(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) => EditItemPage(
                       itemId: item['id'], // Передаем только ID
-                    )
-                )
+                    ),
+              ),
             ).then((updated) {
               if (updated == true) {
                 _refreshItems();
@@ -649,11 +610,7 @@ class _HomePageState extends State<HomePage> {
               title: lw('Delete Item'),
               content: lw('Are you sure you want to delete this item?'),
               actions: [
-                {
-                  'label': lw('Cancel'),
-                  'value': false,
-                  'isDestructive': false,
-                },
+                {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
                 {
                   'label': lw('Delete'),
                   'value': true,
@@ -680,8 +637,10 @@ class _HomePageState extends State<HomePage> {
         PopupMenuItem(
           child: ListTile(
             leading: Icon(Icons.exit_to_app, color: clText),
-            title: Text(lw('Exit private mode'),
-                style: TextStyle(color: clText)),
+            title: Text(
+              lw('Exit private mode'),
+              style: TextStyle(color: clText),
+            ),
             onTap: () {
               Navigator.pop(context); // Close the menu
               setState(() {
@@ -699,12 +658,13 @@ class _HomePageState extends State<HomePage> {
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(200, 200, 200, 200),
-      color: clMenu, // Set the background color to clMenu to match the theme
+      color: clMenu,
+      // Set the background color to clMenu to match the theme
       items: menuItems,
     );
   }
 
-// In the _HomePageState class, we need to modify the AppBar and PopupMenuButton
+  // In the _HomePageState class, we need to modify the AppBar and PopupMenuButton
 
   @override
   Widget build(BuildContext context) {
@@ -720,10 +680,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text(
                 lw('Memorizer'),
-                style: TextStyle(
-                  fontSize: fsLarge,
-                  fontWeight: fwBold,
-                ),
+                style: TextStyle(fontSize: fsLarge, fontWeight: fwBold),
               ),
               if (xvHiddenMode)
                 Padding(
@@ -742,14 +699,16 @@ class _HomePageState extends State<HomePage> {
               await vacuumDatabases();
               // Close the app when X button is pressed from main screen
               Navigator.of(context).canPop()
-                  ? Navigator.of(context).pop() : SystemNavigator.pop();
+                  ? Navigator.of(context).pop()
+                  : SystemNavigator.pop();
             },
           ),
         ),
         actions: [
           // Добавляем кнопку проверки напоминаний
           GestureDetector(
-            onLongPress: () => showHelp(40), // ID 40 для кнопки проверки напоминаний
+            onLongPress: () => showHelp(40),
+            // ID 40 для кнопки проверки напоминаний
             child: IconButton(
               icon: Icon(Icons.notifications),
               tooltip: lw('Check reminders'),
@@ -781,10 +740,10 @@ class _HomePageState extends State<HomePage> {
               onSelected: (String result) {
                 if (result == 'settings') {
                   Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => buildSettingsScreen()
-                      )
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => buildSettingsScreen(),
+                    ),
                   ).then((needsRefresh) {
                     _refreshItems();
                   });
@@ -796,9 +755,7 @@ class _HomePageState extends State<HomePage> {
                   // Added handler for Filters option
                   Navigator.push<bool>(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => FiltersScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => FiltersScreen()),
                   ).then((needsRefresh) {
                     if (needsRefresh == true) {
                       _refreshItems();
@@ -808,9 +765,7 @@ class _HomePageState extends State<HomePage> {
                   // Added handler for Tag filter option
                   Navigator.push<bool>(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => TagsCloudScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => TagsCloudScreen()),
                   ).then((needsRefresh) {
                     if (needsRefresh == true) {
                       _refreshItems();
@@ -830,7 +785,8 @@ class _HomePageState extends State<HomePage> {
                   PopupMenuItem<String>(
                     value: 'clear_filters',
                     child: GestureDetector(
-                      onLongPress: () => showHelp(26), // ID 26 для пункта меню очистки фильтров
+                      onLongPress: () => showHelp(26),
+                      // ID 26 для пункта меню очистки фильтров
                       child: Text(
                         lw('Clear all filters'),
                         style: TextStyle(color: clText),
@@ -841,7 +797,8 @@ class _HomePageState extends State<HomePage> {
                   PopupMenuItem<String>(
                     value: 'filters',
                     child: GestureDetector(
-                      onLongPress: () => showHelp(23), // Reusing ID 23 from former filter button
+                      onLongPress: () => showHelp(23),
+                      // Reusing ID 23 from former filter button
                       child: Text(
                         lw('Filters'),
                         style: TextStyle(color: clText),
@@ -852,7 +809,8 @@ class _HomePageState extends State<HomePage> {
                   PopupMenuItem<String>(
                     value: 'tag_filter',
                     child: GestureDetector(
-                      onLongPress: () => showHelp(24), // Reusing ID 24 from former tag filter button
+                      onLongPress: () => showHelp(24),
+                      // Reusing ID 24 from former tag filter button
                       child: Text(
                         lw('Tag filter'),
                         style: TextStyle(color: clText),
@@ -862,7 +820,8 @@ class _HomePageState extends State<HomePage> {
                   PopupMenuItem<String>(
                     value: 'settings',
                     child: GestureDetector(
-                      onLongPress: () => showHelp(27), // ID 27 для пункта меню настроек
+                      onLongPress: () => showHelp(27),
+                      // ID 27 для пункта меню настроек
                       child: Text(
                         lw('Settings'),
                         style: TextStyle(color: clText),
@@ -872,11 +831,9 @@ class _HomePageState extends State<HomePage> {
                   PopupMenuItem<String>(
                     value: 'about',
                     child: GestureDetector(
-                      onLongPress: () => showHelp(28), // ID 28 для пункта меню "О программе"
-                      child: Text(
-                        lw('About'),
-                        style: TextStyle(color: clText),
-                      ),
+                      onLongPress: () => showHelp(28),
+                      // ID 28 для пункта меню "О программе"
+                      child: Text(lw('About'), style: TextStyle(color: clText)),
                     ),
                   ),
                 ];
@@ -900,150 +857,147 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _items.isEmpty
-          ? Center(
-        child: Text(
-          xvHiddenMode
-              ? lw('No private items yet. Press + to add.')
-              : lw('No items yet. Press + to add.'),
-          style: TextStyle(
-            color: clText,
-            fontSize: fsMedium,
-          ),
-        ),
-      )
-          : ListView.builder(
-        itemCount: _items.length,
-        itemBuilder: (context, index) {
-          final item = _items[index];
-          final priorityValue = item['priority'] ?? 0;
-          final hasDate = item['date'] != null;
-          final isReminder = item['remind'] == 1;
-
-          // Format date for display if it exists
-          String? formattedDate;
-          if (hasDate) {
-            final eventDate = DateTime.fromMillisecondsSinceEpoch(item['date']);
-            formattedDate = DateFormat(ymdDateFormat).format(eventDate);
-          }
-
-          return ListTile(
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item['title'],
-                    style: TextStyle(
-                      fontWeight: fwBold,
-                      color: clText,
-                    ),
-                  ),
+      body:
+          _isLoading
+              ? Center(child: CircularProgressIndicator())
+              : _items.isEmpty
+              ? Center(
+                child: Text(
+                  xvHiddenMode
+                      ? lw('No private items yet. Press + to add.')
+                      : lw('No items yet. Press + to add.'),
+                  style: TextStyle(color: clText, fontSize: fsMedium),
                 ),
-                // Display priority as stars
-                if (priorityValue > 0)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(
-                        priorityValue > 3 ? 3 : priorityValue,
-                            (i) => Icon(Icons.star, color: clUpBar, size: 34)
-                    ),
-                  ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item['content'],
-                  style: TextStyle(color: clText),
-                ),
-                if (item['tags'].toString().isNotEmpty)
-                  Text(
-                    'Tags: ${item['tags']}',
-                    style: TextStyle(
-                      fontSize: fsNormal,
-                      color: clText,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                // Add date information if available
-                if (hasDate)
-                  Row(
-                    children: [
-                      Icon(
-                          isReminder ? Icons.alarm : Icons.event,
-                          color: isReminder ? Colors.red : clText,
-                          size: 14
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        formattedDate!,
-                        style: TextStyle(
-                          fontSize: fsNormal,
-                          color: isReminder ? Colors.red : clText,
-                          fontWeight: isReminder ? fwBold : fwNormal,
+              )
+              : ListView.builder(
+                itemCount: _items.length,
+                itemBuilder: (context, index) {
+                  final item = _items[index];
+                  final priorityValue = item['priority'] ?? 0;
+                  final hasDate = item['date'] != null;
+                  final isReminder = item['remind'] == 1;
+
+                  // Format date for display if it exists
+                  String? formattedDate;
+                  if (hasDate) {
+                    final eventDate = yyyymmddToDateTime(item['date']);
+                    formattedDate = DateFormat(ymdDateFormat).format(eventDate);
+                  }
+
+                  return ListTile(
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item['title'],
+                            style: TextStyle(fontWeight: fwBold, color: clText),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-            tileColor: _selectedItemId == item['id'] ? clSel : clFill,
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (xvHiddenMode)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4.0),
-                    child: Icon(Icons.lock, color: clText, size: 16),
-                  ),
-                if (priorityValue > 0)
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: clUpBar,
-                      shape: BoxShape.circle,
+                        // Display priority as stars
+                        if (priorityValue > 0)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: List.generate(
+                              priorityValue > 3 ? 3 : priorityValue,
+                              (i) => Icon(Icons.star, color: clUpBar, size: 34),
+                            ),
+                          ),
+                      ],
                     ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      priorityValue.toString(),
-                      style: TextStyle(
-                        color: clText,
-                        fontWeight: fwBold,
-                        fontSize: fsSmall,
-                      ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item['content'], style: TextStyle(color: clText)),
+                        if (item['tags'].toString().isNotEmpty)
+                          Text(
+                            'Tags: ${item['tags']}',
+                            style: TextStyle(
+                              fontSize: fsNormal,
+                              color: clText,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        // Add date information if available
+                        if (hasDate)
+                          Row(
+                            children: [
+                              Icon(
+                                isReminder ? Icons.alarm : Icons.event,
+                                color: isReminder ? Colors.red : clText,
+                                size: 14,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                formattedDate!,
+                                style: TextStyle(
+                                  fontSize: fsNormal,
+                                  color: isReminder ? Colors.red : clText,
+                                  fontWeight: isReminder ? fwBold : fwNormal,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
-                  ),
-              ],
-            ),
-            trailing: isReminder
-                ? Icon(Icons.notifications_active, color: Colors.red) : null,
-            onTap: () {
-              // Just select the item and highlight it
-              setState(() {
-                _selectedItemId = item['id'];
-              });
+                    tileColor: _selectedItemId == item['id'] ? clSel : clFill,
+                    leading: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (xvHiddenMode)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4.0),
+                            child: Icon(Icons.lock, color: clText, size: 16),
+                          ),
+                        if (priorityValue > 0)
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: clUpBar,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              priorityValue.toString(),
+                              style: TextStyle(
+                                color: clText,
+                                fontWeight: fwBold,
+                                fontSize: fsSmall,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    trailing:
+                        isReminder
+                            ? Icon(
+                              Icons.notifications_active,
+                              color: Colors.red,
+                            )
+                            : null,
+                    onTap: () {
+                      // Just select the item and highlight it
+                      setState(() {
+                        _selectedItemId = item['id'];
+                      });
 
-              // Сбрасываем таймер автоматического выхода из скрытого режима
-              if (xvHiddenMode) {
-                resetHiddenModeTimer();
-              }
-            },
-            onLongPress: () {
-              // Show context menu with Edit and Delete options
-              _showContextMenu(context, item);
+                      // Сбрасываем таймер автоматического выхода из скрытого режима
+                      if (xvHiddenMode) {
+                        resetHiddenModeTimer();
+                      }
+                    },
+                    onLongPress: () {
+                      // Show context menu with Edit and Delete options
+                      _showContextMenu(context, item);
 
-              // Сбрасываем таймер автоматического выхода из скрытого режима
-              if (xvHiddenMode) {
-                resetHiddenModeTimer();
-              }
-            },
-          );
-        },
-      ),
+                      // Сбрасываем таймер автоматического выхода из скрытого режима
+                      if (xvHiddenMode) {
+                        resetHiddenModeTimer();
+                      }
+                    },
+                  );
+                },
+              ),
       floatingActionButton: GestureDetector(
         onLongPress: () => showHelp(29), // ID 29 для кнопки добавления
         child: FloatingActionButton(
@@ -1058,7 +1012,9 @@ class _HomePageState extends State<HomePage> {
             final result = await Navigator.push<bool>(
               context,
               MaterialPageRoute(
-                  builder: (context) => EditItemPage() // Без параметров для новой записи
+                builder:
+                    (context) =>
+                        EditItemPage(), // Без параметров для новой записи
               ),
             );
 

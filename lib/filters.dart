@@ -1,6 +1,7 @@
 // filters.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import 'globals.dart';
 
 // Class for storing filter data
@@ -22,10 +23,10 @@ class FilterData {
   // Check if any filters are active
   bool get isActive =>
       dateFrom != null ||
-          dateTo != null ||
-          priority != null ||
-          hasReminder != null ||
-          (tags != null && tags!.isNotEmpty);
+      dateTo != null ||
+      priority != null ||
+      hasReminder != null ||
+      (tags != null && tags!.isNotEmpty);
 
   // Convert to string for debugging
   @override
@@ -73,20 +74,20 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
     // Initialize controllers
     _dateFromController = TextEditingController(
-        text: _filterData.dateFrom != null
-            ? DateFormat(ymdDateFormat).format(_filterData.dateFrom!)
-            : ''
+      text:
+          _filterData.dateFrom != null
+              ? DateFormat(ymdDateFormat).format(_filterData.dateFrom!)
+              : '',
     );
 
     _dateToController = TextEditingController(
-        text: _filterData.dateTo != null
-            ? DateFormat(ymdDateFormat).format(_filterData.dateTo!)
-            : ''
+      text:
+          _filterData.dateTo != null
+              ? DateFormat(ymdDateFormat).format(_filterData.dateTo!)
+              : '',
     );
 
-    _tagsController = TextEditingController(
-        text: _filterData.tags ?? ''
-    );
+    _tagsController = TextEditingController(text: _filterData.tags ?? '');
 
     _selectedPriority = _filterData.priority ?? -1;
     _selectedHasReminder = _filterData.hasReminder;
@@ -173,11 +174,15 @@ class _FiltersScreenState extends State<FiltersScreen> {
     List<String> parts = [];
 
     if (_filterData.dateFrom != null) {
-      parts.add('dateFrom:${DateFormat(ymdDateFormat).format(_filterData.dateFrom!)}');
+      parts.add(
+        'dateFrom:${DateFormat(ymdDateFormat).format(_filterData.dateFrom!)}',
+      );
     }
 
     if (_filterData.dateTo != null) {
-      parts.add('dateTo:${DateFormat(ymdDateFormat).format(_filterData.dateTo!)}');
+      parts.add(
+        'dateTo:${DateFormat(ymdDateFormat).format(_filterData.dateTo!)}',
+      );
     }
 
     if (_filterData.priority != null) {
@@ -195,43 +200,50 @@ class _FiltersScreenState extends State<FiltersScreen> {
     return parts.join('|');
   }
 
-// Функция для показа диалога обмена дат
+  // Функция для показа диалога обмена дат
   Future<void> _showSwapDatesDialog() async {
-    bool swapDates = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: clFill,
-          title: Text(lw('Invalid Date Range'), style: TextStyle(color: clText)),
-          content: Text(
-            lw('Date from is after Date to. Would you like to swap the dates?'),
-            style: TextStyle(color: clText),
-          ),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: clUpBar,
-                foregroundColor: clText,
+    bool swapDates =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: clFill,
+              title: Text(
+                lw('Invalid Date Range'),
+                style: TextStyle(color: clText),
               ),
-              child: Text(lw('Cancel')),
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: clUpBar,
-                foregroundColor: clText,
+              content: Text(
+                lw(
+                  'Date from is after Date to. Would you like to swap the dates?',
+                ),
+                style: TextStyle(color: clText),
               ),
-              child: Text(lw('Swap Dates')),
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+              actions: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                    backgroundColor: clUpBar,
+                    foregroundColor: clText,
+                  ),
+                  child: Text(lw('Cancel')),
+                  onPressed: () {
+                    Navigator.pop(context, false);
+                  },
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    backgroundColor: clUpBar,
+                    foregroundColor: clText,
+                  ),
+                  child: Text(lw('Swap Dates')),
+                  onPressed: () {
+                    Navigator.pop(context, true);
+                  },
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
 
     if (swapDates) {
       setState(() {
@@ -248,11 +260,13 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
   }
 
-// В методе _applyFilters добавляем полную проверку
+  // В методе _applyFilters добавляем полную проверку
   void _applyFilters() async {
-     if (_dateFromController.text.isNotEmpty) {
+    if (_dateFromController.text.isNotEmpty) {
       if (!validateDateInput(_dateFromController.text)) {
-        okInfoBarOrange(lw('Invalid date format in From field. Use YYYY-MM-DD'));
+        okInfoBarOrange(
+          lw('Invalid date format in From field. Use YYYY-MM-DD'),
+        );
         return;
       }
     }
@@ -272,7 +286,10 @@ class _FiltersScreenState extends State<FiltersScreen> {
     // Код применения фильтра выполнится только если даты корректны
     _filterData.priority = _selectedPriority >= 0 ? _selectedPriority : null;
     _filterData.hasReminder = _selectedHasReminder;
-    _filterData.tags = _tagsController.text.trim().isEmpty ? null : _tagsController.text.trim();
+    _filterData.tags =
+        _tagsController.text.trim().isEmpty
+            ? null
+            : _tagsController.text.trim();
     xvFilter = _buildFilterString();
     if (_filterData.isActive) {
       okInfoBarGreen(lw('Filter applied'));
@@ -312,9 +329,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            dialogTheme: DialogTheme(
-              backgroundColor: clFill,
-            ),
+            dialogTheme: DialogTheme(backgroundColor: clFill),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
                 backgroundColor: clUpBar,
@@ -357,9 +372,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            dialogTheme: DialogTheme(
-              backgroundColor: clFill,
-            ),
+            dialogTheme: DialogTheme(backgroundColor: clFill),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
                 backgroundColor: clUpBar,
@@ -405,8 +418,10 @@ class _FiltersScreenState extends State<FiltersScreen> {
               itemBuilder: (context, index) {
                 final tag = _tagsWithCounts[index];
                 return ListTile(
-                  title: Text('${tag['name']} (${tag['count']})',
-                      style: TextStyle(color: clText)),
+                  title: Text(
+                    '${tag['name']} (${tag['count']})',
+                    style: TextStyle(color: clText),
+                  ),
                   tileColor: index % 2 == 0 ? clFill : clSel,
                   onTap: () {
                     _addTagToField(tag['name']);
@@ -441,10 +456,12 @@ class _FiltersScreenState extends State<FiltersScreen> {
       _tagsController.text = tag;
     } else {
       // Проверяем, содержит ли уже тег
-      List<String> existingTags = currentTags.split(',')
-          .map((t) => t.trim())
-          .where((t) => t.isNotEmpty)
-          .toList();
+      List<String> existingTags =
+          currentTags
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty)
+              .toList();
 
       if (!existingTags.contains(tag)) {
         // Добавляем тег с запятой
@@ -465,19 +482,17 @@ class _FiltersScreenState extends State<FiltersScreen> {
         children: [
           Text(
             lw('Priority filter'),
-            style: TextStyle(
-              color: clText,
-              fontSize: fsMedium,
-            ),
+            style: TextStyle(color: clText, fontSize: fsMedium),
           ),
           SizedBox(height: 8),
           Row(
             children: [
               // Minus button
               ElevatedButton(
-                onPressed: _selectedPriority > -1
-                    ? () => setState(() => _selectedPriority--)
-                    : null,
+                onPressed:
+                    _selectedPriority > -1
+                        ? () => setState(() => _selectedPriority--)
+                        : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: clUpBar,
                   foregroundColor: clText,
@@ -500,7 +515,9 @@ class _FiltersScreenState extends State<FiltersScreen> {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  _selectedPriority == -1 ? lw('Any') : _selectedPriority.toString(),
+                  _selectedPriority == -1
+                      ? lw('Any')
+                      : _selectedPriority.toString(),
                   style: TextStyle(
                     color: clText,
                     fontSize: fsMedium,
@@ -511,9 +528,10 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
               // Plus button
               ElevatedButton(
-                onPressed: _selectedPriority < 3
-                    ? () => setState(() => _selectedPriority++)
-                    : null,
+                onPressed:
+                    _selectedPriority < 3
+                        ? () => setState(() => _selectedPriority++)
+                        : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: clUpBar,
                   foregroundColor: clText,
@@ -531,7 +549,10 @@ class _FiltersScreenState extends State<FiltersScreen> {
                   children: List.generate(3, (index) {
                     return Icon(
                       Icons.star,
-                      color: (_selectedPriority >= 0 && index < _selectedPriority) ? clUpBar : clFill,
+                      color:
+                          (_selectedPriority >= 0 && index < _selectedPriority)
+                              ? clUpBar
+                              : clFill,
                       size: 34,
                     );
                   }),
@@ -552,10 +573,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
         children: [
           Text(
             lw('Reminder filter'),
-            style: TextStyle(
-              color: clText,
-              fontSize: fsMedium,
-            ),
+            style: TextStyle(color: clText, fontSize: fsMedium),
           ),
           SizedBox(width: 16),
           DropdownButton<bool?>(
@@ -587,14 +605,19 @@ class _FiltersScreenState extends State<FiltersScreen> {
     );
   }
 
-  Widget _buildDateField(String label, TextEditingController controller, Future<void> Function() onSelectDate) {
+  Widget _buildDateField(
+    String label,
+    TextEditingController controller,
+    Future<void> Function() onSelectDate,
+  ) {
     return Row(
       children: [
         Expanded(
           child: TextField(
             controller: controller,
             style: TextStyle(color: clText),
-            readOnly: false, // Разрешаем ручной ввод
+            readOnly: false,
+            // Разрешаем ручной ввод
             onChanged: (value) {
               if (value.isEmpty) {
                 // Если поле пустое, сбрасываем соответствующую дату
@@ -682,7 +705,6 @@ class _FiltersScreenState extends State<FiltersScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -691,12 +713,14 @@ class _FiltersScreenState extends State<FiltersScreen> {
         foregroundColor: clText,
         title: GestureDetector(
           onLongPress: () => showHelp(40), // ID 40 for screen title
-          child: Text(lw('Filters'),
+          child: Text(
+            lw('Filters'),
             style: TextStyle(
-            fontSize: fsLarge,
-            color: clText,
-            fontWeight: fwBold,)
-        ),
+              fontSize: fsLarge,
+              color: clText,
+              fontWeight: fwBold,
+            ),
+          ),
         ),
         leading: GestureDetector(
           onLongPress: () => showHelp(10), // ID 10 for back button
@@ -714,8 +738,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               tooltip: lw('Reset all filters'),
               onPressed: _resetFilters,
             ),
-          ),
-          // Apply button
+          ), // Apply button
           GestureDetector(
             onLongPress: () => showHelp(42), // ID 42 for apply button
             child: IconButton(
@@ -723,8 +746,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               tooltip: lw('Apply filters'),
               onPressed: _applyFilters,
             ),
-          ),
-          // Cancel button
+          ), // Cancel button
           GestureDetector(
             onLongPress: () => showHelp(43), // ID 43 for cancel button
             child: IconButton(
@@ -743,11 +765,19 @@ class _FiltersScreenState extends State<FiltersScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // "Date from" field
-            _buildDateField(lw('Date from'), _dateFromController, () => _selectDateFrom(context)),
+            _buildDateField(
+              lw('Date from'),
+              _dateFromController,
+              () => _selectDateFrom(context),
+            ),
             SizedBox(height: 16),
 
             // "Date to" field
-            _buildDateField(lw('Date to'), _dateToController, () => _selectDateTo(context)),
+            _buildDateField(
+              lw('Date to'),
+              _dateToController,
+              () => _selectDateTo(context),
+            ),
             SizedBox(height: 16),
 
             // Tags field - now using the new method with tag button
@@ -766,26 +796,27 @@ class _FiltersScreenState extends State<FiltersScreen> {
     );
   }
 
-// Function to get filter status text
-Future<String> getFilterStatusText() async {
-  bool hasTagFilter = xvTagFilter.isNotEmpty;
-  bool hasMainFilter = xvFilter.isNotEmpty;
+  // Function to get filter status text
+  Future<String> getFilterStatusText() async {
+    bool hasTagFilter = xvTagFilter.isNotEmpty;
+    bool hasMainFilter = xvFilter.isNotEmpty;
 
-  // Get "Last items" setting value
-  final lastItemsStr = await getSetting("Last items") ?? defSettings["Last items"];
-  final lastItems = int.tryParse(lastItemsStr) ?? 0;
-  bool hasLastItems = lastItems > 0;
+    // Get "Last items" setting value
+    final lastItemsStr =
+        await getSetting("Last items") ?? defSettings["Last items"];
+    final lastItems = int.tryParse(lastItemsStr) ?? 0;
+    bool hasLastItems = lastItems > 0;
 
-  if (hasTagFilter && hasMainFilter) {
-    return '(FT) ';
-  } else if (hasTagFilter) {
-    return '(T) ';
-  } else if (hasMainFilter) {
-    return '(F) ';
-  } else if (hasLastItems) {
-    return '($lastItems) ';
-  } else {
-    return '(All) ';
+    if (hasTagFilter && hasMainFilter) {
+      return '(FT) ';
+    } else if (hasTagFilter) {
+      return '(T) ';
+    } else if (hasMainFilter) {
+      return '(F) ';
+    } else if (hasLastItems) {
+      return '($lastItems) ';
+    } else {
+      return '(All) ';
+    }
   }
- }
 }
