@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="Make help-finger show help"
+COMMENT="field REMOVED and refornat all"
 #
 GLOBVERS='0.7'
 VER=''
