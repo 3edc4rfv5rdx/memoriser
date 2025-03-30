@@ -8,27 +8,36 @@ import 'package:sqflite/sqflite.dart';
 
 import 'globals.dart';
 
-// Получение директории загрузок
-Future<Directory?> _getDownloadsDirectory() async {
+// Получение директории документов
+Future<Directory?> _getDocumentsDirectory() async {
   try {
     if (Platform.isAndroid) {
       // На Android используем внешнее хранилище
       final directory = await getExternalStorageDirectory();
       if (directory != null) {
         final androidPath = directory.path.split('/Android')[0];
-        final downloadDir = Directory('$androidPath/Download');
-        if (await downloadDir.exists()) {
-          return downloadDir;
+        final documentsDir = Directory('$androidPath/Documents');
+        // Создаем директорию, если она не существует
+        if (!await documentsDir.exists()) {
+          await documentsDir.create(recursive: true);
         }
+        return documentsDir;
       }
       return await getApplicationDocumentsDirectory();
     } else if (Platform.isLinux) {
-      // На Linux обычно используем ~/Downloads
+      // На Linux обычно используем ~/Documents
       final home = Platform.environment['HOME'];
       if (home != null) {
-        final downloadDir = Directory('$home/Downloads');
-        if (await downloadDir.exists()) {
-          return downloadDir;
+        final documentsDir = Directory('$home/Documents');
+        if (await documentsDir.exists()) {
+          return documentsDir;
+        }
+        // Если директория не существует, создаем ее
+        try {
+          await documentsDir.create(recursive: true);
+          return documentsDir;
+        } catch (e) {
+          myPrint('Error creating Documents directory: $e');
         }
       }
       return await getApplicationDocumentsDirectory();
@@ -37,7 +46,7 @@ Future<Directory?> _getDownloadsDirectory() async {
       return await getApplicationDocumentsDirectory();
     }
   } catch (e) {
-    myPrint('Error getting downloads directory: $e');
+    myPrint('Error getting documents directory: $e');
     return null;
   }
 }
@@ -47,17 +56,17 @@ Future<String> createBackup() async {
   try {
     myPrint('Starting backup process...');
 
-    // Получение директории загрузок
-    final downloadsDir = await _getDownloadsDirectory();
-    myPrint('Downloads directory: ${downloadsDir?.path}');
+    // Получение директории документов
+    final documentsDir = await _getDocumentsDirectory();
+    myPrint('Documents directory: ${documentsDir?.path}');
 
-    if (downloadsDir == null) {
-      myPrint('Failed to get downloads directory');
+    if (documentsDir == null) {
+      myPrint('Failed to get documents directory');
       return lw('Error creating backup');
     }
 
     // Создание директории Memorizer
-    final backupDir = Directory('${downloadsDir.path}/Memorizer');
+    final backupDir = Directory('${documentsDir.path}/Memorizer');
     myPrint('Backup directory path: ${backupDir.path}');
 
     bool dirExists = await backupDir.exists();
@@ -140,13 +149,13 @@ Future<String> restoreBackup() async {
     // Проверяем директорию бэкапа
     await listBackupFiles();
 
-    final downloadsDir = await _getDownloadsDirectory();
-    if (downloadsDir == null) {
-      myPrint('Failed to get downloads directory');
+    final documentsDir = await _getDocumentsDirectory();
+    if (documentsDir == null) {
+      myPrint('Failed to get documents directory');
       return lw('Error');
     }
 
-    final backupDir = Directory('${downloadsDir.path}/Memorizer');
+    final backupDir = Directory('${documentsDir.path}/Memorizer');
     myPrint('Backup directory path: ${backupDir.path}');
 
     if (!await backupDir.exists()) {
@@ -253,13 +262,13 @@ Future<String> restoreBackup() async {
 // Функция для проверки наличия и отображения файлов бэкапа
 Future<void> listBackupFiles() async {
   try {
-    final downloadsDir = await _getDownloadsDirectory();
-    if (downloadsDir == null) {
-      myPrint('Downloads directory not available');
+    final documentsDir = await _getDocumentsDirectory();
+    if (documentsDir == null) {
+      myPrint('Documents directory not available');
       return;
     }
 
-    final backupDir = Directory('${downloadsDir.path}/Memorizer');
+    final backupDir = Directory('${documentsDir.path}/Memorizer');
     if (!await backupDir.exists()) {
       myPrint('Backup directory does not exist');
       return;

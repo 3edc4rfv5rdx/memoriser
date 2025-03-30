@@ -113,11 +113,11 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     setState(() {
       _hasChanges =
           _newTheme != _currentTheme ||
-          _newLanguage != _currentLanguage ||
-          _newNewestFirst != _newestFirst ||
-          _newLastItems != _lastItems ||
-          _newRemindTime != _remindTime ||
-          _newEnableReminders != _enableReminders; // Add this to the check
+              _newLanguage != _currentLanguage ||
+              _newNewestFirst != _newestFirst ||
+              _newLastItems != _lastItems ||
+              _newRemindTime != _remindTime ||
+              _newEnableReminders != _enableReminders; // Add this to the check
     });
   }
 
@@ -284,12 +284,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             ),
           ),
           actions: [
-            // Добавляем кнопку бэкапа
+            // Меняем кнопку бэкапа (иконку и название в подсказке)
+// settings.dart - обновленная часть для иконки бэкапа
             GestureDetector(
               onLongPress: () => showHelp(44), // ID 44 для кнопки бэкапа
               child: PopupMenuButton<String>(
-                icon: Icon(Icons.backup),
-                tooltip: lw('Backup'),
+                icon: Icon(Icons.save_alt), // Изменяем на Icons.save_alt
+                tooltip: lw('Backup & Restore'), // Обновленный текст подсказки
                 color: clMenu,
                 itemBuilder: (BuildContext context) {
                   return [
@@ -323,7 +324,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     if (result.contains('Error')) {
                       okInfoBarRed(result);
                     } else {
-                      okInfoBarGreen(result);
+                      // Обновляем сообщение, чтобы указать папку Documents
+                      okInfoBarGreen(result + lw(' in Documents folder'));
                     }
                   } else if (result == 'restore_backup') {
                     // Показать предупреждение перед восстановлением
@@ -368,71 +370,71 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           ],
         ),
         body:
-            _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ListView(
-                    children: [
-                      // Language selector row
-                      _buildSettingsRow(
-                        label: lw('App language'),
-                        child: _buildLanguageDropdown(),
-                        helpId:
-                            100, // Keep existing ID 100 for language setting
-                      ),
+        _isLoading
+            ? Center(child: CircularProgressIndicator())
+            : Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: ListView(
+            children: [
+              // Language selector row
+              _buildSettingsRow(
+                label: lw('App language'),
+                child: _buildLanguageDropdown(),
+                helpId:
+                100, // Keep existing ID 100 for language setting
+              ),
 
-                      SizedBox(height: 10),
+              SizedBox(height: 10),
 
-                      // Color theme selector row
-                      _buildSettingsRow(
-                        label: lw('Color theme'),
-                        child: _buildThemeDropdown(),
-                        helpId: 101, // Keep existing ID 101 for theme setting
-                      ),
+              // Color theme selector row
+              _buildSettingsRow(
+                label: lw('Color theme'),
+                child: _buildThemeDropdown(),
+                helpId: 101, // Keep existing ID 101 for theme setting
+              ),
 
-                      SizedBox(height: 10),
+              SizedBox(height: 10),
 
-                      // Newest first checkbox row
-                      _buildSettingsRow(
-                        label: lw('Newest first'),
-                        child: _buildSortOrderCheckbox(),
-                        helpId:
-                            102, // Keep existing ID 102 for sort order setting
-                      ),
+              // Newest first checkbox row
+              _buildSettingsRow(
+                label: lw('Newest first'),
+                child: _buildSortOrderCheckbox(),
+                helpId:
+                102, // Keep existing ID 102 for sort order setting
+              ),
 
-                      SizedBox(height: 10),
+              SizedBox(height: 10),
 
-                      // Last items row
-                      _buildSettingsRow(
-                        label: lw('Last items'),
-                        child: _buildLastItemsField(),
-                        helpId:
-                            103, // Keep existing ID 103 for last items setting
-                      ),
+              // Last items row
+              _buildSettingsRow(
+                label: lw('Last items'),
+                child: _buildLastItemsField(),
+                helpId:
+                103, // Keep existing ID 103 for last items setting
+              ),
 
-                      SizedBox(height: 10),
+              SizedBox(height: 10),
 
-                      // Enable reminders checkbox row
-                      _buildSettingsRow(
-                        label: lw('Enable reminders'),
-                        child: _buildEnableRemindersCheckbox(),
-                        helpId: 105, // New ID 105 for enable reminders setting
-                      ),
+              // Enable reminders checkbox row
+              _buildSettingsRow(
+                label: lw('Enable reminders'),
+                child: _buildEnableRemindersCheckbox(),
+                helpId: 105, // New ID 105 for enable reminders setting
+              ),
 
-                      SizedBox(height: 10),
+              SizedBox(height: 10),
 
-                      // Remind time row (only show if reminders enabled)
-                      if (_newEnableReminders == true)
-                        _buildSettingsRow(
-                          label: lw('Remind time'),
-                          child: _buildRemindTimeField(),
-                          helpId:
-                              104, // Keep existing ID 104 for remind time setting
-                        ),
-                    ],
-                  ),
+              // Remind time row (only show if reminders enabled)
+              if (_newEnableReminders == true)
+                _buildSettingsRow(
+                  label: lw('Remind time'),
+                  child: _buildRemindTimeField(),
+                  helpId:
+                  104, // Keep existing ID 104 for remind time setting
                 ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -487,12 +489,12 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           }
         },
         items:
-            langNames.entries.map<DropdownMenuItem<String>>((entry) {
-              return DropdownMenuItem<String>(
-                value: entry.key,
-                child: Text(entry.value),
-              );
-            }).toList(),
+        langNames.entries.map<DropdownMenuItem<String>>((entry) {
+          return DropdownMenuItem<String>(
+            value: entry.key,
+            child: Text(entry.value),
+          );
+        }).toList(),
       ),
     );
   }
@@ -522,9 +524,9 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           }
         },
         items:
-            appTHEMES.map<DropdownMenuItem<String>>((String value) {
-              return DropdownMenuItem<String>(value: value, child: Text(value));
-            }).toList(),
+        appTHEMES.map<DropdownMenuItem<String>>((String value) {
+          return DropdownMenuItem<String>(value: value, child: Text(value));
+        }).toList(),
       ),
     );
   }
