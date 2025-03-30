@@ -69,7 +69,7 @@ Future<String?> _createBackupDirWithDate() async {
 
     // Генерация имени подкаталога с датой
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
-    final backupDirPath = '${memorizerDir.path}/bak-$dateStr';
+    final backupDirPath = '${memorizerDir.path}/mem-$dateStr';
 
     // Создание подкаталога с датой
     final backupDir = Directory(backupDirPath);
@@ -529,7 +529,7 @@ Future<void> listBackupFiles() async {
     // Получаем список каталогов в Memorizer
     final entities = await memorizerDir.list().toList();
     final backupDirs = entities.whereType<Directory>().where(
-            (dir) => path.basename(dir.path).startsWith('bak-')
+            (dir) => path.basename(dir.path).startsWith('mem-')
     ).toList();
 
     if (backupDirs.isEmpty) {
