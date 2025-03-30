@@ -284,12 +284,12 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             ),
           ),
           actions: [
-            // Меняем кнопку бэкапа (иконку и название в подсказке)
-// settings.dart - обновленная часть для иконки бэкапа
+
+// Обновленная часть settings.dart для меню бэкапа
             GestureDetector(
               onLongPress: () => showHelp(44), // ID 44 для кнопки бэкапа
               child: PopupMenuButton<String>(
-                icon: Icon(Icons.save_alt), // Изменяем на Icons.save_alt
+                icon: Icon(Icons.save_alt), // Иконка сохранения
                 tooltip: lw('Backup & Restore'), // Обновленный текст подсказки
                 color: clMenu,
                 itemBuilder: (BuildContext context) {
@@ -297,10 +297,9 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     PopupMenuItem<String>(
                       value: 'create_backup',
                       child: GestureDetector(
-                        onLongPress: () => showHelp(45),
-                        // ID 45 для пункта меню создания бэкапа
+                        onLongPress: () => showHelp(45), // ID 45 для пункта создания бэкапа
                         child: Text(
-                          lw('Create backup'),
+                          lw('Create DB backup'),
                           style: TextStyle(color: clText),
                         ),
                       ),
@@ -308,10 +307,29 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     PopupMenuItem<String>(
                       value: 'restore_backup',
                       child: GestureDetector(
-                        onLongPress: () => showHelp(46),
-                        // ID 46 для пункта меню восстановления
+                        onLongPress: () => showHelp(46), // ID 46 для восстановления
                         child: Text(
-                          lw('Restore from backup'),
+                          lw('Restore from DB backup'),
+                          style: TextStyle(color: clText),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'export_csv',
+                      child: GestureDetector(
+                        onLongPress: () => showHelp(47), // ID 47 для экспорта CSV
+                        child: Text(
+                          lw('Export to CSV'),
+                          style: TextStyle(color: clText),
+                        ),
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'restore_csv',
+                      child: GestureDetector(
+                        onLongPress: () => showHelp(48), // ID 48 для восстановления из CSV
+                        child: Text(
+                          lw('Restore from CSV'),
                           style: TextStyle(color: clText),
                         ),
                       ),
@@ -324,7 +342,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     if (result.contains('Error')) {
                       okInfoBarRed(result);
                     } else {
-                      // Обновляем сообщение, чтобы указать папку Documents
+                      okInfoBarGreen(result + lw(' in Documents folder'));
+                    }
+                  } else if (result == 'export_csv') {
+                    final result = await exportToCSV();
+                    if (result.contains('Error')) {
+                      okInfoBarRed(result);
+                    } else {
                       okInfoBarGreen(result + lw(' in Documents folder'));
                     }
                   } else if (result == 'restore_backup') {
@@ -353,6 +377,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                       } else {
                         okInfoBarGreen(result);
                       }
+                    }
+                  } else if (result == 'restore_csv') {
+                    final result = await restoreFromCSV();
+                    if (result.contains('Error') || result == lw('Cancel')) {
+                      okInfoBarRed(result);
+                    } else {
+                      okInfoBarGreen(result);
                     }
                   }
                 },

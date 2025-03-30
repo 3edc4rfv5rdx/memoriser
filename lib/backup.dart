@@ -51,35 +51,51 @@ Future<Directory?> _getDocumentsDirectory() async {
   }
 }
 
+// Создание каталога для резервной копии с указанием даты
+Future<String?> _createBackupDirWithDate() async {
+  try {
+    // Получение директории документов
+    final documentsDir = await _getDocumentsDirectory();
+    if (documentsDir == null) {
+      myPrint('Failed to get documents directory');
+      return null;
+    }
+
+    // Создание базовой директории Memorizer
+    final memorizerDir = Directory('${documentsDir.path}/Memorizer');
+    if (!await memorizerDir.exists()) {
+      await memorizerDir.create(recursive: true);
+    }
+
+    // Генерация имени подкаталога с датой
+    final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
+    final backupDirPath = '${memorizerDir.path}/bak-$dateStr';
+
+    // Создание подкаталога с датой
+    final backupDir = Directory(backupDirPath);
+    if (!await backupDir.exists()) {
+      await backupDir.create(recursive: true);
+    }
+
+    return backupDirPath;
+  } catch (e) {
+    myPrint('Error creating backup directory with date: $e');
+    return null;
+  }
+}
+
 // Создание резервной копии базы данных
 Future<String> createBackup() async {
   try {
     myPrint('Starting backup process...');
 
-    // Получение директории документов
-    final documentsDir = await _getDocumentsDirectory();
-    myPrint('Documents directory: ${documentsDir?.path}');
+    // Создание каталога с датой для резервной копии
+    final backupDirPath = await _createBackupDirWithDate();
+    myPrint('Backup directory path: $backupDirPath');
 
-    if (documentsDir == null) {
-      myPrint('Failed to get documents directory');
+    if (backupDirPath == null) {
+      myPrint('Failed to create backup directory');
       return lw('Error creating backup');
-    }
-
-    // Создание директории Memorizer
-    final backupDir = Directory('${documentsDir.path}/Memorizer');
-    myPrint('Backup directory path: ${backupDir.path}');
-
-    bool dirExists = await backupDir.exists();
-    myPrint('Backup directory exists: $dirExists');
-
-    if (!dirExists) {
-      try {
-        await backupDir.create(recursive: true);
-        myPrint('Created backup directory successfully');
-      } catch (dirError) {
-        myPrint('Error creating backup directory: $dirError');
-        return lw('Error creating backup directory');
-      }
     }
 
     // Получение пути к основной базе данных
@@ -98,9 +114,9 @@ Future<String> createBackup() async {
       return lw('Error creating backup: database file not found');
     }
 
-    // Генерация имени файла
+    // Генерация имени файла с датой
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
-    final mainBackupPath = '${backupDir.path}/memorizer-$dateStr.db';
+    final mainBackupPath = '$backupDirPath/memorizer-$dateStr.db';
     myPrint('Target backup file path: $mainBackupPath');
 
     // Копирование файла с проверкой размера
@@ -141,6 +157,65 @@ Future<String> createBackup() async {
   }
 }
 
+// Экспорт данных в CSV
+Future<String> exportToCSV() async {
+  try {
+    myPrint('Starting CSV export...');
+
+    // Создание каталога с датой для экспорта
+    final backupDirPath = await _createBackupDirWithDate();
+
+    if (backupDirPath == null) {
+      myPrint('Failed to create export directory');
+      return lw('Error exporting to CSV');
+    }
+
+    // Получаем все записи из таблицы items
+    final List<Map<String, dynamic>> items = await mainDb.query('items');
+
+    if (items.isEmpty) {
+      myPrint('No data to export');
+      return lw('No data to export');
+    }
+
+    // Создаем CSV файл
+    final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
+    final csvFile = File('$backupDirPath/items-$dateStr.csv');
+    final sink = csvFile.openWrite();
+
+    // Записываем заголовки колонок
+    final headers = items.first.keys.toList();
+    sink.writeln(headers.join(','));
+
+    // Записываем данные
+    for (var item in items) {
+      final values = headers.map((header) {
+        var value = item[header];
+        // Обработка специальных символов в CSV
+        if (value is String) {
+          // Экранирование кавычек и добавление кавычек вокруг строки
+          value = '"${value.replaceAll('"', '""')}"';
+        } else if (value == null) {
+          value = '""';
+        }
+        return value;
+      }).toList();
+
+      sink.writeln(values.join(','));
+    }
+
+    await sink.flush();
+    await sink.close();
+
+    myPrint('CSV export completed successfully at ${csvFile.path}');
+    return lw('CSV export completed successfully');
+  } catch (e) {
+    myPrint('Error exporting to CSV: $e');
+    return lw('Error exporting to CSV');
+  }
+}
+
+// Обновленные функции восстановления с улучшенной фильтрацией по расширению
 // Восстановление из резервной копии
 Future<String> restoreBackup() async {
   try {
@@ -149,36 +224,27 @@ Future<String> restoreBackup() async {
     // Проверяем директорию бэкапа
     await listBackupFiles();
 
+    // Получаем директорию для выбора файла бэкапа
     final documentsDir = await _getDocumentsDirectory();
     if (documentsDir == null) {
       myPrint('Failed to get documents directory');
       return lw('Error');
     }
 
-    final backupDir = Directory('${documentsDir.path}/Memorizer');
-    myPrint('Backup directory path: ${backupDir.path}');
-
-    if (!await backupDir.exists()) {
-      myPrint('Backup directory does not exist');
-      await backupDir.create(recursive: true);
+    final memorizerDir = Directory('${documentsDir.path}/Memorizer');
+    if (!await memorizerDir.exists()) {
+      myPrint('Memorizer directory does not exist');
+      await memorizerDir.create(recursive: true);
       return lw('No backups found. Create a backup first.');
     }
 
-    // Проверяем наличие .db файлов в директории
-    final entities = await backupDir.list().toList();
-    final dbFiles = entities.whereType<File>().where((f) => f.path.endsWith('.db')).toList();
-
-    myPrint('Found ${dbFiles.length} database files in backup directory');
-
-    if (dbFiles.isEmpty) {
-      myPrint('No database backups found');
-      return lw('No database backups found in Memorizer folder.');
-    }
-
-    // Выбор файла резервной копии
+    // Сразу открываем выбор файла, а не каталога
     myPrint('Opening file picker...');
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
+      type: FileType.custom,
+      allowedExtensions: ['db'],
+      initialDirectory: memorizerDir.path,
+      dialogTitle: lw('Select DB backup file'),
     );
 
     if (result == null || result.files.isEmpty) {
@@ -200,6 +266,29 @@ Future<String> restoreBackup() async {
     if (!filePath.toLowerCase().endsWith('.db')) {
       myPrint('Selected file is not a database file');
       return lw('Error: selected file is not a database');
+    }
+
+    // Показываем предупреждение о замене данных (если не было показано ранее)
+    final shouldRestore = await showCustomDialog(
+      title: lw('Warning'),
+      content: lw('Restore will replace all current data with backup'),
+      actions: [
+        {
+          'label': lw('Cancel'),
+          'value': false,
+          'isDestructive': false,
+        },
+        {
+          'label': lw('Restore'),
+          'value': true,
+          'isDestructive': true,
+        },
+      ],
+    );
+
+    if (shouldRestore != true) {
+      myPrint('Restore cancelled by user');
+      return lw('Cancel');
     }
 
     // Закрытие соединения с базой данных
@@ -259,6 +348,167 @@ Future<String> restoreBackup() async {
   }
 }
 
+// Восстановление из CSV файла
+Future<String> restoreFromCSV() async {
+  try {
+    myPrint('Starting restore from CSV process...');
+
+    // Получаем директорию для выбора файла CSV
+    final documentsDir = await _getDocumentsDirectory();
+    if (documentsDir == null) {
+      myPrint('Failed to get documents directory');
+      return lw('Error');
+    }
+
+    final memorizerDir = Directory('${documentsDir.path}/Memorizer');
+    if (!await memorizerDir.exists()) {
+      myPrint('Memorizer directory does not exist');
+      return lw('No backups found. Create a backup first.');
+    }
+
+    // Сразу открываем выбор файла CSV, а не каталога
+    myPrint('Opening file picker...');
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+      initialDirectory: memorizerDir.path,
+      dialogTitle: lw('Select CSV file to restore'),
+    );
+
+    if (result == null || result.files.isEmpty) {
+      myPrint('No file selected or picker cancelled');
+      return lw('Cancel');
+    }
+
+    final file = result.files.first;
+    final filePath = file.path;
+
+    myPrint('Selected file: $filePath');
+
+    if (filePath == null) {
+      myPrint('Selected file path is null');
+      return lw('Error');
+    }
+
+    // Проверяем, что выбранный файл имеет расширение .csv
+    if (!filePath.toLowerCase().endsWith('.csv')) {
+      myPrint('Selected file is not a CSV file');
+      return lw('Error: selected file is not a CSV');
+    }
+
+    // Показываем предупреждение о замене данных
+    final shouldRestore = await showCustomDialog(
+      title: lw('Warning'),
+      content: lw('Restore will replace all data in the Items table'),
+      actions: [
+        {
+          'label': lw('Cancel'),
+          'value': false,
+          'isDestructive': false,
+        },
+        {
+          'label': lw('Restore'),
+          'value': true,
+          'isDestructive': true,
+        },
+      ],
+    );
+
+    if (shouldRestore != true) {
+      myPrint('Restore cancelled by user');
+      return lw('Cancel');
+    }
+
+    // Читаем CSV файл
+    myPrint('Reading CSV file...');
+    final csvFile = File(filePath);
+    final lines = await csvFile.readAsLines();
+
+    if (lines.isEmpty) {
+      myPrint('CSV file is empty');
+      return lw('Error: CSV file is empty');
+    }
+
+    // Парсим заголовки
+    final headers = _parseCSVLine(lines[0]);
+    myPrint('CSV headers: $headers');
+
+    // Начинаем транзакцию для восстановления данных
+    await mainDb.transaction((txn) async {
+      // Очищаем таблицу items
+      await txn.execute('DELETE FROM items');
+
+      // Вставляем данные из CSV
+      for (int i = 1; i < lines.length; i++) {
+        final values = _parseCSVLine(lines[i]);
+
+        if (values.length != headers.length) {
+          myPrint('Skipping malformed line: ${lines[i]}');
+          continue;
+        }
+
+        final Map<String, dynamic> row = {};
+        for (int j = 0; j < headers.length; j++) {
+          // Преобразуем строковые значения в соответствующие типы
+          var value = values[j];
+
+          // Определяем тип данных на основе имени столбца или проверки значения
+          if (value.isEmpty) {
+            row[headers[j]] = null;
+          } else if (headers[j] == 'id' || headers[j] == 'hidden') {
+            row[headers[j]] = int.tryParse(value) ?? 0;
+          } else {
+            row[headers[j]] = value;
+          }
+        }
+
+        await txn.insert('items', row);
+      }
+    });
+
+    myPrint('CSV restore completed successfully');
+    return lw('Data restored from CSV. Please restart the app.');
+  } catch (e) {
+    myPrint('Error restoring from CSV: $e');
+    return lw('Error restoring from CSV');
+  }
+}
+
+
+// Вспомогательная функция для парсинга строк CSV
+List<String> _parseCSVLine(String line) {
+  List<String> result = [];
+  bool inQuotes = false;
+  String currentValue = '';
+
+  for (int i = 0; i < line.length; i++) {
+    String char = line[i];
+
+    if (char == '"') {
+      // Проверяем на экранированные кавычки (двойные кавычки)
+      if (i + 1 < line.length && line[i + 1] == '"') {
+        currentValue += '"';
+        i++; // Пропускаем следующую кавычку
+      } else {
+        // Переключаем флаг кавычек
+        inQuotes = !inQuotes;
+      }
+    } else if (char == ',' && !inQuotes) {
+      // Конец значения
+      result.add(currentValue);
+      currentValue = '';
+    } else {
+      // Добавляем символ к текущему значению
+      currentValue += char;
+    }
+  }
+
+  // Добавляем последнее значение
+  result.add(currentValue);
+
+  return result;
+}
+
 // Функция для проверки наличия и отображения файлов бэкапа
 Future<void> listBackupFiles() async {
   try {
@@ -268,30 +518,41 @@ Future<void> listBackupFiles() async {
       return;
     }
 
-    final backupDir = Directory('${documentsDir.path}/Memorizer');
-    if (!await backupDir.exists()) {
-      myPrint('Backup directory does not exist');
+    final memorizerDir = Directory('${documentsDir.path}/Memorizer');
+    if (!await memorizerDir.exists()) {
+      myPrint('Memorizer directory does not exist');
       return;
     }
 
-    myPrint('Listing files in backup directory: ${backupDir.path}');
+    myPrint('Listing directories in Memorizer directory: ${memorizerDir.path}');
 
-    // Получаем список файлов
-    final entities = await backupDir.list().toList();
+    // Получаем список каталогов в Memorizer
+    final entities = await memorizerDir.list().toList();
+    final backupDirs = entities.whereType<Directory>().where(
+            (dir) => path.basename(dir.path).startsWith('bak-')
+    ).toList();
 
-    if (entities.isEmpty) {
-      myPrint('Backup directory is empty');
+    if (backupDirs.isEmpty) {
+      myPrint('No backup directories found');
       return;
     }
 
-    for (var entity in entities) {
-      if (entity is File) {
-        final size = await entity.length();
-        myPrint('File: ${entity.path}, Size: $size bytes');
-      } else if (entity is Directory) {
-        myPrint('Directory: ${entity.path}');
-      } else {
-        myPrint('Unknown entity: ${entity.path}');
+    // Сортируем каталоги по имени (по дате) в обратном порядке
+    backupDirs.sort((a, b) => path.basename(b.path).compareTo(path.basename(a.path)));
+
+    for (var dir in backupDirs) {
+      myPrint('Backup directory: ${dir.path}');
+
+      // Получаем содержимое каждого каталога
+      final dirEntities = await dir.list().toList();
+
+      for (var entity in dirEntities) {
+        if (entity is File) {
+          final size = await entity.length();
+          myPrint('File: ${entity.path}, Size: $size bytes');
+        } else if (entity is Directory) {
+          myPrint('Directory: ${entity.path}');
+        }
       }
     }
   } catch (e) {
