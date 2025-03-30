@@ -13,7 +13,7 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-const String progVersion = '0.7.250329';
+const String progVersion = '0.7.250330';
 const int buildNumber = 9;
 const String progAuthor = 'Eugen';
 
