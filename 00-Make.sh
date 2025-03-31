@@ -90,6 +90,15 @@ update_version() {
         exit 1
     fi
 
+    # Replace build number in globals.dart
+    sed -i "s/const int buildNumber = [0-9]\+;/const int buildNumber = $VER_CODE;/g" "$GLOB_FILE"
+    if [ $? -eq 0 ]; then
+        echo "✓ Build number successfully updated to $VER_CODE in $GLOB_FILE"
+    else
+        echo "✗ Error updating build number in $GLOB_FILE"
+        exit 1
+    fi
+
     # Create Git commit and tag if in a Git repository
     if [ -d ".git" ] || git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
         # Commit the version changes
