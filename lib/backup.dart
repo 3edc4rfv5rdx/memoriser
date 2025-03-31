@@ -8,89 +8,15 @@ import 'package:sqflite/sqflite.dart';
 
 import 'globals.dart';
 
-// Получение директории документов
-Future<Directory?> _getDocumentsDirectory() async {
-  try {
-    if (Platform.isAndroid) {
-      // На Android используем внешнее хранилище
-      final directory = await getExternalStorageDirectory();
-      if (directory != null) {
-        final androidPath = directory.path.split('/Android')[0];
-        final documentsDir = Directory('$androidPath/Documents');
-        // Создаем директорию, если она не существует
-        if (!await documentsDir.exists()) {
-          await documentsDir.create(recursive: true);
-        }
-        return documentsDir;
-      }
-      return await getApplicationDocumentsDirectory();
-    } else if (Platform.isLinux) {
-      // На Linux обычно используем ~/Documents
-      final home = Platform.environment['HOME'];
-      if (home != null) {
-        final documentsDir = Directory('$home/Documents');
-        if (await documentsDir.exists()) {
-          return documentsDir;
-        }
-        // Если директория не существует, создаем ее
-        try {
-          await documentsDir.create(recursive: true);
-          return documentsDir;
-        } catch (e) {
-          myPrint('Error creating Documents directory: $e');
-        }
-      }
-      return await getApplicationDocumentsDirectory();
-    } else {
-      // Другие платформы - используем директорию приложения
-      return await getApplicationDocumentsDirectory();
-    }
-  } catch (e) {
-    myPrint('Error getting documents directory: $e');
-    return null;
-  }
-}
-
-// Создание каталога для резервной копии с указанием даты
-Future<String?> _createBackupDirWithDate() async {
-  try {
-    // Получение директории документов
-    final documentsDir = await _getDocumentsDirectory();
-    if (documentsDir == null) {
-      myPrint('Failed to get documents directory');
-      return null;
-    }
-
-    // Создание базовой директории Memorizer
-    final memorizerDir = Directory('${documentsDir.path}/Memorizer');
-    if (!await memorizerDir.exists()) {
-      await memorizerDir.create(recursive: true);
-    }
-
-    // Генерация имени подкаталога с датой
-    final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
-    final backupDirPath = '${memorizerDir.path}/mem-$dateStr';
-
-    // Создание подкаталога с датой
-    final backupDir = Directory(backupDirPath);
-    if (!await backupDir.exists()) {
-      await backupDir.create(recursive: true);
-    }
-
-    return backupDirPath;
-  } catch (e) {
-    myPrint('Error creating backup directory with date: $e');
-    return null;
-  }
-}
 
 // Создание резервной копии базы данных
 Future<String> createBackup() async {
   try {
     myPrint('Starting backup process...');
 
-    // Создание каталога с датой для резервной копии
-    final backupDirPath = await _createBackupDirWithDate();
+    final backupDir = await createBackupDirWithDate();
+    final backupDirPath = backupDir?.path;
+
     myPrint('Backup directory path: $backupDirPath');
 
     if (backupDirPath == null) {
@@ -163,9 +89,9 @@ Future<String> exportToCSV() async {
     myPrint('Starting CSV export...');
 
     // Создание каталога с датой для экспорта
-    final backupDirPath = await _createBackupDirWithDate();
+    final backupDir = await createBackupDirWithDate();
 
-    if (backupDirPath == null) {
+    if (backupDir == null) {
       myPrint('Failed to create export directory');
       return lw('Error exporting to CSV');
     }
@@ -180,7 +106,7 @@ Future<String> exportToCSV() async {
 
     // Создаем CSV файл
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
-    final csvFile = File('$backupDirPath/items-$dateStr.csv');
+    final csvFile = File('${backupDir.path}/items-$dateStr.csv');
     final sink = csvFile.openWrite();
 
     // Записываем заголовки колонок
@@ -225,7 +151,10 @@ Future<String> restoreBackup() async {
     await listBackupFiles();
 
     // Получаем директорию для выбора файла бэкапа
-    final documentsDir = await _getDocumentsDirectory();
+    if (documentsDirectory == null) {
+      await initStoragePaths();
+    }
+    final documentsDir = documentsDirectory;
     if (documentsDir == null) {
       myPrint('Failed to get documents directory');
       return lw('Error');
@@ -354,7 +283,10 @@ Future<String> restoreFromCSV() async {
     myPrint('Starting restore from CSV process...');
 
     // Получаем директорию для выбора файла CSV
-    final documentsDir = await _getDocumentsDirectory();
+    if (documentsDirectory == null) {
+      await initStoragePaths();
+    }
+    final documentsDir = documentsDirectory;
     if (documentsDir == null) {
       myPrint('Failed to get documents directory');
       return lw('Error');
@@ -451,14 +383,20 @@ Future<String> restoreFromCSV() async {
         for (int j = 0; j < headers.length; j++) {
           // Преобразуем строковые значения в соответствующие типы
           var value = values[j];
+          String columnName = headers[j];
 
-          // Определяем тип данных на основе имени столбца или проверки значения
+          // Определяем тип данных на основе имени столбца
           if (value.isEmpty) {
-            row[headers[j]] = null;
-          } else if (headers[j] == 'id' || headers[j] == 'hidden') {
-            row[headers[j]] = int.tryParse(value) ?? 0;
+            // Empty strings should be null for all columns
+            row[columnName] = null;
+          } else if (columnName == 'id' || columnName == 'hidden' ||
+              columnName == 'priority' || columnName == 'date' ||
+              columnName == 'remind' || columnName == 'created' ||
+              columnName == 'remove') {
+            // Convert all integer columns properly
+            row[columnName] = int.tryParse(value) ?? 0;
           } else {
-            row[headers[j]] = value;
+            row[columnName] = value;
           }
         }
 
@@ -512,7 +450,7 @@ List<String> _parseCSVLine(String line) {
 // Функция для проверки наличия и отображения файлов бэкапа
 Future<void> listBackupFiles() async {
   try {
-    final documentsDir = await _getDocumentsDirectory();
+    final documentsDir = await getDocumentsDirectory();
     if (documentsDir == null) {
       myPrint('Documents directory not available');
       return;
