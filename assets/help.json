@@ -95,9 +95,9 @@
     "ua": "Керування пріоритетом. Встановіть рівень важливості (0-3) для цього запису. Записи з вищим пріоритетом відображатимуться вгорі списку."
   },
   "35": {
-    "en": "Reminder checkbox. Enable this option if you want to be reminded about this item on the specified date.",
-    "ru": "Флажок напоминания. Включите эту опцию, если хотите получить напоминание об этой записи в указанную дату.",
-    "ua": "Прапорець нагадування. Увімкніть цю опцію, якщо хочете отримати нагадування про цей запис у вказану дату."
+    "en": "Reminder settings. Enable 'Set reminder' if you want to be reminded about this item on the specified date. Enable 'Remove' if you want the item to be automatically deleted the day after the reminder has been triggered.",
+    "ru": "Настройки напоминания. Включите 'Напомнить', если хотите получить напоминание об этой записи в указанную дату. Включите 'Удалить', если хотите, чтобы запись автоматически удалялась на следующий день после срабатывания напоминания.",
+    "ua": "Налаштування нагадування. Увімкніть 'Нагадати', якщо хочете отримати нагадування про цей запис у вказану дату. Увімкніть 'Видалити', якщо хочете, щоб запис автоматично видалявся наступного дня після спрацювання нагадування."
   },
   "36": {
     "en": "Date controls. Set a date for this item. Required if reminder is enabled. Use the calendar button to pick a date or the clear button to remove it.",
