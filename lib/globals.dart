@@ -54,6 +54,8 @@ late Color clUpBar;
 late Color clFill;
 late Color clSel;
 late Color clMenu;
+const Color clRed = Colors.red;
+const Color clWhite = Colors.white;
 
 // Color themes - array of arrays
 List<List<Color>> colorThemes = [
@@ -305,7 +307,7 @@ Future<dynamic> showCustomDialog({
                     style: TextButton.styleFrom(
                       backgroundColor:
                           action['isDestructive'] == true
-                              ? Colors.red
+                              ? clRed
                               : clUpBar,
                       foregroundColor: clText,
                     ),
@@ -362,9 +364,9 @@ void okInfoBarRed(String message, {Duration? duration}) {
     SnackBar(
       content: Text(
         message,
-        style: TextStyle(fontSize: fsSmall, color: Colors.white),
+        style: TextStyle(fontSize: fsSmall, color: clWhite),
       ),
-      backgroundColor: Colors.red,
+      backgroundColor: clRed,
       duration: duration ?? Duration(seconds: 7),
       behavior: SnackBarBehavior.floating,
       dismissDirection: DismissDirection.none,
@@ -380,7 +382,7 @@ void okInfoBarGreen(String message, {Duration? duration}) {
     SnackBar(
       content: Text(
         message,
-        style: TextStyle(fontSize: fsSmall, color: Colors.white),
+        style: TextStyle(fontSize: fsSmall, color: clWhite),
       ),
       backgroundColor: Colors.green,
       duration: duration ?? Duration(seconds: 3),
@@ -398,7 +400,7 @@ void okInfoBarBlue(String message, {Duration? duration}) {
     SnackBar(
       content: Text(
         message,
-        style: TextStyle(fontSize: fsSmall, color: Colors.white),
+        style: TextStyle(fontSize: fsSmall, color: clWhite),
       ),
       backgroundColor: Colors.blue,
       duration: duration ?? Duration(seconds: 3),
