@@ -1,7 +1,10 @@
 // additem.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:sqflite/sqflite.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'globals.dart';
 
@@ -19,6 +22,9 @@ class _EditItemPageState extends State<EditItemPage> {
   late TextEditingController contentController;
   late TextEditingController tagsController;
   late TextEditingController dateController;
+  late TextEditingController photoController;
+
+  final ImagePicker _picker = ImagePicker();
 
   DateTime? _date;
   int _priority = 0; // Default priority value
@@ -38,6 +44,7 @@ class _EditItemPageState extends State<EditItemPage> {
     contentController = TextEditingController();
     tagsController = TextEditingController();
     dateController = TextEditingController();
+    photoController = TextEditingController();
 
     // Если передан ID, значит это режим редактирования
     if (widget.itemId != null) {
@@ -70,6 +77,7 @@ class _EditItemPageState extends State<EditItemPage> {
     contentController.dispose();
     tagsController.dispose();
     dateController.dispose();
+    photoController.dispose();
     super.dispose();
   }
 
@@ -111,6 +119,7 @@ class _EditItemPageState extends State<EditItemPage> {
         _remind = item['remind'] == 1;
         _hidden = item['hidden'] == 1;
         _removeAfterReminder = item['remove'] == 1;
+        photoController.text = item['photo'] ?? '';
 
         // Initialize the date if it exists
         if (item['date'] != null) {
@@ -171,6 +180,9 @@ class _EditItemPageState extends State<EditItemPage> {
     String titleText = titleController.text.trim();
     String contentText = contentController.text.trim();
     String tagsText = tagsController.text.trim();
+    String? photoPath = photoController.text.trim();
+    // Если photoPath пустой, устанавливаем null
+    photoPath = photoPath.isEmpty ? null : photoPath;
 
     // Obfuscate data if the record is hidden and we're in hidden mode
     if (hiddenValue == 1 && xvHiddenMode) {
@@ -193,6 +205,7 @@ class _EditItemPageState extends State<EditItemPage> {
             'remind': remindValue,
             'hidden': hiddenValue,
             'remove': removeValue,
+            'photo': photoPath,
           },
           where: 'id = ?',
           whereArgs: [widget.itemId],
@@ -209,6 +222,7 @@ class _EditItemPageState extends State<EditItemPage> {
           'remind': remindValue,
           'hidden': hiddenValue,
           'remove': removeValue,
+          'photo': photoPath,
           'created': DateTime.now().millisecondsSinceEpoch,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
         myPrint("Item inserted: $titleText");
@@ -220,6 +234,43 @@ class _EditItemPageState extends State<EditItemPage> {
       // Show error message if database operation fails
       okInfoBarPurple(lw('Error saving item') + ': $e');
       myPrint("Error saving item: $e");
+    }
+  }
+
+  Future<void> _takePicture() async {
+    try {
+      // Get the image from the camera
+      final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+
+      if (image != null) {
+        // Проверяем инициализацию путей
+        if (photoDirectory == null) {
+          await initStoragePaths();
+        }
+
+        if (photoDirectory == null) {
+          throw Exception('Photo directory is not available');
+        }
+
+        // Generate a unique filename with timestamp
+        final now = DateTime.now();
+        final formattedDate = DateFormat('yyyyMMdd-HHmmss').format(now);
+        final fileName = 'mem-$formattedDate.jpg';
+
+        // Copy the image to our app's directory
+        final File newImage = File('${photoDirectory!.path}/$fileName');
+        await File(image.path).copy(newImage.path);
+
+        // Update the photo controller with the new path
+        setState(() {
+          photoController.text = newImage.path;
+        });
+
+        okInfoBarGreen(lw('Photo saved'));
+      }
+    } catch (e) {
+      myPrint('Error taking picture: $e');
+      okInfoBarRed(lw('Failed to take picture'));
     }
   }
 
@@ -521,6 +572,47 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
+  // Build photo field and camera button
+// Build photo field and camera button
+  Widget _buildPhotoField() {
+    return GestureDetector(
+      onLongPress: () => showHelp(38), // New help ID for photo field
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: photoController,
+              style: TextStyle(color: clText),
+              readOnly: true,
+              decoration: InputDecoration(
+                labelText: lw('Photo'),
+                labelStyle: TextStyle(color: clText),
+                fillColor: clFill,
+                filled: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.camera_alt, color: clText),
+            tooltip: lw('Take photo'),
+            onPressed: _takePicture,
+          ),
+          IconButton(
+            icon: Icon(Icons.clear, color: clText),
+            tooltip: lw('Clear photo'),
+            onPressed: () {
+              setState(() {
+                photoController.clear();
+              });
+              okInfoBarBlue(lw('Photo cleared'));
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   // Функция для показа диалога выбора тегов
   void _showTagsDialog() {
     if (_tagsWithCounts.isEmpty) {
@@ -685,7 +777,7 @@ class _EditItemPageState extends State<EditItemPage> {
                     ),
                     SizedBox(height: 10),
 
-                    // Content field
+                    // Content field with reduced height
                     GestureDetector(
                       onLongPress:
                           () => showHelp(32), // ID 32 для поля содержимого
@@ -699,22 +791,30 @@ class _EditItemPageState extends State<EditItemPage> {
                           filled: true,
                           border: OutlineInputBorder(),
                         ),
-                        maxLines: 5,
+                        maxLines: 3, // Reduced from 5 to 3
                       ),
                     ),
                     SizedBox(height: 10),
 
-                    // Tags field - используем новый метод
-                    _buildTagsField(), SizedBox(height: 10),
+                    // Tags field
+                    _buildTagsField(),
+                    SizedBox(height: 10),
+
+                    // Photo field - add a new field for photos
+                    _buildPhotoField(),
+                    SizedBox(height: 10),
 
                     // Priority section
-                    _buildPrioritySelector(), SizedBox(height: 10),
+                    _buildPrioritySelector(),
+                    SizedBox(height: 10),
 
                     // Date field
-                    _buildDateField(), SizedBox(height: 10),
+                    _buildDateField(),
+                    SizedBox(height: 10),
 
-                    // Reminder checkbox - moved to after the date field
-                    _buildReminderSelector(), SizedBox(height: 10),
+                    // Reminder checkbox
+                    _buildReminderSelector(),
+                    SizedBox(height: 10),
 
                     // Hidden checkbox (only in hidden mode)
                     _buildHiddenSelector(),

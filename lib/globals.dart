@@ -1,11 +1,13 @@
 // globals.dart
 import 'dart:async'; // Для Timer
 import 'dart:convert'; // Для работы с JSON (json.decode) and base64
-
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Для доступа к rootBundle
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:intl/intl.dart';
 
 // Глобальные ключи для доступа к основным компонентам Flutter
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
@@ -25,6 +27,12 @@ const String settDbFile = 'settings.db';
 late Database mainDb;
 late Database settDb;
 late BuildContext globalContext;
+
+// Пути для хранения файлов
+late Directory? documentsDirectory;
+late Directory? memorizerDirectory;
+late Directory? photoDirectory;
+late Directory? backupDirectory;
 
 bool xvDebug = true;
 String xvTagFilter = '';
@@ -732,12 +740,120 @@ int dateTimeToYYYYMMDD(DateTime date) {
 
 // Convert YYYYMMDD (int) back to DateTime
 DateTime yyyymmddToDateTime(int yyyymmdd) {
+  if (yyyymmdd == 0) return DateTime(1970, 1, 1); // Или другая специальная обработка
+
   final String dateStr = yyyymmdd.toString();
-  if (dateStr.length != 8) return DateTime.now(); // Default fallback
+  if (dateStr.length != 8) return DateTime.now();
 
   final year = int.parse(dateStr.substring(0, 4));
   final month = int.parse(dateStr.substring(4, 6));
   final day = int.parse(dateStr.substring(6, 8));
 
   return DateTime(year, month, day);
+}
+
+Future<void> initStoragePaths() async {
+  try {
+    // Инициализируем директорию документов
+    documentsDirectory = await getDocumentsDirectory();
+
+    if (documentsDirectory != null) {
+      // Создаем основную директорию приложения
+      memorizerDirectory = Directory('${documentsDirectory!.path}/Memorizer');
+      if (!await memorizerDirectory!.exists()) {
+        await memorizerDirectory!.create(recursive: true);
+      }
+
+      // Создаем директорию для фотографий
+      photoDirectory = Directory('${memorizerDirectory!.path}/Photo');
+      if (!await photoDirectory!.exists()) {
+        await photoDirectory!.create(recursive: true);
+      }
+
+      myPrint('Storage paths initialized: ${documentsDirectory!.path}');
+    } else {
+      myPrint('Failed to get documents directory');
+    }
+  } catch (e) {
+    myPrint('Error initializing storage paths: $e');
+  }
+}
+
+// Получение директории документов
+Future<Directory?> getDocumentsDirectory() async {
+  try {
+    if (Platform.isAndroid) {
+      // На Android используем внешнее хранилище
+      final directory = await getExternalStorageDirectory();
+      if (directory != null) {
+        final androidPath = directory.path.split('/Android')[0];
+        final documentsDir = Directory('$androidPath/Documents');
+        // Создаем директорию, если она не существует
+        if (!await documentsDir.exists()) {
+          await documentsDir.create(recursive: true);
+        }
+        return documentsDir;
+      }
+      return await getApplicationDocumentsDirectory();
+    } else if (Platform.isLinux) {
+      // На Linux обычно используем ~/Documents
+      final home = Platform.environment['HOME'];
+      if (home != null) {
+        final documentsDir = Directory('$home/Documents');
+        if (await documentsDir.exists()) {
+          return documentsDir;
+        }
+        // Если директория не существует, создаем ее
+        try {
+          await documentsDir.create(recursive: true);
+          return documentsDir;
+        } catch (e) {
+          myPrint('Error creating Documents directory: $e');
+        }
+      }
+      return await getApplicationDocumentsDirectory();
+    } else {
+      // Другие платформы - используем директорию приложения
+      return await getApplicationDocumentsDirectory();
+    }
+  } catch (e) {
+    myPrint('Error getting documents directory: $e');
+    return null;
+  }
+}
+
+// Создание каталога для резервной копии с указанием даты
+Future<Directory?> createBackupDirWithDate() async {
+  try {
+    if (memorizerDirectory == null) {
+      await initStoragePaths();
+    }
+
+    if (memorizerDirectory == null) {
+      myPrint('Memorizer directory is not initialized');
+      return null;
+    }
+
+    // Генерация имени подкаталога с датой
+    final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
+    final backupDirPath = '${memorizerDirectory!.path}/mem-$dateStr';
+
+    // Создание подкаталога с датой
+    backupDirectory = Directory(backupDirPath);
+    if (!await backupDirectory!.exists()) {
+      await backupDirectory!.create(recursive: true);
+    }
+
+    return backupDirectory;
+  } catch (e) {
+    myPrint('Error creating backup directory with date: $e');
+    return null;
+  }
+}
+
+bool isValidPhotoPath(dynamic photoValue) {
+  if (photoValue == null) return false;
+  String path = photoValue.toString().trim();
+  if (path.isEmpty || path == "\"\"" || path == "\"") return false;
+  return true;
 }
