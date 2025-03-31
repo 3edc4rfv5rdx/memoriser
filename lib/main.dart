@@ -600,7 +600,7 @@ class _HomePageState extends State<HomePage> {
       ),
       PopupMenuItem(
         child: ListTile(
-          leading: Icon(Icons.delete, color: Colors.red),
+          leading: Icon(Icons.delete, color: clRed),
           title: Text(lw('Delete'), style: TextStyle(color: clText)),
           onTap: () {
             Navigator.pop(context); // Close the menu
@@ -923,7 +923,7 @@ class _HomePageState extends State<HomePage> {
                             children: [
                               Icon(
                                 isReminder ? Icons.alarm : Icons.event,
-                                color: isReminder ? Colors.red : clText,
+                                color: isReminder ? clRed : clText,
                                 size: 14,
                               ),
                               SizedBox(width: 4),
@@ -931,7 +931,7 @@ class _HomePageState extends State<HomePage> {
                                 formattedDate!,
                                 style: TextStyle(
                                   fontSize: fsNormal,
-                                  color: isReminder ? Colors.red : clText,
+                                  color: isReminder ? clRed : clText,
                                   fontWeight: isReminder ? fwBold : fwNormal,
                                 ),
                               ),
@@ -972,7 +972,7 @@ class _HomePageState extends State<HomePage> {
                         isReminder
                             ? Icon(
                               Icons.notifications_active,
-                              color: Colors.red,
+                              color: clRed,
                             )
                             : null,
                     onTap: () {

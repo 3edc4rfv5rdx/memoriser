@@ -392,7 +392,7 @@ class _EditItemPageState extends State<EditItemPage> {
               ),
               Checkbox(
                 value: _removeAfterReminder,
-                activeColor: Colors.red,
+                activeColor: clRed,
                 checkColor: clText,
                 onChanged: (value) {
                   setState(() {
