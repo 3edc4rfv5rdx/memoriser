@@ -1032,10 +1032,12 @@ class _HomePageState extends State<HomePage> {
 void _showAbout() {
   String txt = 'Memorizer';
   txt += '\n\n';
-  txt += lw('Version') + ': $progVersion\n';
-  txt += lw('Build number') + ': $buildNumber\n\n';
-  txt += '(c): $progAuthor 2025\n';
+  txt += '${lw('Version')}: $progVersion';
   txt += '\n';
+  txt += '${lw('Build number')}: $buildNumber';
+  txt += '\n\n';
+  txt += '(c): $progAuthor 2025';
+  txt += '\n\n';
   txt += lw('Long press on interface elements for help');
   okInfo(txt);
 }
