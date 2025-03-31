@@ -1,9 +1,9 @@
 #!/bin/bash
 
 
-COMMENT="field REMOVED and refornat all"
+COMMENT="photo, reminders, locales etc"
 #
-GLOBVERS='0.7'
+GLOBVERS='0.8'
 VER=''
 VER_CODE=''
 #
