@@ -732,25 +732,45 @@ bool isDateFromBeforeDateTo(String dateFrom, String dateTo) {
 }
 
 // Convert DateTime to YYYYMMDD format (int)
-int dateTimeToYYYYMMDD(DateTime date) {
-  return int.parse(
-    '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}',
-  );
+int? dateTimeToYYYYMMDD(DateTime? date) {
+  if (date == null) return null;
+  int n = int.parse(DateFormat('yyyyMMdd').format(date));
+  return n;
 }
 
-// Convert YYYYMMDD (int) back to DateTime
-DateTime yyyymmddToDateTime(int yyyymmdd) {
-  if (yyyymmdd == 0) return DateTime(1970, 1, 1); // Или другая специальная обработка
 
-  final String dateStr = yyyymmdd.toString();
-  if (dateStr.length != 8) return DateTime.now();
+// Функция для преобразования int YYYYMMDD в DateTime
+DateTime? yyyymmddToDateTime(int? yyyymmdd) {
+  if (yyyymmdd == null) return null;
+  if (yyyymmdd == 0) return null; // Explicitly handle 0 as null
 
-  final year = int.parse(dateStr.substring(0, 4));
-  final month = int.parse(dateStr.substring(4, 6));
-  final day = int.parse(dateStr.substring(6, 8));
+  final dateStr = yyyymmdd.toString().padLeft(8, '0');
+  try {
+    // Parse and validate the date
+    final year = int.parse(dateStr.substring(0, 4));
+    final month = int.parse(dateStr.substring(4, 6));
+    final day = int.parse(dateStr.substring(6, 8));
 
-  return DateTime(year, month, day);
+    // Check if date is valid
+    if (month < 1 || month > 12 || day < 1 || day > 31) {
+      myPrint('Invalid date components: year=$year, month=$month, day=$day');
+      return null;
+    }
+
+    final date = DateTime(year, month, day);
+    // Verify the date is valid (handles cases like Feb 30)
+    if (date.year != year || date.month != month || date.day != day) {
+      myPrint('Date components do not match created date');
+      return null;
+    }
+
+    return date;
+  } catch (e) {
+    myPrint('Error parsing date $yyyymmdd: $e');
+    return null;
+  }
 }
+
 
 Future<void> initStoragePaths() async {
   try {
