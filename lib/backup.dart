@@ -88,43 +88,42 @@ Future<String> exportToCSV() async {
   try {
     myPrint('Starting CSV export...');
 
-    // Создание каталога с датой для экспорта
     final backupDir = await createBackupDirWithDate();
-
     if (backupDir == null) {
       myPrint('Failed to create export directory');
       return lw('Error exporting to CSV');
     }
 
-    // Получаем все записи из таблицы items
     final List<Map<String, dynamic>> items = await mainDb.query('items');
-
     if (items.isEmpty) {
       myPrint('No data to export');
       return lw('No data to export');
     }
 
-    // Создаем CSV файл
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
     final csvFile = File('${backupDir.path}/items-$dateStr.csv');
     final sink = csvFile.openWrite();
 
-    // Записываем заголовки колонок
+    // Заголовки колонок
     final headers = items.first.keys.toList();
     sink.writeln(headers.join(','));
 
-    // Записываем данные
     for (var item in items) {
       final values = headers.map((header) {
         var value = item[header];
-        // Обработка специальных символов в CSV
-        if (value is String) {
-          // Экранирование кавычек и добавление кавычек вокруг строки
-          value = '"${value.replaceAll('"', '""')}"';
-        } else if (value == null) {
-          value = '""';
+
+        // Обработка NULL и числовых полей
+        if (value == null) {
+          return ''; // Пустая строка для NULL
         }
-        return value;
+
+        // Для строк - экранирование кавычек
+        if (value is String) {
+          return '"${value.replaceAll('"', '""')}"';
+        }
+
+        // Все остальные типы (числа, bool) - как есть
+        return value.toString();
       }).toList();
 
       sink.writeln(values.join(','));
@@ -298,7 +297,7 @@ Future<String> restoreFromCSV() async {
       return lw('No backups found. Create a backup first.');
     }
 
-    // Сразу открываем выбор файла CSV, а не каталога
+    // Выбор CSV файла
     myPrint('Opening file picker...');
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -313,7 +312,7 @@ Future<String> restoreFromCSV() async {
     }
 
     final file = result.files.first;
-    final filePath = file.path;
+    final filePath = file.path; // Теперь filePath определен
 
     myPrint('Selected file: $filePath');
 
@@ -322,27 +321,18 @@ Future<String> restoreFromCSV() async {
       return lw('Error');
     }
 
-    // Проверяем, что выбранный файл имеет расширение .csv
     if (!filePath.toLowerCase().endsWith('.csv')) {
       myPrint('Selected file is not a CSV file');
       return lw('Error: selected file is not a CSV');
     }
 
-    // Показываем предупреждение о замене данных
+    // Подтверждение восстановления
     final shouldRestore = await showCustomDialog(
       title: lw('Warning'),
       content: lw('Restore will replace all data in the Items table'),
       actions: [
-        {
-          'label': lw('Cancel'),
-          'value': false,
-          'isDestructive': false,
-        },
-        {
-          'label': lw('Restore'),
-          'value': true,
-          'isDestructive': true,
-        },
+        {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
+        {'label': lw('Restore'), 'value': true, 'isDestructive': true},
       ],
     );
 
@@ -351,7 +341,7 @@ Future<String> restoreFromCSV() async {
       return lw('Cancel');
     }
 
-    // Читаем CSV файл
+    // Чтение и обработка CSV
     myPrint('Reading CSV file...');
     final csvFile = File(filePath);
     final lines = await csvFile.readAsLines();
@@ -361,16 +351,14 @@ Future<String> restoreFromCSV() async {
       return lw('Error: CSV file is empty');
     }
 
-    // Парсим заголовки
+    // Парсинг заголовков
     final headers = _parseCSVLine(lines[0]);
     myPrint('CSV headers: $headers');
 
-    // Начинаем транзакцию для восстановления данных
+    // Восстановление данных
     await mainDb.transaction((txn) async {
-      // Очищаем таблицу items
       await txn.execute('DELETE FROM items');
 
-      // Вставляем данные из CSV
       for (int i = 1; i < lines.length; i++) {
         final values = _parseCSVLine(lines[i]);
 
@@ -381,22 +369,27 @@ Future<String> restoreFromCSV() async {
 
         final Map<String, dynamic> row = {};
         for (int j = 0; j < headers.length; j++) {
-          // Преобразуем строковые значения в соответствующие типы
-          var value = values[j];
-          String columnName = headers[j];
+          final columnName = headers[j];
+          final value = values[j].trim();
 
-          // Определяем тип данных на основе имени столбца
           if (value.isEmpty) {
-            // Empty strings should be null for all columns
             row[columnName] = null;
-          } else if (columnName == 'id' || columnName == 'hidden' ||
-              columnName == 'priority' || columnName == 'date' ||
-              columnName == 'remind' || columnName == 'created' ||
-              columnName == 'remove') {
-            // Convert all integer columns properly
-            row[columnName] = int.tryParse(value) ?? 0;
           } else {
-            row[columnName] = value;
+            switch (columnName) {
+              case 'id':
+              case 'priority':
+              case 'remind':
+              case 'created':
+              case 'remove':
+              case 'hidden':
+                row[columnName] = int.tryParse(value) ?? 0;
+                break;
+              case 'date':
+                row[columnName] = int.tryParse(value); // Может быть null
+                break;
+              default:
+                row[columnName] = value;
+            }
           }
         }
 
@@ -411,7 +404,6 @@ Future<String> restoreFromCSV() async {
     return lw('Error restoring from CSV');
   }
 }
-
 
 // Вспомогательная функция для парсинга строк CSV
 List<String> _parseCSVLine(String line) {
