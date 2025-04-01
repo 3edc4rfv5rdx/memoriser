@@ -124,8 +124,16 @@ class _EditItemPageState extends State<EditItemPage> {
         // Initialize the date if it exists
         if (item['date'] != null) {
           _date = yyyymmddToDateTime(item['date']);
-          dateController.text = DateFormat(ymdDateFormat).format(_date!);
+          // Only set the date controller text if _date is not null
+          if (_date != null) {
+            // Use the null assertion operator (!) to tell Dart that _date is not null here
+            dateController.text = DateFormat(ymdDateFormat).format(_date!);
+          } else {
+            dateController.text = ""; // Clear the date controller if date is invalid
+            myPrint('Warning: Could not parse date value: ${item['date']}');
+          }
         }
+
       }
     } catch (e) {
       myPrint('Error loading item: $e');
@@ -171,7 +179,7 @@ class _EditItemPageState extends State<EditItemPage> {
     }
 
     // Convert date to YYYYMMDD format for storage
-    final dateValue = _date != null ? dateTimeToYYYYMMDD(_date!) : null;
+    final dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
     final remindValue = _remind ? 1 : 0;
     final hiddenValue = _hidden ? 1 : 0;
     final removeValue = _removeAfterReminder ? 1 : 0;
@@ -181,7 +189,6 @@ class _EditItemPageState extends State<EditItemPage> {
     String contentText = contentController.text.trim();
     String tagsText = tagsController.text.trim();
     String? photoPath = photoController.text.trim();
-    // Если photoPath пустой, устанавливаем null
     photoPath = photoPath.isEmpty ? null : photoPath;
 
     // Obfuscate data if the record is hidden and we're in hidden mode
@@ -223,7 +230,7 @@ class _EditItemPageState extends State<EditItemPage> {
           'hidden': hiddenValue,
           'remove': removeValue,
           'photo': photoPath,
-          'created': DateTime.now().millisecondsSinceEpoch,
+          'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
         myPrint("Item inserted: $titleText");
       }
@@ -314,6 +321,8 @@ class _EditItemPageState extends State<EditItemPage> {
       setState(() {
         _date = picked;
         dateController.text = DateFormat(ymdDateFormat).format(picked);
+        // Автоматическая валидация напоминания
+        if (_remind) _validateReminderDate();
       });
     }
   }
@@ -458,6 +467,21 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
+  void _validateDateInput() {
+    if (dateController.text.isNotEmpty) {
+      try {
+        final parsedDate = DateFormat(ymdDateFormat).parse(dateController.text);
+        setState(() {
+          _date = parsedDate;
+        });
+      } catch (e) {
+        okInfoBarRed(lw('Invalid date format'));
+        dateController.clear();
+        _date = null;
+      }
+    }
+  }
+
   // Validate reminder date is in the future
   void _validateReminderDate() {
     // Check if date is set
@@ -469,20 +493,29 @@ class _EditItemPageState extends State<EditItemPage> {
       return;
     }
 
-    // Get today's date (start of day)
-    final today = DateTime(
-      DateTime.now().year,
-      DateTime.now().month,
-      DateTime.now().day,
-    );
+    try {
+      // Get today's date (start of day)
+      final today = DateTime(
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day,
+      );
 
-    // Check if date is at least today (not in the past)
-    if (_date!.isBefore(today)) {
-      okInfoBarOrange(lw('Reminder date cannot be in the past'));
-      // Automatically uncheck the reminder if date is invalid
+      // Check if date is at least today (not in the past)
+      if (_date!.isBefore(today)) {
+        okInfoBarOrange(lw('Reminder date cannot be in the past'));
+        // Automatically uncheck the reminder if date is invalid
+        setState(() {
+          _remind = false;
+        });
+      }
+    } catch (e) {
+      // Handle any exceptions that might occur
+      myPrint('Error validating reminder date: $e');
       setState(() {
         _remind = false;
       });
+      okInfoBarRed(lw('Error validating date'));
     }
   }
 
@@ -573,7 +606,7 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   // Build photo field and camera button
-// Build photo field and camera button
+  // Build photo field and camera button
   Widget _buildPhotoField() {
     return GestureDetector(
       onLongPress: () => showHelp(38), // New help ID for photo field
