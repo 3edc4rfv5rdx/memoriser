@@ -28,13 +28,13 @@ Future<void> initDatabases() async {
       return mainDb.execute('''
     CREATE TABLE IF NOT EXISTS items(
       id INTEGER PRIMARY KEY, 
-      title TEXT, 
-      content TEXT, 
-      tags TEXT, 
-      priority INTEGER, 
-      date INTEGER, 
-      remind INTEGER, 
-      created INTEGER,
+      title TEXT DEFAULT NULL, 
+      content TEXT DEFAULT NULL, 
+      tags TEXT DEFAULT NULL, 
+      priority INTEGER DEFAULT 0, 
+      date INTEGER DEFAULT null, 
+      remind INTEGER DEFAULT 0, 
+      created INTEGER DEFAULT 0,
       remove INTEGER DEFAULT 0,
       hidden INTEGER DEFAULT 0,
       photo TEXT DEFAULT NULL
