@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="photo, reminders, locales etc"
+COMMENT="null strings, filters etc"
 #
 GLOBVERS='0.8'
 VER=''
