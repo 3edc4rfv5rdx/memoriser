@@ -143,7 +143,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
 
       // Разбиваем строку тегов на отдельные теги
       List<String> tagFilters =
-          xvTagFilter.split(',').map((tag) => tag.trim()).toList();
+      xvTagFilter.split(',').map((tag) => tag.trim()).toList();
 
       if (xvHiddenMode) {
         // В скрытом режиме обфусцируем теги перед поиском
@@ -182,7 +182,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
               try {
                 final date = DateFormat(ymdDateFormat).parse(value);
                 final dateValue = dateTimeToYYYYMMDD(date);
-                whereConditions.add('(date IS NULL OR date >= ?)');
+                whereConditions.add('(date IS NOT NULL AND date >= ?)');
                 whereArgs.add(dateValue);
               } catch (e) {
                 myPrint('Error parsing dateFrom: $e');
@@ -195,16 +195,67 @@ Future<List<Map<String, dynamic>>> getItems() async {
               try {
                 final date = DateFormat(ymdDateFormat).parse(value);
                 final dateValue = dateTimeToYYYYMMDD(date);
-                whereConditions.add('(date IS NULL OR date <= ?)');
+                whereConditions.add('(date IS NOT NULL AND date <= ?)');
                 whereArgs.add(dateValue);
               } catch (e) {
                 myPrint('Error parsing dateTo: $e');
               }
             }
             break;
+
+        // Add processing for priority filter
+          case 'priority':
+            if (value.isNotEmpty) {
+              try {
+                final priorityValue = int.parse(value);
+                whereConditions.add('priority = ?');
+                whereArgs.add(priorityValue);
+              } catch (e) {
+                myPrint('Error parsing priority: $e');
+              }
+            }
+            break;
+
+        // Add processing for reminder filter
+          case 'hasReminder':
+            if (value.isNotEmpty) {
+              final hasReminder = value.toLowerCase() == 'true' ? 1 : 0;
+              whereConditions.add('remind = ?');
+              whereArgs.add(hasReminder);
+            }
+            break;
+
+        // Add processing for tags filter in the main filter
+          case 'tags':
+            if (value.isNotEmpty) {
+              // Split by comma to handle multiple tags in filter
+              List<String> tagFilters = value.split(',').map((tag) => tag.trim()).toList();
+
+              // For each tag, add a LIKE condition
+              List<String> tagConditions = [];
+              for (String tag in tagFilters) {
+                if (xvHiddenMode) {
+                  // In hidden mode, obfuscate tags before searching
+                  String obfuscatedTag = obfuscateText(tag);
+                  tagConditions.add('tags LIKE ?');
+                  whereArgs.add('%$obfuscatedTag%');
+                } else {
+                  // In normal mode, search as-is
+                  tagConditions.add('tags LIKE ?');
+                  whereArgs.add('%$tag%');
+                }
+              }
+
+              // Use OR between tag conditions if there are multiple tags
+              if (tagConditions.isNotEmpty) {
+                whereConditions.add('(${tagConditions.join(' OR ')})');
+              }
+            }
+            break;
         }
       }
     }
+
     // Собираем окончательный WHERE и параметры
     String whereClause = whereConditions.join(' AND ');
     myPrint('WHERE clause: $whereClause');
@@ -253,6 +304,27 @@ Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
   );
 }
 
+// Function to remove expired reminders with remove flag set
+Future<void> removeExpiredItems() async {
+  try {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayInt = dateTimeToYYYYMMDD(today);
+
+    // Оптимизированный SQL-запрос с проверкой NULL в начале
+    final count = await mainDb.rawDelete(
+        'DELETE FROM items WHERE date IS NOT NULL AND date < ? AND remove = 1',
+        [todayInt]
+    );
+
+    if (count > 0) {
+      myPrint('Удалено $count просроченных записей');
+    }
+  } catch (e) {
+    myPrint('Ошибка при удалении просроченных записей: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Используем FFI только на десктопных платформах
@@ -265,6 +337,10 @@ void main() async {
   await initStoragePaths();
   // Initialize default settings
   await initDefaultSettings();
+
+  // Cleanup expired reminders marked for removal
+  await removeExpiredItems();
+
   final themeName =
       await getSetting("Color theme") ?? defSettings["Color theme"];
   setThemeColors(themeName);
@@ -1041,6 +1117,10 @@ class _HomePageState extends State<HomePage> {
                     }
                   }
 
+                  // Safely get content and tags with null checks
+                  final String content = item['content'] ?? '';
+                  final String tags = item['tags'] ?? '';
+
                   return ListTile(
                     title: Row(
                       children: [
@@ -1064,10 +1144,10 @@ class _HomePageState extends State<HomePage> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item['content'], style: TextStyle(color: clText)),
-                        if (item['tags'].toString().isNotEmpty)
+                        Text(content, style: TextStyle(color: clText)),
+                        if (tags.isNotEmpty)
                           Text(
-                            'Tags: ${item['tags']}',
+                            'Tags: $tags',
                             style: TextStyle(
                               fontSize: fsNormal,
                               color: clText,
