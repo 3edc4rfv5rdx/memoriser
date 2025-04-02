@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:sqflite/sqflite.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'globals.dart';
 
@@ -191,7 +190,7 @@ class _EditItemPageState extends State<EditItemPage> {
     String? photoPath = photoController.text.trim();
     photoPath = photoPath.isEmpty ? null : photoPath;
 
-    // Obfuscate data if the record is hidden and we're in hidden mode
+// Obfuscate data if the record is hidden and we're in hidden mode
     if (hiddenValue == 1 && xvHiddenMode) {
       titleText = obfuscateText(titleText);
       contentText = obfuscateText(contentText);
@@ -205,8 +204,8 @@ class _EditItemPageState extends State<EditItemPage> {
           'items',
           {
             'title': titleText,
-            'content': contentText,
-            'tags': tagsText,
+            'content': contentText.isEmpty ? null : contentText,
+            'tags': tagsText.isEmpty ? null : tagsText,
             'priority': _priority,
             'date': dateValue,
             'remind': remindValue,
@@ -222,8 +221,8 @@ class _EditItemPageState extends State<EditItemPage> {
         // Insert new item
         await mainDb.insert('items', {
           'title': titleText,
-          'content': contentText,
-          'tags': tagsText,
+          'content': contentText.isEmpty ? null : contentText,
+          'tags': tagsText.isEmpty ? null : tagsText,
           'priority': _priority,
           'date': dateValue,
           'remind': remindValue,
@@ -235,7 +234,6 @@ class _EditItemPageState extends State<EditItemPage> {
         myPrint("Item inserted: $titleText");
       }
 
-      // Return to previous screen
       Navigator.pop(context, true);
     } catch (e) {
       // Show error message if database operation fails
@@ -465,21 +463,6 @@ class _EditItemPageState extends State<EditItemPage> {
         ],
       ),
     );
-  }
-
-  void _validateDateInput() {
-    if (dateController.text.isNotEmpty) {
-      try {
-        final parsedDate = DateFormat(ymdDateFormat).parse(dateController.text);
-        setState(() {
-          _date = parsedDate;
-        });
-      } catch (e) {
-        okInfoBarRed(lw('Invalid date format'));
-        dateController.clear();
-        _date = null;
-      }
-    }
   }
 
   // Validate reminder date is in the future
