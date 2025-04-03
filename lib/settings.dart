@@ -338,57 +338,18 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                 },
                 onSelected: (String result) async {
                   if (result == 'create_backup') {
-                    final result = await createBackup();
-                    if (result.contains('Error')) {
-                      okInfoBarRed(result);
-                    } else {
-                      okInfoBarGreen(result + lw(' in Documents folder'));
-                    }
+                    await createBackup();
                   } else if (result == 'export_csv') {
-                    final result = await exportToCSV();
-                    if (result.contains('Error')) {
-                      okInfoBarRed(result);
-                    } else {
-                      okInfoBarGreen(result + lw(' in Documents folder'));
-                    }
+                    await exportToCSV();
                   } else if (result == 'restore_backup') {
-                    // Показать предупреждение перед восстановлением
-                    final shouldRestore = await showCustomDialog(
-                      title: lw('Warning'),
-                      content: lw('Restore will replace all data'),
-                      actions: [
-                        {
-                          'label': lw('Cancel'),
-                          'value': false,
-                          'isDestructive': false,
-                        },
-                        {
-                          'label': lw('Restore'),
-                          'value': true,
-                          'isDestructive': true,
-                        },
-                      ],
-                    );
-
-                    if (shouldRestore == true) {
-                      final result = await restoreBackup();
-                      if (result.contains('Error')) {
-                        okInfoBarRed(result);
-                      } else {
-                        okInfoBarGreen(result);
-                      }
-                    }
+                    await restoreBackup();
                   } else if (result == 'restore_csv') {
-                    final result = await restoreFromCSV();
-                    if (result.contains('Error') || result == lw('Cancel')) {
-                      okInfoBarRed(result);
-                    } else {
-                      okInfoBarGreen(result);
-                    }
+                    await restoreFromCSV();
                   }
                 },
               ),
             ),
+
             // Save button in AppBar (disk icon) with long press handler
             GestureDetector(
               onLongPress: () => showHelp(12), // ID 12 for save button
