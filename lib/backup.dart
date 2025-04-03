@@ -1,6 +1,5 @@
 // backup.dart
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:intl/intl.dart';
@@ -21,6 +20,7 @@ Future<String> createBackup() async {
 
     if (backupDirPath == null) {
       myPrint('Failed to create backup directory');
+      okInfoBarRed(lw('Error creating backup'));
       return lw('Error creating backup');
     }
 
@@ -37,6 +37,7 @@ Future<String> createBackup() async {
 
     if (!dbExists) {
       myPrint('Database file not found');
+      okInfoBarRed(lw('Error creating backup: database file not found'));
       return lw('Error creating backup: database file not found');
     }
 
@@ -60,6 +61,7 @@ Future<String> createBackup() async {
       }
     } catch (copyError) {
       myPrint('Error copying file: $copyError');
+      okInfoBarRed(lw('Error copying database file'));
       return lw('Error copying database file');
     }
 
@@ -69,6 +71,7 @@ Future<String> createBackup() async {
 
     if (!backupExists) {
       myPrint('Backup file was not created for some reason');
+      okInfoBarRed(lw('Error: backup file was not created'));
       return lw('Error: backup file was not created');
     }
 
@@ -76,9 +79,11 @@ Future<String> createBackup() async {
     await listBackupFiles();
 
     myPrint('Backup created successfully at $mainBackupPath');
+    okInfoBarGreen(lw('Backup created successfully') + ' ' + lw('in Documents folder'));
     return lw('Backup created successfully');
   } catch (e) {
     myPrint('Error creating backup: $e');
+    okInfoBarRed(lw('Error creating backup'));
     return lw('Error creating backup');
   }
 }
@@ -91,12 +96,14 @@ Future<String> exportToCSV() async {
     final backupDir = await createBackupDirWithDate();
     if (backupDir == null) {
       myPrint('Failed to create export directory');
+      okInfoBarRed(lw('Error exporting to CSV'));
       return lw('Error exporting to CSV');
     }
 
     final List<Map<String, dynamic>> items = await mainDb.query('items');
     if (items.isEmpty) {
       myPrint('No data to export');
+      okInfoBarRed(lw('No data to export'));
       return lw('No data to export');
     }
 
@@ -133,14 +140,16 @@ Future<String> exportToCSV() async {
     await sink.close();
 
     myPrint('CSV export completed successfully at ${csvFile.path}');
+    okInfoBarGreen(lw('CSV export completed successfully') + ' ' + lw('in Documents folder'));
     return lw('CSV export completed successfully');
   } catch (e) {
     myPrint('Error exporting to CSV: $e');
+    okInfoBarRed(lw('Error exporting to CSV'));
     return lw('Error exporting to CSV');
   }
 }
 
-// Обновленные функции восстановления с улучшенной фильтрацией по расширению
+
 // Восстановление из резервной копии
 Future<String> restoreBackup() async {
   try {
@@ -156,13 +165,14 @@ Future<String> restoreBackup() async {
     final documentsDir = documentsDirectory;
     if (documentsDir == null) {
       myPrint('Failed to get documents directory');
+      okInfoBarRed(lw('Error'));
       return lw('Error');
     }
 
     final memorizerDir = Directory('${documentsDir.path}/Memorizer');
     if (!await memorizerDir.exists()) {
       myPrint('Memorizer directory does not exist');
-      await memorizerDir.create(recursive: true);
+      okInfoBarRed(lw('No backups found. Create a backup first.'));
       return lw('No backups found. Create a backup first.');
     }
 
@@ -187,12 +197,14 @@ Future<String> restoreBackup() async {
 
     if (filePath == null) {
       myPrint('Selected file path is null');
+      okInfoBarRed(lw('Error'));
       return lw('Error');
     }
 
     // Проверяем, что выбранный файл имеет расширение .db
     if (!filePath.toLowerCase().endsWith('.db')) {
       myPrint('Selected file is not a database file');
+      okInfoBarRed(lw('Error: selected file is not a database'));
       return lw('Error: selected file is not a database');
     }
 
@@ -244,6 +256,7 @@ Future<String> restoreBackup() async {
       }
     } catch (copyError) {
       myPrint('Error copying backup file: $copyError');
+      okInfoBarRed(lw('Error copying backup file'));
       return lw('Error copying backup file');
     }
 
@@ -254,11 +267,13 @@ Future<String> restoreBackup() async {
       myPrint('Database reopened successfully');
     } catch (openError) {
       myPrint('Error reopening database: $openError');
+      okInfoBarRed(lw('Error reopening database'));
       return lw('Error reopening database');
     }
 
     // Если успешно, возвращаем сообщение с рекомендацией перезапустить
     myPrint('Database restored successfully');
+    okInfoBarGreen(lw('Database restored. Please restart the app.'));
     return lw('Database restored. Please restart the app.');
   } catch (e) {
     myPrint('Error restoring backup: $e');
@@ -272,6 +287,7 @@ Future<String> restoreBackup() async {
     } catch (reInitError) {
       myPrint('Error re-opening database: $reInitError');
     }
+    okInfoBarRed(lw('Error restoring backup'));
     return lw('Error restoring backup');
   }
 }
@@ -288,12 +304,14 @@ Future<String> restoreFromCSV() async {
     final documentsDir = documentsDirectory;
     if (documentsDir == null) {
       myPrint('Failed to get documents directory');
+      okInfoBarRed(lw('Error'));
       return lw('Error');
     }
 
     final memorizerDir = Directory('${documentsDir.path}/Memorizer');
     if (!await memorizerDir.exists()) {
       myPrint('Memorizer directory does not exist');
+      okInfoBarRed(lw('No backups found. Create a backup first.'));
       return lw('No backups found. Create a backup first.');
     }
 
@@ -312,17 +330,19 @@ Future<String> restoreFromCSV() async {
     }
 
     final file = result.files.first;
-    final filePath = file.path; // Теперь filePath определен
+    final filePath = file.path;
 
     myPrint('Selected file: $filePath');
 
     if (filePath == null) {
       myPrint('Selected file path is null');
+      okInfoBarRed(lw('Error'));
       return lw('Error');
     }
 
     if (!filePath.toLowerCase().endsWith('.csv')) {
       myPrint('Selected file is not a CSV file');
+      okInfoBarRed(lw('Error: selected file is not a CSV'));
       return lw('Error: selected file is not a CSV');
     }
 
@@ -348,6 +368,7 @@ Future<String> restoreFromCSV() async {
 
     if (lines.isEmpty) {
       myPrint('CSV file is empty');
+      okInfoBarRed(lw('Error: CSV file is empty'));
       return lw('Error: CSV file is empty');
     }
 
@@ -398,12 +419,15 @@ Future<String> restoreFromCSV() async {
     });
 
     myPrint('CSV restore completed successfully');
+    okInfoBarGreen(lw('Data restored from CSV. Please restart the app.'));
     return lw('Data restored from CSV. Please restart the app.');
   } catch (e) {
     myPrint('Error restoring from CSV: $e');
+    okInfoBarRed(lw('Error restoring from CSV'));
     return lw('Error restoring from CSV');
   }
 }
+
 
 // Вспомогательная функция для парсинга строк CSV
 List<String> _parseCSVLine(String line) {
