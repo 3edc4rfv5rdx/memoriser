@@ -418,6 +418,38 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showPhoto(String photoPath) {
+    // First check if the file exists
+    final file = File(photoPath);
+    if (!file.existsSync()) {
+      // Show a dialog with a concise message
+      showCustomDialog(
+        title: lw('Photo Not Found'),
+        content: lw('The photo file is missing. Remove the reference?'),
+        actions: [
+          {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
+          {
+            'label': lw('Remove'),
+            'value': true,
+            'isDestructive': true,
+            'onPressed': () async {
+              if (_selectedItemId != null) {
+                await mainDb.update(
+                  'items',
+                  {'photo': null},
+                  where: 'id = ?',
+                  whereArgs: [_selectedItemId],
+                );
+                _refreshItems();
+                okInfoBarBlue(lw('Photo reference removed'));
+              }
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    // Original photo display code if file exists
     showDialog(
       context: navigatorKey.currentContext!,
       builder: (BuildContext dialogContext) {
@@ -449,7 +481,7 @@ class _HomePageState extends State<HomePage> {
                     maxWidth: screenSize.width * 0.9,
                   ),
                   child: SingleChildScrollView(
-                    child: Image.file(File(photoPath), fit: BoxFit.contain),
+                    child: Image.file(file, fit: BoxFit.contain),
                   ),
                 ),
               ),
@@ -840,11 +872,21 @@ class _HomePageState extends State<HomePage> {
                   'value': true,
                   'isDestructive': true,
                   'onPressed': () async {
+                    // First check if item has a photo
+                    final photoPath = item['photo'];
+
+                    // Delete item from database
                     await mainDb.delete(
                       'items',
                       where: 'id = ?',
                       whereArgs: [item['id']],
                     );
+
+                    // Delete photo file if exists
+                    if (isValidPhotoPath(photoPath)) {
+                      await deletePhotoFile(photoPath);
+                    }
+
                     _refreshItems();
                   },
                 },

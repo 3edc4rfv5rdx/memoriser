@@ -617,11 +617,19 @@ class _EditItemPageState extends State<EditItemPage> {
           IconButton(
             icon: Icon(Icons.clear, color: clText),
             tooltip: lw('Clear photo'),
-            onPressed: () {
-              setState(() {
-                photoController.clear();
-              });
-              okInfoBarBlue(lw('Photo cleared'));
+            onPressed: () async {
+              if (photoController.text.isNotEmpty) {
+                final wasDeleted = await deletePhotoFile(photoController.text);
+                if (wasDeleted) {
+                  setState(() {
+                    photoController.clear();
+                  });
+                }
+              } else {
+                setState(() {
+                  photoController.clear();
+                });
+              }
             },
           ),
         ],
