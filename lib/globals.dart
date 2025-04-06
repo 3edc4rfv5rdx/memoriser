@@ -877,3 +877,37 @@ bool isValidPhotoPath(dynamic photoValue) {
   if (path.isEmpty || path == "\"\"" || path == "\"") return false;
   return true;
 }
+
+Future<bool> deletePhotoFile(String photoPath) async {
+  // Quick exit if path is empty/invalid
+  if (!isValidPhotoPath(photoPath)) return false;
+
+  // Check if file exists
+  final file = File(photoPath);
+  if (!await file.exists()) return true; // Exit silently if file doesn't exist
+
+  // Show confirmation dialog using existing methods
+  final confirmed = await showCustomDialog(
+    title: lw('Delete Photo'),
+    content: lw('Are you sure you want to delete this photo?'),
+    actions: [
+      {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
+      {'label': lw('Delete'), 'value': true, 'isDestructive': true},
+    ],
+  );
+
+  // Delete file if confirmed
+  if (confirmed == true) {
+    try {
+      await file.delete();
+      return true;
+    } catch (e) {
+      myPrint('Error deleting photo: $e');
+      okInfoBarRed(lw('Error deleting photo'));
+      return false;
+    }
+  }
+
+  return false;
+}
+
