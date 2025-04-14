@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 class MainActivity : FlutterActivity() {
     
     companion object {
+        const val DEFAULT_NOTIFICATION_TIME = "08:00"
         private var methodChannel: MethodChannel? = null
         
         // Function to send message to Flutter
