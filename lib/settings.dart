@@ -23,7 +23,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentLanguage;
   bool _newestFirst = true;
   int _lastItems = 0; // Last items setting
-  String _remindTime = "08:00"; // Default remind time
+  String _remindTime = notifTime; // Default remind time
   bool _enableReminders = true; // Add this for reminders setting
   bool _isLoading = true;
 
@@ -75,7 +75,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     final lastItems = int.tryParse(lastItemsValue) ?? 0;
 
     // Load remind time setting
-    final remindTimeValue = await getSetting("Remind time") ?? "08:00";
+    final remindTimeValue = await getSetting("Remind time") ?? notifTime;
 
     // Load enable reminders setting
     final enableRemindersValue =
@@ -648,7 +648,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   // Time picker function with styled buttons
   Future<void> _selectTime(BuildContext context) async {
     // Parse current time or use default
-    final List<String> timeParts = (_newRemindTime ?? "08:00").split(":");
+    final List<String> timeParts = (_newRemindTime ?? notifTime).split(":");
     final int hour = int.tryParse(timeParts[0]) ?? 10;
     final int minute = int.tryParse(timeParts[1]) ?? 0;
 
