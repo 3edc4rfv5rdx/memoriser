@@ -15,7 +15,7 @@ class NotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("MemorizerApp", "NotificationReceiver: onReceive triggered")
 
-        val title = intent.getStringExtra("title") ?: "Reminder"
+        val title = intent.getStringExtra("title") ?: "Memorizer"
         val body = intent.getStringExtra("body") ?: "Check your events for today"
 
         try {
