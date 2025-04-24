@@ -145,11 +145,8 @@ class SimpleNotifications {
 
       myPrint('Found ${todayEvents.length} events for today');
 
+      // Если нет событий на сегодня, просто выходим
       if (todayEvents.isEmpty) {
-        // If no events, show a message in the app
-        if (scaffoldMessengerKey.currentState != null) {
-          okInfoBarBlue(lw('No scheduled events for today'));
-        }
         return;
       }
 
@@ -157,9 +154,9 @@ class SimpleNotifications {
       for (var item in todayEvents) {
         // If in hidden mode, process the record for display
         final processedItem =
-            xvHiddenMode && (item['hidden'] as int? ?? 0) == 1
-                ? processItemForView(item)
-                : item;
+        xvHiddenMode && (item['hidden'] as int? ?? 0) == 1
+            ? processItemForView(item)
+            : item;
 
         // Show notification for this event with correct type casting
         await showNotification(
@@ -182,6 +179,7 @@ class SimpleNotifications {
       myPrint('Error checking events for today: $e');
     }
   }
+
 
   // Function for manual reminder check (called from UI)
   static Future<void> manualCheckReminders() async {
