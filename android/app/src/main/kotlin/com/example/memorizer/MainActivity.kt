@@ -9,13 +9,16 @@ import io.flutter.plugin.common.MethodChannel
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.content.Context
+import android.app.NotificationManager
+
 
 class MainActivity : FlutterActivity() {
-    
+
     companion object {
         const val DEFAULT_NOTIFICATION_TIME = "08:00"
         private var methodChannel: MethodChannel? = null
-        
+
         // Function to send message to Flutter
         fun checkEvents() {
             try {
@@ -26,13 +29,13 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
-    
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
+
         // Запрос разрешений для Android 13+
         requestNotificationPermission()
-        
+
         try {
             // Set up method channel
             methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.memorizer/notifications")
@@ -45,9 +48,12 @@ class MainActivity : FlutterActivity() {
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager.cancelAll()
 
         try {
+            // Очищаем все уведомления при запуске приложения
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancelAll()
+
             // Проверяем, есть ли payload в intent
             if (intent.hasExtra("notification_payload")) {
                 val payload = intent.getStringExtra("notification_payload")
@@ -60,7 +66,7 @@ class MainActivity : FlutterActivity() {
             Log.e("MemorizerApp", "Error in onNewIntent: ${e.message}")
         }
     }
-    
+
     private fun requestNotificationPermission() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
