@@ -45,6 +45,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager.cancelAll()
 
         try {
             // Проверяем, есть ли payload в intent
