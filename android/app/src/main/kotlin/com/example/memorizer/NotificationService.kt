@@ -58,7 +58,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 result.success(null)
             }
             "scheduleDaily" -> {
-                val time = call.argument<String>("time") ?: DEFAULT_NOTIFICATION_TIME
+                val time = call.argument<String>("time") ?: MainActivity.DEFAULT_NOTIFICATION_TIME
                 val title = call.argument<String>("title") ?: ""
                 val body = call.argument<String>("body") ?: ""
 
