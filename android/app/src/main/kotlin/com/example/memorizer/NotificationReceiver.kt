@@ -6,6 +6,7 @@ import android.content.Intent
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.database.Cursor
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -18,97 +19,6 @@ class NotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("MemorizerApp", "NotificationReceiver: onReceive triggered")
 
-        // Сначала проверяем, есть ли события на сегодня
-        val hasEventsForToday = checkForTodayEvents(context)
-
-        // Если нет событий, просто выходим без показа уведомления
-        if (!hasEventsForToday) {
-            Log.d("MemorizerApp", "No events for today, skipping notification")
-            return
-        }
-
-        // Если события есть, показываем уведомление
-        val title = intent.getStringExtra("title") ?: "Memorizer"
-        val body = intent.getStringExtra("body") ?: "Check your events for today"
-
-        try {
-            // Создаем специальный цветной канал
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val coloredChannel = NotificationChannel(
-                    "memorizer_colored_channel",
-                    "Memorizer Colored Reminders",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "Colored reminders for Memorizer app"
-                    enableLights(true)
-                    enableVibration(true)
-                    setShowBadge(true)
-                }
-                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                notificationManager.createNotificationChannel(coloredChannel)
-            }
-
-            // Create notification intent
-            val notificationIntent = Intent(context, MainActivity::class.java)
-            val pendingIntent = PendingIntent.getActivity(
-                context,
-                0,
-                notificationIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            // Цвет оранжевый
-            val orangeColor = 0xFFfb8500.toInt()
-
-            // Создаем стиль для текста
-            val bigTextStyle = NotificationCompat.BigTextStyle()
-                .bigText(body)
-                .setBigContentTitle(title)
-
-            // Создаем уведомление
-            val builder = NotificationCompat.Builder(context, "memorizer_colored_channel")
-                .setSmallIcon(R.drawable.notification_icon)
-                .setContentTitle(title)
-                .setContentText(body)
-                .setStyle(bigTextStyle)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_REMINDER)
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setColor(orangeColor)
-                .setColorized(true)
-
-            // Для Android 5.0+ (Lollipop)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            }
-
-            // Show the notification
-            val notificationManager = NotificationManagerCompat.from(context)
-            try {
-                // Дополнительные флаги для усиления важности
-                val notification = builder.build()
-                notification.flags = notification.flags or android.app.Notification.FLAG_SHOW_LIGHTS
-
-                notificationManager.notify(0, notification)
-                Log.d("MemorizerApp", "Notification shown from receiver")
-            } catch (e: SecurityException) {
-                Log.e("MemorizerApp", "Permission denied in receiver: ${e.message}")
-            } catch (e: Exception) {
-                Log.e("MemorizerApp", "Error showing notification in receiver: ${e.message}")
-            }
-
-            // Also send a message to Flutter to check for today's events
-            MainActivity.checkEvents()
-            Log.d("MemorizerApp", "checkEvents called from receiver")
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error in NotificationReceiver.onReceive: ${e.message}")
-        }
-    }
-
-    // Метод для проверки наличия событий на сегодня
-    private fun checkForTodayEvents(context: Context): Boolean {
         try {
             // Получаем сегодняшнюю дату в формате YYYYMMDD
             val calendar = Calendar.getInstance()
@@ -121,27 +31,113 @@ class NotificationReceiver : BroadcastReceiver() {
                 dbPath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
             )
 
-            // Запрашиваем количество событий на сегодня с включенными напоминаниями
+            // Запрашиваем события на сегодня с включенными напоминаниями
             val cursor = db.rawQuery(
-                "SELECT COUNT(*) FROM items WHERE remind = 1 AND date = ? AND (hidden = 0 OR hidden IS NULL)",
+                "SELECT id, title, content FROM items WHERE remind = 1 AND date = ? AND (hidden = 0 OR hidden IS NULL)",
                 arrayOf(todayDate.toString())
             )
 
-            var count = 0
-            if (cursor.moveToFirst()) {
-                count = cursor.getInt(0)
+            // Получаем количество событий
+            val eventCount = cursor.count
+
+            // Если нет событий, просто выходим
+            if (eventCount == 0) {
+                cursor.close()
+                db.close()
+                Log.d("MemorizerApp", "No events for today, skipping notifications")
+                return
+            }
+
+            // Создаем канал уведомлений
+            createNotificationChannel(context)
+
+            // Для каждого события создаем отдельное уведомление
+            var notificationId = 1
+            while (cursor.moveToNext()) {
+                val id = cursor.getInt(cursor.getColumnIndex("id"))
+                val title = cursor.getString(cursor.getColumnIndex("title")) ?: ""
+                val content = cursor.getString(cursor.getColumnIndex("content")) ?: ""
+
+                showEventNotification(context, id, "Reminder: $title", content, notificationId)
+                notificationId++
+            }
+
+            // Если событий больше одного, показываем общее уведомление
+            if (eventCount > 1) {
+                showEventNotification(
+                    context,
+                    0,
+                    "Today's events",
+                    "You have $eventCount scheduled events for today",
+                    999999
+                )
             }
 
             cursor.close()
             db.close()
 
-            Log.d("MemorizerApp", "Found $count events for today")
-            return count > 0
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error in NotificationReceiver.onReceive: ${e.message}")
+        }
+    }
+
+    private fun createNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "memorizer_colored_channel",
+                "Memorizer Colored Reminders",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Colored reminders for Memorizer app"
+                enableLights(true)
+                enableVibration(true)
+                setShowBadge(true)
+            }
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showEventNotification(context: Context, itemId: Int, title: String, content: String, notificationId: Int) {
+        try {
+            // Create notification intent that opens the app
+            val notificationIntent = Intent(context, MainActivity::class.java)
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId,
+                notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Оранжевый цвет
+            val orangeColor = 0xFFfb8500.toInt()
+
+            // Стиль для большого текста
+            val bigTextStyle = NotificationCompat.BigTextStyle()
+                .bigText(content)
+                .setBigContentTitle(title)
+
+            // Создаем уведомление
+            val builder = NotificationCompat.Builder(context, "memorizer_colored_channel")
+                .setSmallIcon(R.drawable.notification_icon)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setStyle(bigTextStyle)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setColor(orangeColor)
+                .setColorized(true)
+
+            // Показываем уведомление
+            val notificationManager = NotificationManagerCompat.from(context)
+            notificationManager.notify(notificationId, builder.build())
+
+            Log.d("MemorizerApp", "Notification shown with ID: $notificationId")
 
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error checking events for today: ${e.message}")
-            // В случае ошибки лучше показать уведомление, чем пропустить его
-            return true
+            Log.e("MemorizerApp", "Error showing notification: ${e.message}")
         }
     }
 }
