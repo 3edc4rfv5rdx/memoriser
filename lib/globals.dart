@@ -16,7 +16,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 const String progVersion = '0.8.250424';
-const int buildNumber = 24;
+const int buildNumber = 25;
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
