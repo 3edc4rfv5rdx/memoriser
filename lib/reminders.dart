@@ -161,7 +161,7 @@ class SimpleNotifications {
         // Show notification for this event with correct type casting
         await showNotification(
           item['id'] as int,
-          lw('Reminder') + ': ' + (processedItem['title'] as String? ?? ''),
+          lw('Memorizer') + ': ' + (processedItem['title'] as String? ?? ''),
           processedItem['content'] as String? ?? '',
           payload: (item['id'] as int).toString(),
         );
