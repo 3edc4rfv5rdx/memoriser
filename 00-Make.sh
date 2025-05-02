@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="null strings, filters etc"
+COMMENT="new release"
 #
 GLOBVERS='0.8'
 VER=''
