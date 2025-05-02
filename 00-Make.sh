@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="new release"
+COMMENT="todays red events"
 #
 GLOBVERS='0.8'
 VER=''
