@@ -111,13 +111,11 @@ Future<String> getFilterStatusText() async {
 Future<List<Map<String, dynamic>>> getItems() async {
   try {
     // Get sort order from settings
-    final newestFirst =
-        await getSetting("Newest first") ?? defSettings["Newest first"];
+    final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
     myPrint('Newest first setting: $newestFirst');
 
     // Get last items limit from settings
-    final lastItemsStr =
-        await getSetting("Last items") ?? defSettings["Last items"];
+    final lastItemsStr = await getSetting("Last items") ?? defSettings["Last items"];
     final lastItems = int.tryParse(lastItemsStr) ?? 0;
     myPrint('Last items setting: $lastItems');
 
@@ -142,8 +140,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
       myPrint('Tag filter is active: $xvTagFilter');
 
       // Разбиваем строку тегов на отдельные теги
-      List<String> tagFilters =
-      xvTagFilter.split(',').map((tag) => tag.trim()).toList();
+      List<String> tagFilters = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
 
       if (xvHiddenMode) {
         // В скрытом режиме обфусцируем теги перед поиском
@@ -280,17 +277,41 @@ Future<List<Map<String, dynamic>>> getItems() async {
       result = result.map((item) => processItemForView(item)).toList();
     }
 
-    myPrint('Retrieved items count: ${result.length}');
-    if (result.isNotEmpty) {
-      myPrint('First item: ${result.first}');
+    // Получаем сегодняшнюю дату в формате YYYYMMDD
+    final todayDate = dateTimeToYYYYMMDD(DateTime.now());
+    myPrint('Today date: $todayDate');
+
+    // Создаем новый список с событиями на сегодня в начале
+    List<Map<String, dynamic>> sortedResult = [];
+
+    // Сначала добавляем события на сегодня
+    for (var item in List<Map<String, dynamic>>.from(result)) {
+      if (item['date'] == todayDate) {
+        sortedResult.add(Map<String, dynamic>.from(item)); // Копируем элемент
+      }
     }
 
-    return result;
+    // Затем добавляем все остальные события
+    for (var item in List<Map<String, dynamic>>.from(result)) {
+      if (item['date'] != todayDate) {
+        sortedResult.add(Map<String, dynamic>.from(item)); // Копируем элемент
+      }
+    }
+
+    myPrint('Retrieved items count: ${sortedResult.length}');
+    myPrint('Today items count: ${sortedResult.where((item) => item['date'] == todayDate).length}');
+    if (sortedResult.isNotEmpty) {
+      myPrint('First item: ${sortedResult.first}');
+    }
+
+    return sortedResult;
   } catch (e) {
     myPrint('Error loading items: $e');
     return []; // Return empty list instead of throwing error
   }
 }
+
+
 
 Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
   final today = DateTime.now();
@@ -1136,157 +1157,172 @@ class _HomePageState extends State<HomePage> {
                 ),
               )
               : ListView.builder(
-                itemCount: _items.length,
-                itemBuilder: (context, index) {
-                  final item = _items[index];
-                  final priorityValue = item['priority'] ?? 0;
-                  final hasDate = item['date'] != null && item['date'] != 0;
-                  final isReminder = item['remind'] == 1;
-                  final hasPhoto = isValidPhotoPath(item['photo']);
+            itemCount: _items.length,
+            itemBuilder: (context, index) {
+              final item = _items[index];
+              final priorityValue = item['priority'] ?? 0;
+              final hasDate = item['date'] != null && item['date'] != 0;
+              final isReminder = item['remind'] == 1;
+              final hasPhoto = isValidPhotoPath(item['photo']);
 
-                  // Format date for display if it exists
-                  String? formattedDate;
-                  if (hasDate) {
-                    try {
-                      final eventDate = yyyymmddToDateTime(item['date']);
-                      if (eventDate != null) {
-                        formattedDate = DateFormat(ymdDateFormat).format(eventDate);
-                      } else {
-                        myPrint('Warning: Could not format date: ${item['date']}');
-                      }
-                    } catch (e) {
-                      myPrint('Error formatting date: $e');
-                    }
+              // Проверяем, является ли дата текущей
+              final todayDate = dateTimeToYYYYMMDD(DateTime.now());
+              final isToday = hasDate && item['date'] == todayDate;
+
+              // Format date for display if it exists
+              String? formattedDate;
+              if (hasDate) {
+                try {
+                  final eventDate = yyyymmddToDateTime(item['date']);
+                  if (eventDate != null) {
+                    formattedDate = DateFormat(ymdDateFormat).format(eventDate);
+                  } else {
+                    myPrint('Warning: Could not format date: ${item['date']}');
                   }
+                } catch (e) {
+                  myPrint('Error formatting date: $e');
+                }
+              }
 
-                  // Safely get content and tags with null checks
-                  final String content = item['content'] ?? '';
-                  final String tags = item['tags'] ?? '';
+              // Safely get content and tags with null checks
+              final String content = item['content'] ?? '';
+              final String tags = item['tags'] ?? '';
 
-                  return ListTile(
-                    title: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item['title'],
-                            style: TextStyle(fontWeight: fwBold, color: clText),
+              return ListTile(
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item['title'],
+                        style: TextStyle(
+                          fontWeight: fwBold,
+                          color: isToday ? clRed : clText,
+                        ),
+                      ),
+                    ),
+                    // Display priority as stars
+                    if (priorityValue > 0)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(
+                          priorityValue > 3 ? 3 : priorityValue,
+                              (i) => Icon(Icons.star, color: clUpBar, size: 34),
+                        ),
+                      ),
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(content, style: TextStyle(color: isToday ? clRed : clText)),
+                    if (tags.isNotEmpty)
+                      Text(
+                        'Tags: $tags',
+                        style: TextStyle(
+                          fontSize: fsNormal,
+                          color: isToday ? clRed : clText,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+
+                    // Add date information if available
+                    if (hasDate && formattedDate != null)
+                      Row(
+                        children: [
+                          Icon(Icons.event, color: isToday ? clRed : clText, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            formattedDate,
+                            style: TextStyle(
+                              fontSize: fsMedium,
+                              color: isReminder || isToday ? clRed : clText,
+                              fontWeight: isReminder || isToday ? fwBold : fwNormal,
+                            ),
+                          ),
+
+                          // Add reminder bell icon next to the date with more spacing
+                          if (isReminder)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                left: 8,
+                              ), // Увеличено расстояние между датой и колокольчиком
+                              child: Icon(
+                                Icons.notifications_active,
+                                color: clRed,
+                                size: 16,
+                              ),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
+                tileColor: _selectedItemId == item['id']
+                    ? clSel
+                    : isToday
+                    ? Color(0x22FF0000) // Полупрозрачный красный цвет для фона сегодняшних событий
+                    : clFill,
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isToday)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4.0),
+                        child: Icon(Icons.today, color: clRed, size: 16),
+                      ),
+                    if (xvHiddenMode)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4.0),
+                        child: Icon(Icons.lock, color: clText, size: 16),
+                      ),
+                    if (priorityValue > 0)
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: clUpBar,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          priorityValue.toString(),
+                          style: TextStyle(
+                            color: clText,
+                            fontWeight: fwBold,
+                            fontSize: fsSmall,
                           ),
                         ),
-                        // Display priority as stars
-                        if (priorityValue > 0)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: List.generate(
-                              priorityValue > 3 ? 3 : priorityValue,
-                              (i) => Icon(Icons.star, color: clUpBar, size: 34),
-                            ),
-                          ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(content, style: TextStyle(color: clText)),
-                        if (tags.isNotEmpty)
-                          Text(
-                            'Tags: $tags',
-                            style: TextStyle(
-                              fontSize: fsNormal,
-                              color: clText,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
+                      ),
+                  ],
+                ),
+                trailing: hasPhoto
+                    ? IconButton(
+                  icon: Icon(Icons.photo, color: isToday ? clRed : clText),
+                  onPressed: () => _showPhoto(item['photo']),
+                )
+                    : null,
+                onTap: () {
+                  // Just select the item and highlight it
+                  setState(() {
+                    _selectedItemId = item['id'];
+                  });
 
-                        // Add date information if available
-                        if (hasDate && formattedDate != null)
-                          Row(
-                            children: [
-                              Icon(Icons.event, color: clText, size: 16),
-                              SizedBox(width: 4),
-                              Text(
-                                formattedDate,
-                                style: TextStyle(
-                                  fontSize: fsMedium,
-                                  color: isReminder ? clRed : clText,
-                                  fontWeight: isReminder ? fwBold : fwNormal,
-                                ),
-                              ),
-
-                              // Add reminder bell icon next to the date with more spacing
-                              if (isReminder)
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    left: 8,
-                                  ), // Увеличено расстояние между датой и колокольчиком
-                                  child: Icon(
-                                    Icons.notifications_active,
-                                    color: clRed,
-                                    size: 16,
-                                  ),
-                                ),
-                            ],
-                          ),
-                      ],
-                    ),
-                    tileColor: _selectedItemId == item['id'] ? clSel : clFill,
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (xvHiddenMode)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4.0),
-                            child: Icon(Icons.lock, color: clText, size: 16),
-                          ),
-                        if (priorityValue > 0)
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: clUpBar,
-                              shape: BoxShape.circle,
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              priorityValue.toString(),
-                              style: TextStyle(
-                                color: clText,
-                                fontWeight: fwBold,
-                                fontSize: fsSmall,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    trailing:
-                        hasPhoto
-                            ? IconButton(
-                              icon: Icon(Icons.photo, color: clText),
-                              onPressed: () => _showPhoto(item['photo']),
-                            )
-                            : null,
-                    onTap: () {
-                      // Just select the item and highlight it
-                      setState(() {
-                        _selectedItemId = item['id'];
-                      });
-
-                      // Сбрасываем таймер автоматического выхода из скрытого режима
-                      if (xvHiddenMode) {
-                        resetHiddenModeTimer();
-                      }
-                    },
-                    onLongPress: () {
-                      // Show context menu with Edit and Delete options
-                      _showContextMenu(context, item);
-
-                      // Сбрасываем таймер автоматического выхода из скрытого режима
-                      if (xvHiddenMode) {
-                        resetHiddenModeTimer();
-                      }
-                    },
-                  );
+                  // Сбрасываем таймер автоматического выхода из скрытого режима
+                  if (xvHiddenMode) {
+                    resetHiddenModeTimer();
+                  }
                 },
-              ),
+                onLongPress: () {
+                  // Show context menu with Edit and Delete options
+                  _showContextMenu(context, item);
+
+                  // Сбрасываем таймер автоматического выхода из скрытого режима
+                  if (xvHiddenMode) {
+                    resetHiddenModeTimer();
+                  }
+                },
+              );
+            },
+          ),
 
       floatingActionButton: GestureDetector(
         onLongPress: () => showHelp(29), // ID 29 для кнопки добавления
