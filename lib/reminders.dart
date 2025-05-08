@@ -6,6 +6,7 @@ import 'globals.dart';
 // A simple notification system using direct platform channels
 class SimpleNotifications {
   static const platform = MethodChannel('com.example.memorizer/notifications');
+  static bool _methodCallHandlerRegistered = false;
 
   // Initialize the notification system
   static Future<void> initNotifications() async {
@@ -13,13 +14,26 @@ class SimpleNotifications {
       await platform.invokeMethod('initializeNotifications');
       myPrint('Notification system initialized');
 
-      // Set up method call handler for messages from native code
-      platform.setMethodCallHandler((call) async {
-        if (call.method == 'checkEvents') {
-          await removeExpiredItems(); // First remove expired items
-          await checkTodayEvents(); // Then check today's events
-        }
-      });
+      // Регистрируем обработчик сообщений из нативного кода только один раз
+      if (!_methodCallHandlerRegistered) {
+        platform.setMethodCallHandler((call) async {
+          myPrint('Received method call from native: ${call.method}');
+
+          if (call.method == 'checkEvents') {
+            await removeExpiredItems(); // First remove expired items
+            await checkTodayEvents(); // Then check today's events
+          } else if (call.method == 'permissionDenied') {
+            final permissionType = call.arguments as String? ?? 'unknown';
+            myPrint('Permission denied: $permissionType');
+
+            if (permissionType == 'notifications') {
+              okInfoBarRed(lw('Notification permission denied. Reminders may not work properly.'));
+            }
+          }
+        });
+        _methodCallHandlerRegistered = true;
+        myPrint('Method call handler registered');
+      }
     } catch (e) {
       myPrint('Failed to initialize notifications: $e');
     }
@@ -41,19 +55,48 @@ class SimpleNotifications {
       // Get reminder time from settings
       final remindTime = await getSetting("Remind time") ?? notifTime;
 
+      // Проверяем формат времени и корректируем при необходимости
+      String validatedTime = remindTime;
+      if (!_isValidTimeFormat(remindTime)) {
+        validatedTime = notifTime; // Используем значение по умолчанию
+        myPrint('Invalid time format: $remindTime, using default: $validatedTime');
+
+        // Сохраняем правильное значение
+        await saveSetting("Remind time", validatedTime);
+      }
+
       await platform.invokeMethod('scheduleDaily', {
-        'time': remindTime,
+        'time': validatedTime,
         'title': lw('Reminder Check'),
         'body': lw('Checking for today\'s events'),
       });
 
-      myPrint('Scheduled daily reminder check at $remindTime');
+      myPrint('Scheduled daily reminder check at $validatedTime');
 
       // Do an immediate check, but with removal first
       await removeExpiredItems(); // New method to handle removals first
       await checkTodayEvents(); // Then check today's events
     } catch (e) {
       myPrint('Failed to schedule reminder: $e');
+    }
+  }
+
+  // Validate time format (HH:MM)
+  static bool _isValidTimeFormat(String time) {
+    try {
+      final parts = time.split(':');
+      if (parts.length != 2) return false;
+
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+
+      if (hour == null || minute == null) return false;
+      if (hour < 0 || hour > 23) return false;
+      if (minute < 0 || minute > 59) return false;
+
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -89,11 +132,11 @@ class SimpleNotifications {
 
   // Show a notification
   static Future<void> showNotification(
-    int id,
-    String title,
-    String body, {
-    String? payload,
-  }) async {
+      int id,
+      String title,
+      String body, {
+        String? payload,
+      }) async {
     try {
       await platform.invokeMethod('showNotification', {
         'id': id,
@@ -140,7 +183,7 @@ class SimpleNotifications {
         'items',
         where: 'remind = 1 AND date = ?',
         whereArgs: [todayDate],
-        orderBy: 'date ASC',
+        orderBy: 'priority DESC', // Сначала показываем события с высоким приоритетом
       );
 
       myPrint('Found ${todayEvents.length} events for today');
@@ -152,6 +195,11 @@ class SimpleNotifications {
 
       // Process events - show a notification for each one
       for (var item in todayEvents) {
+        // Skip hidden items if not in hidden mode
+        if ((item['hidden'] as int? ?? 0) == 1 && !xvHiddenMode) {
+          continue;
+        }
+
         // If in hidden mode, process the record for display
         final processedItem =
         xvHiddenMode && (item['hidden'] as int? ?? 0) == 1

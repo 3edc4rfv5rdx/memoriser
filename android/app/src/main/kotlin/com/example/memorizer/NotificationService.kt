@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -17,6 +18,17 @@ import java.util.Calendar
 class NotificationService(private val context: Context) : MethodChannel.MethodCallHandler {
     private val channelId = "memorizer_channel"
     private val notificationManager = NotificationManagerCompat.from(context)
+    private val prefs: SharedPreferences by lazy {
+        context.getSharedPreferences("memorizer_notifications", Context.MODE_PRIVATE)
+    }
+
+    companion object {
+        const val PREF_REMINDER_TIME = "reminder_time"
+        const val PREF_REMINDER_ENABLED = "reminder_enabled"
+        const val PREF_REMINDER_TITLE = "reminder_title"
+        const val PREF_REMINDER_BODY = "reminder_body"
+        const val REMINDER_REQUEST_CODE = 12345
+    }
 
     init {
         createNotificationChannel()
@@ -62,17 +74,39 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 val title = call.argument<String>("title") ?: ""
                 val body = call.argument<String>("body") ?: ""
 
+                // Сохраняем настройки напоминаний
+                saveReminderSettings(time, title, body, true)
+
+                // Планируем ежедневную проверку
                 scheduleDaily(time, title, body)
                 result.success(null)
             }
             "cancelAllNotifications" -> {
                 cancelAllNotifications()
+                // Сохраняем, что напоминания отключены
+                saveReminderSettings(
+                    prefs.getString(PREF_REMINDER_TIME, MainActivity.DEFAULT_NOTIFICATION_TIME) ?: MainActivity.DEFAULT_NOTIFICATION_TIME,
+                    prefs.getString(PREF_REMINDER_TITLE, "") ?: "",
+                    prefs.getString(PREF_REMINDER_BODY, "") ?: "",
+                    false
+                )
                 result.success(null)
             }
             else -> {
                 result.notImplemented()
             }
         }
+    }
+
+    private fun saveReminderSettings(time: String, title: String, body: String, isEnabled: Boolean) {
+        prefs.edit().apply {
+            putString(PREF_REMINDER_TIME, time)
+            putString(PREF_REMINDER_TITLE, title)
+            putString(PREF_REMINDER_BODY, body)
+            putBoolean(PREF_REMINDER_ENABLED, isEnabled)
+            apply()
+        }
+        Log.d("MemorizerApp", "Saved reminder settings: time=$time, enabled=$isEnabled")
     }
 
     private fun showNotification(id: Int, title: String, body: String, payload: String = "") {
@@ -174,7 +208,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
-                0,
+                REMINDER_REQUEST_CODE,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -194,26 +228,61 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
             Log.d("MemorizerApp", "Alarm scheduled for: ${calendar.time}")
 
-            // Schedule the alarm to repeat daily
+            // Сначала отменяем предыдущие будильники
+            alarmManager.cancel(pendingIntent)
+
+            // Используем ПОВТОРЯЮЩИЙСЯ будильник вместо однократного
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Для Android 6.0+
+                // Сначала устанавливаем точный будильник на сегодня/завтра
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     calendar.timeInMillis,
                     pendingIntent
                 )
-            } else {
-                alarmManager.setExact(
+
+                // Затем устанавливаем повторяющийся будильник
+                // Для повторяющегося будильника используем setRepeating или setInexactRepeating
+                alarmManager.setRepeating(
                     AlarmManager.RTC_WAKEUP,
                     calendar.timeInMillis,
+                    AlarmManager.INTERVAL_DAY, // Повторять ежедневно
+                    pendingIntent
+                )
+            } else {
+                // Для более старых версий Android
+                alarmManager.setRepeating(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    AlarmManager.INTERVAL_DAY, // Повторять ежедневно
                     pendingIntent
                 )
             }
 
-            // Также сразу показываем уведомление для проверки
-            // showNotification(100, "Тестовое уведомление", "Уведомления запланированы на $timeString")
+            Log.d("MemorizerApp", "Daily alarm set successfully")
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error in scheduleDaily: ${e.message}")
         }
+    }
+
+    fun rescheduleRemindersAfterReboot() {
+        // Проверяем, включены ли напоминания
+        val isEnabled = prefs.getBoolean(PREF_REMINDER_ENABLED, false)
+
+        if (!isEnabled) {
+            Log.d("MemorizerApp", "Reminders disabled, not rescheduling after reboot")
+            return
+        }
+
+        // Получаем сохраненные настройки напоминаний
+        val reminderTime = prefs.getString(PREF_REMINDER_TIME, MainActivity.DEFAULT_NOTIFICATION_TIME)
+            ?: MainActivity.DEFAULT_NOTIFICATION_TIME
+        val reminderTitle = prefs.getString(PREF_REMINDER_TITLE, "") ?: ""
+        val reminderBody = prefs.getString(PREF_REMINDER_BODY, "") ?: ""
+
+        // Перепланируем напоминания
+        scheduleDaily(reminderTime, reminderTitle, reminderBody)
+        Log.d("MemorizerApp", "Reminders rescheduled after reboot for time: $reminderTime")
     }
 
     private fun cancelAllNotifications() {
@@ -224,7 +293,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             val intent = Intent(context, NotificationReceiver::class.java)
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
-                0,
+                REMINDER_REQUEST_CODE,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
