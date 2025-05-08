@@ -113,3 +113,53 @@ class MainActivity : FlutterActivity() {
         }
         return true // На более старых версиях Android это разрешение не требуется
     }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+
+        try {
+            // Очищаем все уведомления при запуске приложения
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancelAll()
+
+            // Проверяем, есть ли payload в intent
+            if (intent.hasExtra("notification_payload")) {
+                val payload = intent.getStringExtra("notification_payload")
+                Log.d("MemorizerApp", "Notification clicked with payload: $payload")
+                methodChannel?.invokeMethod("notificationClick", payload ?: "")
+            } else {
+                Log.d("MemorizerApp", "Intent received but no notification payload found")
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error in onNewIntent: ${e.message}")
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (requestCode == 100) {
+            // Проверяем массив на пустоту
+            if (grantResults.isNotEmpty()) {
+                when (grantResults[0]) {
+                    PackageManager.PERMISSION_GRANTED -> {
+                        Log.d("MemorizerApp", "POST_NOTIFICATIONS permission granted by user")
+                        // Если разрешение получено, проверяем настройки напоминаний
+                        checkAndRestoreReminders()
+                    }
+                    PackageManager.PERMISSION_DENIED -> {
+                        Log.d("MemorizerApp", "POST_NOTIFICATIONS permission denied by user")
+                        // Информируем Flutter, что разрешение не получено
+                        methodChannel?.invokeMethod("permissionDenied", "notifications")
+                    }
+                    else -> {
+                        Log.d("MemorizerApp", "Unexpected permission result: ${grantResults[0]}")
+                    }
+                }
+            } else {
+                // Массив может быть пустым, если пользователь отменил диалог запроса
+                Log.d("MemorizerApp", "Permission request was cancelled")
+            }
+        }
+    }
+}
