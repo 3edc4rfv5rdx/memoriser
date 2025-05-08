@@ -11,6 +11,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.content.Context
 import android.app.NotificationManager
+import android.content.SharedPreferences
 
 
 class MainActivity : FlutterActivity() {
@@ -30,45 +31,55 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private lateinit var notificationService: NotificationService
+    private lateinit var prefs: SharedPreferences
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Запрос разрешений для Android 13+
-        requestNotificationPermission()
+        // Инициализируем SharedPreferences
+        prefs = getSharedPreferences("memorizer_notifications", Context.MODE_PRIVATE)
+
+        // Запрос необходимых разрешений
+        requestRequiredPermissions()
 
         try {
+            // Инициализируем сервис уведомлений
+            notificationService = NotificationService(applicationContext)
+
             // Set up method channel
             methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.memorizer/notifications")
-            methodChannel?.setMethodCallHandler(NotificationService(applicationContext))
+            methodChannel?.setMethodCallHandler(notificationService)
             Log.d("MemorizerApp", "Method channel initialized")
+
+            // Проверяем, нужно ли восстановить напоминания
+            checkAndRestoreReminders()
+
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error configuring flutter engine: ${e.message}")
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
-        super.onNewIntent(intent)
+    private fun checkAndRestoreReminders() {
+        // Проверяем, включены ли напоминания
+        val remindersEnabled = prefs.getBoolean(NotificationService.PREF_REMINDER_ENABLED, false)
 
-        try {
-            // Очищаем все уведомления при запуске приложения
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.cancelAll()
+        if (remindersEnabled) {
+            // Получаем сохраненные настройки напоминаний
+            val reminderTime = prefs.getString(NotificationService.PREF_REMINDER_TIME, DEFAULT_NOTIFICATION_TIME)
+                ?: DEFAULT_NOTIFICATION_TIME
+            val reminderTitle = prefs.getString(NotificationService.PREF_REMINDER_TITLE, "") ?: ""
+            val reminderBody = prefs.getString(NotificationService.PREF_REMINDER_BODY, "") ?: ""
 
-            // Проверяем, есть ли payload в intent
-            if (intent.hasExtra("notification_payload")) {
-                val payload = intent.getStringExtra("notification_payload")
-                Log.d("MemorizerApp", "Notification clicked with payload: $payload")
-                methodChannel?.invokeMethod("notificationClick", payload ?: "")
-            } else {
-                Log.d("MemorizerApp", "Intent received but no notification payload found")
-            }
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error in onNewIntent: ${e.message}")
+            // Перепланируем напоминания
+            notificationService.rescheduleRemindersAfterReboot()
+            Log.d("MemorizerApp", "Reminders restored during app start for time: $reminderTime")
         }
     }
 
-    private fun requestNotificationPermission() {
+    private fun requestRequiredPermissions() {
         try {
+            // Запрос разрешения на показ уведомлений для Android 13+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     Log.d("MemorizerApp", "Requesting POST_NOTIFICATIONS permission")
@@ -76,37 +87,29 @@ class MainActivity : FlutterActivity() {
                 } else {
                     Log.d("MemorizerApp", "POST_NOTIFICATIONS permission already granted")
                 }
-            } else {
-                Log.d("MemorizerApp", "POST_NOTIFICATIONS permission not needed on this Android version")
+            }
+
+            // Запрос разрешения на работу с точными будильниками для Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!canScheduleExactAlarms()) {
+                    Log.d("MemorizerApp", "Requesting SCHEDULE_EXACT_ALARM permission")
+                    // На Android 12+ для этого разрешения нужно отправить пользователя в настройки
+                    // Здесь можно показать диалог с объяснением и кнопкой для перехода в настройки
+                    // или запрашивать разрешение только при необходимости
+                } else {
+                    Log.d("MemorizerApp", "SCHEDULE_EXACT_ALARM permission already granted")
+                }
             }
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error requesting notification permission: ${e.message}")
+            Log.e("MemorizerApp", "Error requesting permissions: ${e.message}")
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (requestCode == 100) {
-            // Проверяем массив на пустоту
-            if (grantResults.isNotEmpty()) {
-                when (grantResults[0]) {
-                    PackageManager.PERMISSION_GRANTED -> {
-                        Log.d("MemorizerApp", "POST_NOTIFICATIONS permission granted by user")
-                        // Можно уведомить Flutter об успешном получении разрешения
-                    }
-                    PackageManager.PERMISSION_DENIED -> {
-                        Log.d("MemorizerApp", "POST_NOTIFICATIONS permission denied by user")
-                        // Информируем Flutter, что разрешение не получено
-                    }
-                    else -> {
-                        Log.d("MemorizerApp", "Unexpected permission result: ${grantResults[0]}")
-                    }
-                }
-            } else {
-                // Массив может быть пустым, если пользователь отменил диалог запроса
-                Log.d("MemorizerApp", "Permission request was cancelled")
-            }
+    // Проверка разрешения на работу с точными будильниками
+    private fun canScheduleExactAlarms(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            return alarmManager.canScheduleExactAlarms()
         }
+        return true // На более старых версиях Android это разрешение не требуется
     }
-}
