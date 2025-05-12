@@ -39,18 +39,17 @@
             </intent-filter>
         </activity>
 
-        <!-- Обновленный NotificationReceiver с атрибутом exported="true" -->
         <receiver
             android:name=".NotificationReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <!-- Добавляем дополнительные действия для более широкой поддержки устройств -->
                 <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+                <!-- Добавляем действие для ваших напоминаний -->
+                <action android:name="com.example.memorizer.CHECK_REMINDERS"/>
             </intent-filter>
         </receiver>
-
         <!-- Добавляем новый BootReceiver -->
         <receiver
             android:name=".BootReceiver"
