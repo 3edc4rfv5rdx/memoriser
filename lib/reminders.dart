@@ -39,7 +39,9 @@ class SimpleNotifications {
     }
   }
 
-  // Schedule a daily reminder check
+// Важно проверить этот фрагмент в reminders.dart
+
+// Schedule a daily reminder check
   static Future<void> scheduleReminderCheck() async {
     // Check if reminders are enabled
     final enableReminders =
@@ -52,8 +54,14 @@ class SimpleNotifications {
     }
 
     try {
-      // Get reminder time from settings
-      final remindTime = await getSetting("Remind time") ?? notifTime;
+      // Проверьте эту строку:
+      final remindTime = await getSetting("Notification time") ?? notifTime;
+
+      // Добавьте синхронизацию с ключом "Remind time" чтобы оба ключа имели одинаковое значение
+      // Эта строка должна быть добавлена:
+      await saveSetting("Remind time", remindTime);
+
+      myPrint('Scheduling daily reminder check at $remindTime');
 
       // Проверяем формат времени и корректируем при необходимости
       String validatedTime = remindTime;
@@ -61,27 +69,28 @@ class SimpleNotifications {
         validatedTime = notifTime; // Используем значение по умолчанию
         myPrint('Invalid time format: $remindTime, using default: $validatedTime');
 
-        // Сохраняем правильное значение
+        // Сохраняем правильное значение в обоих ключах
+        await saveSetting("Notification time", validatedTime);
         await saveSetting("Remind time", validatedTime);
       }
 
       await platform.invokeMethod('scheduleDaily', {
         'time': validatedTime,
-        'title': lw('Reminder Check'),
+        'title': lw('Memorizer'),
         'body': lw('Checking for today\'s events'),
       });
 
       myPrint('Scheduled daily reminder check at $validatedTime');
 
-      // Do an immediate check, but with removal first
-      await removeExpiredItems(); // New method to handle removals first
-      await checkTodayEvents(); // Then check today's events
+      // Do an immediate check after scheduling
+      await removeExpiredItems();
+      await checkTodayEvents();
     } catch (e) {
       myPrint('Failed to schedule reminder: $e');
     }
   }
 
-  // Validate time format (HH:MM)
+// Метод для проверки формата времени
   static bool _isValidTimeFormat(String time) {
     try {
       final parts = time.split(':');
@@ -99,6 +108,7 @@ class SimpleNotifications {
       return false;
     }
   }
+
 
   // New method to handle removal of expired items
   static Future<void> removeExpiredItems() async {
