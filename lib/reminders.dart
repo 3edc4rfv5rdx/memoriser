@@ -57,9 +57,9 @@ class SimpleNotifications {
       // Проверьте эту строку:
       final remindTime = await getSetting("Notification time") ?? notifTime;
 
-      // Добавьте синхронизацию с ключом "Remind time" чтобы оба ключа имели одинаковое значение
+      // Добавьте синхронизацию с ключом "Notification time" чтобы оба ключа имели одинаковое значение
       // Эта строка должна быть добавлена:
-      await saveSetting("Remind time", remindTime);
+      await saveSetting("Notification time", remindTime);
 
       myPrint('Scheduling daily reminder check at $remindTime');
 
@@ -71,7 +71,7 @@ class SimpleNotifications {
 
         // Сохраняем правильное значение в обоих ключах
         await saveSetting("Notification time", validatedTime);
-        await saveSetting("Remind time", validatedTime);
+        await saveSetting("Notification time", validatedTime);
       }
 
       await platform.invokeMethod('scheduleDaily', {

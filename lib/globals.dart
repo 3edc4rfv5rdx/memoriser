@@ -34,7 +34,7 @@ late Directory? memorizerDirectory;
 late Directory? photoDirectory;
 late Directory? backupDirectory;
 
-bool xvDebug = true;
+bool xvDebug = false;
 String xvTagFilter = '';
 String xvFilter = '';
 bool xvHiddenMode = false;
