@@ -75,7 +75,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     final lastItems = int.tryParse(lastItemsValue) ?? 0;
 
     // Load remind time setting
-    final remindTimeValue = await getSetting("Remind time") ?? notifTime;
+    final remindTimeValue = await getSetting("Notification time") ?? notifTime;
 
     // Load enable reminders setting
     final enableRemindersValue =
@@ -160,7 +160,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
     // Save remind time setting if changed
     if (_newRemindTime != _remindTime && _newRemindTime != null) {
-      await saveSetting("Remind time", _newRemindTime.toString());
+      await saveSetting("Notification time", _newRemindTime.toString());
       savedSettings.add('remind time');
       reminderSettingsChanged = true;
     }
@@ -416,10 +416,10 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
               SizedBox(height: 10),
 
-              // Remind time row (only show if reminders enabled)
+              // Notification time row (only show if reminders enabled)
               if (_newEnableReminders == true)
                 _buildSettingsRow(
-                  label: lw('Remind time'),
+                  label: lw('Notification time'),
                   child: _buildRemindTimeField(),
                   helpId:
                   104, // Keep existing ID 104 for remind time setting
@@ -597,7 +597,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     );
   }
 
-  // Function for Remind time input field and clock button outside
+  // Function for Notification time input field and clock button outside
   Widget _buildRemindTimeField() {
     return Row(
       children: [

@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ContentValues // Добавлен импорт ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -302,6 +303,39 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             putBoolean(PREF_REMINDER_ENABLED, isEnabled)
             apply()
         }
+
+        // Также пробуем записать время в SQLite для отладки
+        try {
+            val dbPath = context.getDatabasePath("settings.db")
+            if (dbPath.exists()) {
+                val db = SQLiteDatabase.openDatabase(
+                    dbPath.absolutePath,
+                    null,
+                    SQLiteDatabase.OPEN_READWRITE
+                )
+
+                // Проверяем существует ли запись
+                val cursor = db.rawQuery(
+                    "SELECT value FROM settings WHERE key = ?",
+                    arrayOf("Notification time")
+                )
+
+                if (cursor.moveToFirst()) {
+                    // Запись существует, обновляем значение через SQL запрос
+                    db.execSQL(
+                        "UPDATE settings SET value = ? WHERE key = ?",
+                        arrayOf(time, "Notification time")
+                    )
+                    Log.d("MemorizerApp", "Updated SQLite record for Notification time: $time")
+                }
+
+                cursor.close()
+                db.close()
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error updating SQLite database: ${e.message}")
+        }
+
         Log.d("MemorizerApp", "Saved reminder settings: time=$time, enabled=$isEnabled")
     }
 
@@ -359,16 +393,61 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
     private fun scheduleDaily(timeString: String, title: String, body: String) {
         try {
+            Log.d("MemorizerApp", "scheduleDaily called with timeString: '$timeString'")
+
+            // Изначально используем переданное время
+            var timeToUse = timeString
+
+            // Если переданное время пустое или некорректное, ищем в базе данных
+            if (timeToUse.isBlank() || !isValidTimeFormat(timeToUse)) {
+                // Ищем только в SQLite базе данных с правильным ключом "Notification time"
+                try {
+                    val dbPath = context.getDatabasePath("settings.db")
+                    if (dbPath.exists()) {
+                        val db = SQLiteDatabase.openDatabase(
+                            dbPath.absolutePath,
+                            null,
+                            SQLiteDatabase.OPEN_READONLY
+                        )
+
+                        // Запрашиваем значение с ключом "Notification time"
+                        val cursor = db.rawQuery(
+                            "SELECT value FROM settings WHERE key = ?",
+                            arrayOf("Notification time")
+                        )
+
+                        if (cursor.moveToFirst()) {
+                            val sqliteValue = cursor.getString(0)
+                            if (!sqliteValue.isNullOrEmpty() && isValidTimeFormat(sqliteValue)) {
+                                timeToUse = sqliteValue
+                                Log.d("MemorizerApp", "Found valid time in SQLite: '$timeToUse'")
+                            }
+                        }
+
+                        cursor.close()
+                        db.close()
+                    }
+                } catch (e: Exception) {
+                    Log.e("MemorizerApp", "Error reading from SQLite database: ${e.message}")
+                }
+            }
+
+            // Если все равно не нашли валидное время, используем значение по умолчанию
+            if (timeToUse.isBlank() || !isValidTimeFormat(timeToUse)) {
+                timeToUse = MainActivity.DEFAULT_NOTIFICATION_TIME
+                Log.d("MemorizerApp", "Using default time: '$timeToUse'")
+            }
+
             // Parse time string (format: HH:MM)
-            val parts = timeString.split(":")
-            val hour = parts[0].toIntOrNull() ?: 8  // Default to 8 if parsing fails
+            val parts = timeToUse.split(":")
+            val hour = parts[0].toIntOrNull() ?: 8
             val minute = parts[1].toIntOrNull() ?: 0
 
             Log.d("MemorizerApp", "Scheduling daily notification at: $hour:$minute")
 
-            // Create intent for the alarm with explicit action
+            // Create intent for the alarm
             val intent = Intent(context, NotificationReceiver::class.java).apply {
-                action = "com.example.memorizer.CHECK_REMINDERS"  // Явный action
+                action = "com.example.memorizer.CHECK_REMINDERS"
                 putExtra("title", title)
                 putExtra("body", body)
             }
@@ -396,11 +475,13 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
             Log.d("MemorizerApp", "Alarm scheduled for: ${calendar.time}")
 
-            // Сначала отменяем предыдущие будильники с этим pendingIntent
+            // Сохраняем настройки (включая использованное время)
+            saveReminderSettings(timeToUse, title, body, true)
+
+            // Сначала отменяем предыдущие будильники
             alarmManager.cancel(pendingIntent)
 
-            // Устанавливаем ПОВТОРЯЮЩИЙСЯ будильник
-            // Это самый простой и надежный способ
+            // Устанавливаем повторяющийся будильник
             alarmManager.setRepeating(
                 AlarmManager.RTC_WAKEUP,
                 calendar.timeInMillis,
@@ -408,9 +489,9 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 pendingIntent
             )
 
-            Log.d("MemorizerApp", "Daily repeating alarm set successfully")
+            Log.d("MemorizerApp", "Daily alarm set successfully")
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error scheduling daily alarm: ${e.message}")
+            Log.e("MemorizerApp", "Error in scheduleDaily: ${e.message}")
             e.printStackTrace()
         }
     }
