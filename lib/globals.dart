@@ -16,7 +16,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 const String progVersion = '0.8.250512';
-const int buildNumber = 31;
+const int buildNumber = 32;
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -42,7 +42,7 @@ bool xvHiddenMode = false;
 String currentPin = '';
 // Константа для ключа в настройках
 const String hiddPinKey = 'hiddpin';
-const String notifTime = "08:00";
+const String notifTime = "08:15";
 const hidModeColor = Color(0xFFf29238);
 
 // Font setups
