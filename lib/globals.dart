@@ -15,8 +15,8 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-const String progVersion = '0.8.250512';
-const int buildNumber = 32;
+const String progVersion = '0.8.250513';
+const int buildNumber = 33;
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -34,7 +34,7 @@ late Directory? memorizerDirectory;
 late Directory? photoDirectory;
 late Directory? backupDirectory;
 
-bool xvDebug = false;
+bool xvDebug = true;
 String xvTagFilter = '';
 String xvFilter = '';
 bool xvHiddenMode = false;
