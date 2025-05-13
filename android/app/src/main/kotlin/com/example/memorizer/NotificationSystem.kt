@@ -821,7 +821,7 @@ class BootReceiver : BroadcastReceiver() {
                     val notificationService = NotificationService(context)
                     notificationService.restoreNotificationSchedule()
                     Log.d("MemorizerApp", "Reminders rescheduled after device reboot")
-                }, 5000) // Задержка 5 секунд
+                }, 15000) // Задержка 15 секунд
             } catch (e: Exception) {
                 Log.e("MemorizerApp", "Error rescheduling after boot: ${e.message}")
             }
