@@ -108,6 +108,9 @@ Future<String> getFilterStatusText() async {
   }
 }
 
+// Оптимизированная функция getItems() с использованием SQL для сортировки и LIMIT
+// Исправленная функция getItems() с корректным SQL-синтаксисом
+
 Future<List<Map<String, dynamic>>> getItems() async {
   try {
     // Get sort order from settings
@@ -119,12 +122,11 @@ Future<List<Map<String, dynamic>>> getItems() async {
     final lastItems = int.tryParse(lastItemsStr) ?? 0;
     myPrint('Last items setting: $lastItems');
 
-    // Determine sort order based on setting
-    final sortOrder = newestFirst == "true" ? "DESC" : "ASC";
-    String orderByClause = 'priority DESC, created ${sortOrder}';
-    myPrint('Order by clause: $orderByClause');
+    // Определяем сегодняшнюю дату в формате YYYYMMDD
+    final todayDate = dateTimeToYYYYMMDD(DateTime.now());
+    myPrint('Today date: $todayDate');
 
-    // Начальные значения для WHERE и параметров
+    // Начальные значения для WHERE
     List<String> whereConditions = [];
     List<dynamic> whereArgs = [];
 
@@ -200,7 +202,6 @@ Future<List<Map<String, dynamic>>> getItems() async {
             }
             break;
 
-        // Add processing for priority filter
           case 'priority':
             if (value.isNotEmpty) {
               try {
@@ -213,7 +214,6 @@ Future<List<Map<String, dynamic>>> getItems() async {
             }
             break;
 
-        // Add processing for reminder filter
           case 'hasReminder':
             if (value.isNotEmpty) {
               final hasReminder = value.toLowerCase() == 'true' ? 1 : 0;
@@ -222,7 +222,6 @@ Future<List<Map<String, dynamic>>> getItems() async {
             }
             break;
 
-        // Add processing for tags filter in the main filter
           case 'tags':
             if (value.isNotEmpty) {
               // Split by comma to handle multiple tags in filter
@@ -253,65 +252,51 @@ Future<List<Map<String, dynamic>>> getItems() async {
       }
     }
 
-    // Собираем окончательный WHERE и параметры
-    String whereClause = whereConditions.join(' AND ');
-    myPrint('WHERE clause: $whereClause');
-    myPrint('WHERE args: $whereArgs');
+    // Собираем окончательный WHERE
+    String whereClause = whereConditions.isEmpty ? "" : "WHERE " + whereConditions.join(' AND ');
 
-    // Выполняем запрос с учетом фильтров
-    List<Map<String, dynamic>> result = await mainDb.query(
-      'items',
-      where: whereClause,
-      whereArgs: whereArgs,
-      orderBy: orderByClause,
-    );
+    // Определяем множитель направления сортировки (-1 для DESC, 1 для ASC)
+    // SQLite не позволяет использовать DESC/ASC в выражениях CASE,
+    // поэтому используем множитель для изменения направления сортировки
+    final dateFactor = newestFirst == "true" ? "-1" : "1";
+    final createdFactor = newestFirst == "true" ? "-1" : "1";
 
-    // Применяем ограничение на количество записей из настройки "Last items"
-    if (lastItems > 0 && result.length > lastItems) {
-      myPrint('Limiting results to last $lastItems items');
-      result = result.sublist(0, lastItems);
+    // Формируем ORDER BY как строку с правильным синтаксисом SQLite
+    // Вместо использования DESC/ASC в выражениях, умножаем значения на -1 для обратной сортировки
+    String orderByClause =
+        "CASE WHEN date = $todayDate THEN 1 WHEN date IS NOT NULL AND date > 0 THEN 2 ELSE 3 END ASC, " +
+            "priority DESC, " +
+            "CASE WHEN date = $todayDate THEN 0 WHEN date IS NOT NULL AND date > 0 THEN ${dateFactor} * date ELSE 0 END, " +
+            "CASE WHEN date IS NULL OR date = 0 THEN ${createdFactor} * created ELSE 0 END";
+
+    // Формируем полный SQL-запрос
+    String sqlQuery = "SELECT * FROM items $whereClause ORDER BY $orderByClause";
+
+    // Добавляем LIMIT, если нужно
+    if (lastItems > 0) {
+      sqlQuery += " LIMIT $lastItems";
     }
+
+    // Выполняем запрос
+    List<Map<String, dynamic>> result = await mainDb.rawQuery(sqlQuery, whereArgs);
 
     // Обработка обфускированных записей, если мы в режиме скрытых записей
     if (xvHiddenMode) {
       result = result.map((item) => processItemForView(item)).toList();
     }
 
-    // Получаем сегодняшнюю дату в формате YYYYMMDD
-    final todayDate = dateTimeToYYYYMMDD(DateTime.now());
-    myPrint('Today date: $todayDate');
-
-    // Создаем новый список с событиями на сегодня в начале
-    List<Map<String, dynamic>> sortedResult = [];
-
-    // Сначала добавляем события на сегодня
-    for (var item in List<Map<String, dynamic>>.from(result)) {
-      if (item['date'] == todayDate) {
-        sortedResult.add(Map<String, dynamic>.from(item)); // Копируем элемент
-      }
+    myPrint('Retrieved items count: ${result.length}');
+    myPrint('Today items count: ${result.where((item) => item['date'] == todayDate).length}');
+    if (result.isNotEmpty) {
+      myPrint('First item: ${result.first}');
     }
 
-    // Затем добавляем все остальные события
-    for (var item in List<Map<String, dynamic>>.from(result)) {
-      if (item['date'] != todayDate) {
-        sortedResult.add(Map<String, dynamic>.from(item)); // Копируем элемент
-      }
-    }
-
-    myPrint('Retrieved items count: ${sortedResult.length}');
-    myPrint('Today items count: ${sortedResult.where((item) => item['date'] == todayDate).length}');
-    if (sortedResult.isNotEmpty) {
-      myPrint('First item: ${sortedResult.first}');
-    }
-
-    return sortedResult;
+    return result;
   } catch (e) {
     myPrint('Error loading items: $e');
     return []; // Return empty list instead of throwing error
   }
 }
-
-
 
 Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
   final today = DateTime.now();
