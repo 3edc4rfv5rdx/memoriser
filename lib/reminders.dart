@@ -39,8 +39,6 @@ class SimpleNotifications {
     }
   }
 
-// Важно проверить этот фрагмент в reminders.dart
-
 // Schedule a daily reminder check
   static Future<void> scheduleReminderCheck() async {
     // Check if reminders are enabled
@@ -54,14 +52,8 @@ class SimpleNotifications {
     }
 
     try {
-      // Проверьте эту строку:
+      // Получаем текущее значение времени напоминания
       final remindTime = await getSetting("Notification time") ?? notifTime;
-
-      // Добавьте синхронизацию с ключом "Notification time" чтобы оба ключа имели одинаковое значение
-      // Эта строка должна быть добавлена:
-      await saveSetting("Notification time", remindTime);
-
-      myPrint('Scheduling daily reminder check at $remindTime');
 
       // Проверяем формат времени и корректируем при необходимости
       String validatedTime = remindTime;
@@ -69,8 +61,7 @@ class SimpleNotifications {
         validatedTime = notifTime; // Используем значение по умолчанию
         myPrint('Invalid time format: $remindTime, using default: $validatedTime');
 
-        // Сохраняем правильное значение в обоих ключах
-        await saveSetting("Notification time", validatedTime);
+        // Сохраняем исправленное значение (только если нужна коррекция)
         await saveSetting("Notification time", validatedTime);
       }
 
@@ -81,10 +72,6 @@ class SimpleNotifications {
       });
 
       myPrint('Scheduled daily reminder check at $validatedTime');
-
-      // Do an immediate check after scheduling
-      await removeExpiredItems();
-      await checkTodayEvents();
     } catch (e) {
       myPrint('Failed to schedule reminder: $e');
     }
