@@ -25,6 +25,15 @@ class _EditItemPageState extends State<EditItemPage> {
 
   final ImagePicker _picker = ImagePicker();
 
+  late TextEditingController timeController;
+  int? _time; // Значение времени в формате HHMM
+  int? _selectedTimeOption; // 0 - утро, 1 - день, 2 - вечер, null - не выбрано
+
+// Константы для опций времени
+  static const int TIME_MORNING = 800;  // 08:00
+  static const int TIME_DAY = 1230;     // 12:30
+  static const int TIME_EVENING = 1700; // 17:00
+
   DateTime? _date;
   int _priority = 0; // Default priority value
   bool _remind = false; // Default remind value
@@ -44,6 +53,7 @@ class _EditItemPageState extends State<EditItemPage> {
     tagsController = TextEditingController();
     dateController = TextEditingController();
     photoController = TextEditingController();
+    timeController = TextEditingController();
 
     // Если передан ID, значит это режим редактирования
     if (widget.itemId != null) {
@@ -72,6 +82,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
   @override
   void dispose() {
+    timeController.dispose();
     titleController.dispose();
     contentController.dispose();
     tagsController.dispose();
