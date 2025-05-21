@@ -91,14 +91,14 @@ class _EditItemPageState extends State<EditItemPage> {
     super.dispose();
   }
 
-  // Method to load an item by ID
+// Метод для загрузки элемента по ID в _EditItemPageState
   Future<void> _loadItem(int itemId) async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Get the record from the database
+      // Получаем запись из базы данных
       final List<Map<String, dynamic>> result = await mainDb.query(
         'items',
         where: 'id = ?',
@@ -108,7 +108,7 @@ class _EditItemPageState extends State<EditItemPage> {
       if (result.isNotEmpty) {
         final item = result.first;
 
-        // If the record is hidden and we're in hidden mode, decode the data
+        // Если запись скрыта и мы в скрытом режиме, декодируем данные
         if (item['hidden'] == 1 && xvHiddenMode) {
           final decodedTitle = deobfuscateText(item['title'] ?? '');
           final decodedContent = deobfuscateText(item['content'] ?? '');
@@ -118,32 +118,52 @@ class _EditItemPageState extends State<EditItemPage> {
           contentController.text = decodedContent;
           tagsController.text = decodedTags;
         } else {
-          // Regular records are used as is
+          // Обычные записи используются как есть
           titleController.text = item['title'] ?? '';
           contentController.text = item['content'] ?? '';
           tagsController.text = item['tags'] ?? '';
         }
 
-        // Initialize the other fields
+        // Инициализируем другие поля
         _priority = item['priority'] ?? 0;
         _remind = item['remind'] == 1;
         _hidden = item['hidden'] == 1;
         _removeAfterReminder = item['remove'] == 1;
         photoController.text = item['photo'] ?? '';
 
-        // Initialize the date if it exists
-        if (item['date'] != null) {
-          _date = yyyymmddToDateTime(item['date']);
-          // Only set the date controller text if _date is not null
-          if (_date != null) {
-            // Use the null assertion operator (!) to tell Dart that _date is not null here
-            dateController.text = DateFormat(ymdDateFormat).format(_date!);
-          } else {
-            dateController.text = ""; // Clear the date controller if date is invalid
-            myPrint('Warning: Could not parse date value: ${item['date']}');
+        // Загружаем время, если оно задано
+        _time = item['time'] as int?;
+        if (_time != null) {
+          // Преобразуем числовое значение в строку формата HH:MM
+          String? timeStr = timeIntToString(_time);
+          if (timeStr != null) {
+            timeController.text = timeStr;
+
+            // Проверяем, соответствует ли время одной из предустановленных опций
+            if (_time == TIME_MORNING) {
+              _selectedTimeOption = 0;
+            } else if (_time == TIME_DAY) {
+              _selectedTimeOption = 1;
+            } else if (_time == TIME_EVENING) {
+              _selectedTimeOption = 2;
+            } else {
+              _selectedTimeOption = null;
+            }
           }
         }
 
+        // Инициализируем дату, если она существует
+        if (item['date'] != null) {
+          _date = yyyymmddToDateTime(item['date']);
+          // Устанавливаем текст контроллера даты только если _date не null
+          if (_date != null) {
+            // Используем оператор принудительного разворачивания (!), так как мы проверили, что _date не null
+            dateController.text = DateFormat(ymdDateFormat).format(_date!);
+          } else {
+            dateController.text = ""; // Очищаем контроллер даты, если дата некорректна
+            myPrint('Warning: Could not parse date value: ${item['date']}');
+          }
+        }
       }
     } catch (e) {
       myPrint('Error loading item: $e');
@@ -155,7 +175,7 @@ class _EditItemPageState extends State<EditItemPage> {
     }
   }
 
-  // Save function that directly interacts with the database
+// Функция сохранения, которая напрямую взаимодействует с базой данных
   Future<void> _saveItem() async {
     if (titleController.text.trim().isEmpty) {
       okInfoBarRed(lw('Title cannot be empty'), duration: Duration(seconds: 4));
@@ -163,7 +183,7 @@ class _EditItemPageState extends State<EditItemPage> {
     }
 
     if (_remind) {
-      // Check if date is set
+      // Проверяем, задана ли дата
       if (_date == null) {
         okInfoBarRed(
           lw('Set a date for the reminder'),
@@ -172,7 +192,7 @@ class _EditItemPageState extends State<EditItemPage> {
         return;
       }
 
-      // Validate the reminder date is not in the past
+      // Проверяем, что дата напоминания не в прошлом
       final today = DateTime(
         DateTime.now().year,
         DateTime.now().month,
@@ -188,20 +208,23 @@ class _EditItemPageState extends State<EditItemPage> {
       }
     }
 
-    // Convert date to YYYYMMDD format for storage
+    // Конвертируем дату в формат YYYYMMDD для хранения
     final dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
     final remindValue = _remind ? 1 : 0;
     final hiddenValue = _hidden ? 1 : 0;
     final removeValue = _removeAfterReminder ? 1 : 0;
 
-    // Prepare data for saving
+    // Получаем значение времени (может быть null)
+    final timeValue = _time;
+
+    // Подготовка данных для сохранения
     String titleText = titleController.text.trim();
     String contentText = contentController.text.trim();
     String tagsText = tagsController.text.trim();
     String? photoPath = photoController.text.trim();
     photoPath = photoPath.isEmpty ? null : photoPath;
 
-// Obfuscate data if the record is hidden and we're in hidden mode
+    // Обфускация данных, если запись скрыта и мы в скрытом режиме
     if (hiddenValue == 1 && xvHiddenMode) {
       titleText = obfuscateText(titleText);
       contentText = obfuscateText(contentText);
@@ -210,7 +233,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
     try {
       if (widget.itemId != null) {
-        // Update existing item
+        // Обновляем существующую запись
         await mainDb.update(
           'items',
           {
@@ -219,6 +242,7 @@ class _EditItemPageState extends State<EditItemPage> {
             'tags': tagsText.isEmpty ? null : tagsText,
             'priority': _priority,
             'date': dateValue,
+            'time': timeValue,  // Добавляем поле времени
             'remind': remindValue,
             'hidden': hiddenValue,
             'remove': removeValue,
@@ -227,27 +251,28 @@ class _EditItemPageState extends State<EditItemPage> {
           where: 'id = ?',
           whereArgs: [widget.itemId],
         );
-        myPrint("Item updated: ${widget.itemId} - $titleText");
+        myPrint("Item updated: ${widget.itemId} - $titleText - Time: $timeValue");
       } else {
-        // Insert new item
+        // Вставляем новую запись
         await mainDb.insert('items', {
           'title': titleText,
           'content': contentText.isEmpty ? null : contentText,
           'tags': tagsText.isEmpty ? null : tagsText,
           'priority': _priority,
           'date': dateValue,
+          'time': timeValue,  // Добавляем поле времени
           'remind': remindValue,
           'hidden': hiddenValue,
           'remove': removeValue,
           'photo': photoPath,
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
-        myPrint("Item inserted: $titleText");
+        myPrint("Item inserted: $titleText - Time: $timeValue");
       }
 
       Navigator.pop(context, true);
     } catch (e) {
-      // Show error message if database operation fails
+      // Показываем сообщение об ошибке, если операция с базой данных завершается неудачно
       okInfoBarPurple(lw('Error saving item') + ': $e');
       myPrint("Error saving item: $e");
     }
@@ -418,58 +443,60 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  // Build reminder and remove checkboxes in a single row
+// Обновленный строитель чек-бокса напоминания с обнулением времени
   Widget _buildReminderSelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(35),
-      // ID 35 для чекбокса и текста напоминания
+      onLongPress: () => showHelp(35), // ID 35 для чекбокса напоминания
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        // This spreads the elements
         children: [
-          // Left side - Reminder checkbox
-          Row(
-            children: [
-              Checkbox(
-                value: _remind,
-                activeColor: clUpBar,
-                checkColor: clText,
-                onChanged: (value) {
-                  setState(() {
-                    _remind = value ?? false;
+          Checkbox(
+            value: _remind,
+            activeColor: clUpBar,
+            checkColor: clText,
+            onChanged: (value) {
+              setState(() {
+                _remind = value ?? false;
 
-                    // If turning on reminder, validate the date
-                    if (_remind) {
-                      _validateReminderDate();
-                    }
-                  });
-                },
-              ),
-              Text(
-                lw('Set reminder'),
-                style: TextStyle(color: clText, fontSize: fsMedium),
-              ),
-            ],
+                // Если включаем напоминание, проверяем дату
+                if (_remind) {
+                  _validateReminderDate();
+                } else {
+                  // Если отключаем напоминание, сбрасываем поле времени и радио-кнопки
+                  timeController.clear();
+                  _time = null;
+                  _selectedTimeOption = null;
+                }
+              });
+            },
           ),
+          Text(
+            lw('Set reminder'),
+            style: TextStyle(color: clText, fontSize: fsMedium),
+          ),
+        ],
+      ),
+    );
+  }
 
-          // Right side - Remove checkbox
-          Row(
-            children: [
-              Text(
-                lw('Remove'),
-                style: TextStyle(color: clText, fontSize: fsMedium),
-              ),
-              Checkbox(
-                value: _removeAfterReminder,
-                activeColor: clRed,
-                checkColor: clText,
-                onChanged: (value) {
-                  setState(() {
-                    _removeAfterReminder = value ?? false;
-                  });
-                },
-              ),
-            ],
+// Новый метод для чек-бокса Remove (внизу формы)
+  Widget _buildRemoveAfterReminderSelector() {
+    return GestureDetector(
+      onLongPress: () => showHelp(42), // ID 42 для чекбокса Remove
+      child: Row(
+        children: [
+          Checkbox(
+            value: _removeAfterReminder,
+            activeColor: clRed,
+            checkColor: clText,
+            onChanged: (value) {
+              setState(() {
+                _removeAfterReminder = value ?? false;
+              });
+            },
+          ),
+          Text(
+            lw('Remove after reminder'),
+            style: TextStyle(color: clText, fontSize: fsMedium),
           ),
         ],
       ),
@@ -599,6 +626,219 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
+  // Виджет для выбора времени с полем ввода и кнопками
+  Widget _buildTimeField() {
+    return GestureDetector(
+      onLongPress: () => showHelp(39), // ID 39 для поля времени
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: timeController,
+              style: TextStyle(color: clText),
+              readOnly: false, // Разрешаем ручной ввод
+              enabled: _remind, // Активно только если включено напоминание
+              onChanged: (value) {
+                if (value.isEmpty) {
+                  setState(() {
+                    _time = null;
+                    _selectedTimeOption = null; // Сбрасываем выбор радио-кнопок
+                  });
+                } else if (isValidTimeFormat(value)) {
+                  // Если ввод корректен, обновляем _time
+                  setState(() {
+                    _time = timeStringToInt(value);
+
+                    // Проверяем, соответствует ли введенное время одному из предустановленных вариантов
+                    if (_time == TIME_MORNING) {
+                      _selectedTimeOption = 0;
+                    } else if (_time == TIME_DAY) {
+                      _selectedTimeOption = 1;
+                    } else if (_time == TIME_EVENING) {
+                      _selectedTimeOption = 2;
+                    } else {
+                      _selectedTimeOption = null;
+                    }
+                  });
+                }
+              },
+              decoration: InputDecoration(
+                labelText: lw('Time (HH:MM)'),
+                labelStyle: TextStyle(color: _remind ? clText : clText.withOpacity(0.5)),
+                fillColor: clFill,
+                filled: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.access_time, color: _remind ? clText : clText.withOpacity(0.5)),
+            onPressed: _remind ? () => _selectTime(context) : null,
+          ),
+          IconButton(
+            icon: Icon(Icons.clear, color: _remind ? clText : clText.withOpacity(0.5)),
+            onPressed: _remind ? () {
+              setState(() {
+                timeController.clear();
+                _time = null;
+                _selectedTimeOption = null; // Сбрасываем выбор радио-кнопок
+              });
+            } : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+// Виджет для выбора предустановленных вариантов времени (радио-кнопки)
+  Widget _buildTimeOptions() {
+    return GestureDetector(
+      onLongPress: () => showHelp(41), // ID 41 для радио-кнопок времени
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Утро
+          Row(
+            children: [
+              Radio<int>(
+                value: 0,
+                groupValue: _selectedTimeOption,
+                onChanged: _remind ? (int? value) {
+                  setState(() {
+                    _selectedTimeOption = value;
+                    _time = TIME_MORNING; // 08:00
+                    timeController.text = '08:00';
+                  });
+                } : null,
+              ),
+              Text(
+                lw('Morning'),
+                style: TextStyle(
+                  color: _remind ? clText : clText.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+          // День
+          Row(
+            children: [
+              Radio<int>(
+                value: 1,
+                groupValue: _selectedTimeOption,
+                onChanged: _remind ? (int? value) {
+                  setState(() {
+                    _selectedTimeOption = value;
+                    _time = TIME_DAY; // 12:30
+                    timeController.text = '12:30';
+                  });
+                } : null,
+              ),
+              Text(
+                lw('Day'),
+                style: TextStyle(
+                  color: _remind ? clText : clText.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+          // Вечер
+          Row(
+            children: [
+              Radio<int>(
+                value: 2,
+                groupValue: _selectedTimeOption,
+                onChanged: _remind ? (int? value) {
+                  setState(() {
+                    _selectedTimeOption = value;
+                    _time = TIME_EVENING; // 17:00
+                    timeController.text = '17:00';
+                  });
+                } : null,
+              ),
+              Text(
+                lw('Evening'),
+                style: TextStyle(
+                  color: _remind ? clText : clText.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+// Метод для отображения выбора времени
+  Future<void> _selectTime(BuildContext context) async {
+    // Парсим текущее время или используем время по умолчанию
+    TimeOfDay initialTime;
+    if (_time != null) {
+      final hours = _time! ~/ 100;
+      final minutes = _time! % 100;
+      initialTime = TimeOfDay(hour: hours, minute: minutes);
+    } else {
+      initialTime = TimeOfDay.now(); // Используем текущее время
+    }
+
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: clUpBar,
+              onPrimary: clText,
+              onSurface: clText,
+            ),
+            dialogTheme: DialogTheme(backgroundColor: clFill),
+            timePickerTheme: TimePickerThemeData(
+              backgroundColor: clFill,
+              hourMinuteTextColor: clText,
+              dayPeriodTextColor: clText,
+              dialHandColor: clUpBar,
+              dialBackgroundColor: clFill.withOpacity(0.8),
+              dialTextColor: clText,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        // Преобразуем выбранное время в числовой формат HHMM
+        _time = picked.hour * 100 + picked.minute;
+
+        // Обновляем текст в поле ввода
+        timeController.text = timeIntToString(_time) ?? '';
+
+        // Проверяем, соответствует ли выбранное время одному из предустановленных вариантов
+        if (_time == TIME_MORNING) {
+          _selectedTimeOption = 0;
+        } else if (_time == TIME_DAY) {
+          _selectedTimeOption = 1;
+        } else if (_time == TIME_EVENING) {
+          _selectedTimeOption = 2;
+        } else {
+          _selectedTimeOption = null; // Не соответствует предустановленным вариантам
+        }
+      });
+    }
+  }
+
+
   // Build photo field and camera button
   // Build photo field and camera button
   Widget _buildPhotoField() {
@@ -724,7 +964,7 @@ class _EditItemPageState extends State<EditItemPage> {
     }
   }
 
-  // Модифицируем существующий виджет для поля тегов
+// Модифицируем существующий виджет для поля тегов
   Widget _buildTagsField() {
     return GestureDetector(
       onLongPress: () => showHelp(33), // ID 33 для поля тегов
@@ -747,6 +987,15 @@ class _EditItemPageState extends State<EditItemPage> {
             icon: Icon(Icons.tag, color: clText),
             tooltip: lw('Select from existing tags'),
             onPressed: _showTagsDialog,
+          ),
+          IconButton(
+            icon: Icon(Icons.clear, color: clText),
+            tooltip: lw('Clear tags'),
+            onPressed: () {
+              setState(() {
+                tagsController.clear();
+              });
+            },
           ),
         ],
       ),
@@ -787,75 +1036,88 @@ class _EditItemPageState extends State<EditItemPage> {
         ],
       ),
       body:
-          _isLoading
-              ? Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title field
-                    GestureDetector(
-                      onLongPress:
-                          () => showHelp(31), // ID 31 для поля заголовка
-                      child: TextField(
-                        controller: titleController,
-                        style: TextStyle(color: clText),
-                        decoration: InputDecoration(
-                          labelText: lw('Title'),
-                          labelStyle: TextStyle(color: clText),
-                          fillColor: clFill,
-                          filled: true,
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-
-                    // Content field with reduced height
-                    GestureDetector(
-                      onLongPress:
-                          () => showHelp(32), // ID 32 для поля содержимого
-                      child: TextField(
-                        controller: contentController,
-                        style: TextStyle(color: clText),
-                        decoration: InputDecoration(
-                          labelText: lw('Content'),
-                          labelStyle: TextStyle(color: clText),
-                          fillColor: clFill,
-                          filled: true,
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 3, // Reduced from 5 to 3
-                      ),
-                    ),
-                    SizedBox(height: 10),
-
-                    // Tags field
-                    _buildTagsField(),
-                    SizedBox(height: 10),
-
-                    // Photo field - add a new field for photos
-                    _buildPhotoField(),
-                    SizedBox(height: 10),
-
-                    // Priority section
-                    _buildPrioritySelector(),
-                    SizedBox(height: 10),
-
-                    // Date field
-                    _buildDateField(),
-                    SizedBox(height: 10),
-
-                    // Reminder checkbox
-                    _buildReminderSelector(),
-                    SizedBox(height: 10),
-
-                    // Hidden checkbox (only in hidden mode)
-                    _buildHiddenSelector(),
-                  ],
+      _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title field
+            GestureDetector(
+              onLongPress:
+                  () => showHelp(31), // ID 31 для поля заголовка
+              child: TextField(
+                controller: titleController,
+                style: TextStyle(color: clText),
+                decoration: InputDecoration(
+                  labelText: lw('Title'),
+                  labelStyle: TextStyle(color: clText),
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
                 ),
               ),
+            ),
+            SizedBox(height: 10),
+
+            // Content field with reduced height
+            GestureDetector(
+              onLongPress:
+                  () => showHelp(32), // ID 32 для поля содержимого
+              child: TextField(
+                controller: contentController,
+                style: TextStyle(color: clText),
+                decoration: InputDecoration(
+                  labelText: lw('Content'),
+                  labelStyle: TextStyle(color: clText),
+                  fillColor: clFill,
+                  filled: true,
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3, // Reduced from 5 to 3
+              ),
+            ),
+            SizedBox(height: 10),
+
+            // Tags field
+            _buildTagsField(),
+            SizedBox(height: 10),
+
+            // Photo field - add a new field for photos
+            _buildPhotoField(),
+            SizedBox(height: 10),
+
+            // Priority section
+            _buildPrioritySelector(),
+            SizedBox(height: 10),
+
+            // Date field
+            _buildDateField(),
+            SizedBox(height: 10),
+
+            // Time field
+            _buildTimeField(),
+            SizedBox(height: 10),
+
+            // Time options (radio buttons)
+            _buildTimeOptions(),
+            SizedBox(height: 10),
+
+            // Reminder checkbox
+            _buildReminderSelector(),
+            SizedBox(height: 10),
+
+            // Remove checkbox (moved down)
+            _buildRemoveAfterReminderSelector(),
+            SizedBox(height: 10),
+
+            // Hidden checkbox (only in hidden mode)
+            _buildHiddenSelector(),
+          ],
+        ),
+      ),
     );
   }
+
 }
