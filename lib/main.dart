@@ -22,7 +22,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 5, // Увеличено с 4 до 5 для применения изменений схемы
+    version: 6, // Увеличиваем версию с 5 до 6 для добавления поля time
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -32,6 +32,7 @@ Future<void> initDatabases() async {
           tags TEXT DEFAULT NULL, 
           priority INTEGER DEFAULT 0, 
           date INTEGER DEFAULT NULL, 
+          time INTEGER DEFAULT NULL,
           remind INTEGER DEFAULT 0, 
           created INTEGER DEFAULT 0,
           remove INTEGER DEFAULT 0,
@@ -40,38 +41,42 @@ Future<void> initDatabases() async {
         )
       ''');
     },
-    // onUpgrade: (db, oldVersion, newVersion) async {
-    //   if (oldVersion < 5) {
-    //     // Миграция
-    //     await db.execute('''
-    //       CREATE TABLE IF NOT EXISTS items_new(
-    //         id INTEGER PRIMARY KEY,
-    //         title TEXT DEFAULT NULL,
-    //         content TEXT DEFAULT NULL,
-    //         tags TEXT DEFAULT NULL,
-    //         priority INTEGER DEFAULT 0,
-    //         date INTEGER DEFAULT NULL,
-    //         remind INTEGER DEFAULT 0,
-    //         created INTEGER DEFAULT 0,
-    //         remove INTEGER DEFAULT 0,
-    //         hidden INTEGER DEFAULT 0,
-    //         photo TEXT DEFAULT NULL
-    //       )
-    //     ''');
-    //
-    //     // Перенос данных из старой таблицы
-    //     await db.execute('''
-    //       INSERT INTO items_new
-    //       SELECT id, title, content, tags, priority,
-    //              CASE WHEN date = 0 THEN NULL ELSE date END,
-    //              remind, created, remove, hidden, photo
-    //       FROM items
-    //     ''');
-    //
-    //     await db.execute('DROP TABLE items');
-    //     await db.execute('ALTER TABLE items_new RENAME TO items');
-    //   }
-    // },
+    onUpgrade: (db, oldVersion, newVersion) async {
+      if (oldVersion < 6) {
+        // Миграция с пересозданием таблицы для вставки поля time после date
+        await db.execute('''
+          CREATE TABLE items_new(
+            id INTEGER PRIMARY KEY, 
+            title TEXT DEFAULT NULL, 
+            content TEXT DEFAULT NULL, 
+            tags TEXT DEFAULT NULL, 
+            priority INTEGER DEFAULT 0, 
+            date INTEGER DEFAULT NULL, 
+            time INTEGER DEFAULT NULL,
+            remind INTEGER DEFAULT 0, 
+            created INTEGER DEFAULT 0,
+            remove INTEGER DEFAULT 0,
+            hidden INTEGER DEFAULT 0,
+            photo TEXT DEFAULT NULL
+          )
+        ''');
+
+        // Перенос данных из старой таблицы в новую (time будет NULL)
+        await db.execute('''
+          INSERT INTO items_new(id, title, content, tags, priority, date, 
+                               remind, created, remove, hidden, photo)
+          SELECT id, title, content, tags, priority, date, 
+                 remind, created, remove, hidden, photo
+          FROM items
+        ''');
+
+        // Удаляем старую таблицу и переименовываем новую
+        await db.execute('DROP TABLE items');
+        await db.execute('ALTER TABLE items_new RENAME TO items');
+
+        myPrint("Database upgraded to version 6: Added 'time' field after 'date'");
+      }
+    },
   );
 
   settDb = await openDatabase(
