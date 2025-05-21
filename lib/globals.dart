@@ -912,3 +912,51 @@ Future<bool> deletePhotoFile(String photoPath) async {
   return false;
 }
 
+// Функция для преобразования int HHMM в строку "HH:MM"
+String? timeIntToString(int? timeInt) {
+  if (timeInt == null) return null;
+
+  // Проверка корректности формата
+  if (timeInt < 0 || timeInt > 2359) return null;
+
+  // Разделяем на часы и минуты
+  final hours = timeInt ~/ 100;
+  final minutes = timeInt % 100;
+
+  // Проверка правильности времени
+  if (hours > 23 || minutes > 59) return null;
+
+  // Форматируем с ведущими нулями
+  return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+}
+
+// Функция для преобразования строки "HH:MM" в int HHMM
+int? timeStringToInt(String? timeString) {
+  if (timeString == null || timeString.isEmpty) return null;
+
+  // Разбиваем строку на части
+  final parts = timeString.split(':');
+  if (parts.length != 2) return null;
+
+  // Пытаемся преобразовать части в числа
+  final hours = int.tryParse(parts[0]);
+  final minutes = int.tryParse(parts[1]);
+
+  // Проверяем корректность значений
+  if (hours == null || minutes == null) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  // Возвращаем в формате HHMM
+  return hours * 100 + minutes;
+}
+
+// Функция для проверки времени на корректность
+bool isValidTimeFormat(String? timeString) {
+  if (timeString == null || timeString.isEmpty) return true; // Пустое значение допустимо
+
+  // Проверяем формат HH:MM
+  final RegExp timeRegex = RegExp(r'^([01]?[0-9]|2[0-3]):([0-5][0-9])$');
+  if (!timeRegex.hasMatch(timeString)) return false;
+
+  return true;
+}
