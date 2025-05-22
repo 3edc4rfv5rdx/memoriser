@@ -380,4 +380,95 @@ class SimpleNotifications {
       okInfoBarOrange(lw('Reminders are disabled in settings'));
     }
   }
+
+  // Schedule a specific reminder for individual item
+  static Future<void> scheduleSpecificReminder(int itemId, DateTime date, int? time) async {
+    try {
+      // Check if reminders are enabled
+      final enableReminders = await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
+      if (enableReminders != "true") {
+        myPrint('Reminders are disabled, not scheduling specific reminder');
+        return;
+      }
+
+      // Determine notification time
+      String notificationTime;
+      if (time != null) {
+        // Use specific time from item
+        final timeString = timeIntToString(time);
+        if (timeString != null) {
+          notificationTime = timeString;
+        } else {
+          // Fallback to default time if conversion fails
+          notificationTime = await getSetting("Notification time") ?? notifTime;
+        }
+      } else {
+        // Use default notification time
+        notificationTime = await getSetting("Notification time") ?? notifTime;
+      }
+
+      // Parse notification time
+      final timeParts = notificationTime.split(':');
+      final hour = int.tryParse(timeParts[0]) ?? 8;
+      final minute = int.tryParse(timeParts[1]) ?? 0;
+
+      // Create notification date/time
+      final notificationDateTime = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        hour,
+        minute,
+      );
+
+      // Only schedule if notification time is in the future
+      if (notificationDateTime.isAfter(DateTime.now())) {
+        await platform.invokeMethod('scheduleSpecificReminder', {
+          'itemId': itemId,
+          'year': date.year,
+          'month': date.month,
+          'day': date.day,
+          'hour': hour,
+          'minute': minute,
+          'title': lw('Memorizer'),
+          'body': lw('You have a scheduled event'),
+        });
+
+        myPrint('Scheduled specific reminder for item $itemId at $notificationDateTime');
+      } else {
+        myPrint('Notification time is in the past, not scheduling for item $itemId');
+      }
+    } catch (e) {
+      myPrint('Failed to schedule specific reminder: $e');
+    }
+  }
+
+// Cancel a specific reminder for individual item
+  static Future<void> cancelSpecificReminder(int itemId) async {
+    try {
+      await platform.invokeMethod('cancelSpecificReminder', {
+        'itemId': itemId,
+      });
+
+      myPrint('Cancelled specific reminder for item $itemId');
+    } catch (e) {
+      myPrint('Failed to cancel specific reminder: $e');
+    }
+  }
+
+// Update or create a specific reminder (used when editing items)
+  static Future<void> updateSpecificReminder(int itemId, bool hasReminder, DateTime? date, int? time) async {
+    try {
+      // First, cancel any existing reminder for this item
+      await cancelSpecificReminder(itemId);
+
+      // If reminder is enabled and date is set, schedule new reminder
+      if (hasReminder && date != null) {
+        await scheduleSpecificReminder(itemId, date, time);
+      }
+    } catch (e) {
+      myPrint('Failed to update specific reminder: $e');
+    }
+  }
 }
+
