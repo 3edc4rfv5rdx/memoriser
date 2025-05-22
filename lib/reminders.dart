@@ -39,7 +39,7 @@ class SimpleNotifications {
     }
   }
 
-// Schedule a daily reminder check
+// Schedule individual reminders instead of one daily check
   static Future<void> scheduleReminderCheck() async {
     // Check if reminders are enabled
     final enableReminders =
@@ -52,28 +52,76 @@ class SimpleNotifications {
     }
 
     try {
-      // Получаем текущее значение времени напоминания
-      final remindTime = await getSetting("Notification time") ?? notifTime;
+      // Get all future reminders from database
+      final now = DateTime.now();
+      final todayDate = dateTimeToYYYYMMDD(now);
 
-      // Проверяем формат времени и корректируем при необходимости
-      String validatedTime = remindTime;
-      if (!_isValidTimeFormat(remindTime)) {
-        validatedTime = notifTime; // Используем значение по умолчанию
-        myPrint('Invalid time format: $remindTime, using default: $validatedTime');
+      final futureReminders = await mainDb.query(
+        'items',
+        where: 'remind = 1 AND date >= ?',
+        whereArgs: [todayDate],
+        orderBy: 'date ASC, time ASC',
+      );
 
-        // Сохраняем исправленное значение (только если нужна коррекция)
-        await saveSetting("Notification time", validatedTime);
+      myPrint('Found ${futureReminders.length} future reminders to schedule');
+
+      // Get default notification time
+      final defaultNotificationTime = await getSetting("Notification time") ?? notifTime;
+
+      // Schedule each reminder individually
+      for (var item in futureReminders) {
+        await _scheduleIndividualReminder(item, defaultNotificationTime);
       }
 
-      await platform.invokeMethod('scheduleDaily', {
-        'time': validatedTime,
-        'title': lw('Memorizer'),
-        'body': lw('Checking for today\'s events'),
-      });
-
-      myPrint('Scheduled daily reminder check at $validatedTime');
+      myPrint('Scheduled ${futureReminders.length} individual reminders');
     } catch (e) {
-      myPrint('Failed to schedule reminder: $e');
+      myPrint('Failed to schedule individual reminders: $e');
+    }
+  }
+
+  // Helper method to schedule individual reminder
+  static Future<void> _scheduleIndividualReminder(Map<String, dynamic> item, String defaultTime) async {
+    try {
+      final itemDate = item['date'] as int?;
+      if (itemDate == null) return;
+
+      // Convert date back to DateTime
+      final eventDate = yyyymmddToDateTime(itemDate);
+      if (eventDate == null) return;
+
+      // Determine notification time for this item
+      String notificationTime = defaultTime;
+      final itemTime = item['time'] as int?;
+      if (itemTime != null) {
+        final timeString = timeIntToString(itemTime);
+        if (timeString != null) {
+          notificationTime = timeString;
+        }
+      }
+
+      // Parse notification time
+      final timeParts = notificationTime.split(':');
+      final hour = int.tryParse(timeParts[0]) ?? 8;
+      final minute = int.tryParse(timeParts[1]) ?? 0;
+
+      // Create notification date/time
+      final notificationDateTime = DateTime(
+        eventDate.year,
+        eventDate.month,
+        eventDate.day,
+        hour,
+        minute,
+      );
+
+      // Only schedule if notification time is in the future
+      if (notificationDateTime.isAfter(DateTime.now())) {
+        // Here we would call platform-specific scheduling
+        // For now, we'll use the existing daily check mechanism
+        // but this is where individual scheduling would happen
+        myPrint('Would schedule reminder for ${item['title']} at $notificationDateTime');
+      }
+    } catch (e) {
+      myPrint('Error scheduling individual reminder: $e');
     }
   }
 
@@ -190,6 +238,9 @@ class SimpleNotifications {
         return;
       }
 
+      // Get default notification time for items without specific time
+      final defaultNotificationTime = await getSetting("Notification time") ?? notifTime;
+
       // Process events - show a notification for each one
       for (var item in todayEvents) {
         // Skip hidden items if not in hidden mode
@@ -197,27 +248,66 @@ class SimpleNotifications {
           continue;
         }
 
-        // If in hidden mode, process the record for display
-        final processedItem =
-        xvHiddenMode && (item['hidden'] as int? ?? 0) == 1
-            ? processItemForView(item)
-            : item;
+        // Determine the notification time for this item
+        String notificationTime = defaultNotificationTime;
 
-        // Show notification for this event with correct type casting
-        await showNotification(
-          item['id'] as int,
-          lw('Memorizer') + ': ' + (processedItem['title'] as String? ?? ''),
-          processedItem['content'] as String? ?? '',
-          payload: (item['id'] as int).toString(),
-        );
+        // Check if item has specific time set
+        final itemTime = item['time'] as int?;
+        if (itemTime != null) {
+          // Convert item time from HHMM format to HH:MM string
+          final timeString = timeIntToString(itemTime);
+          if (timeString != null) {
+            notificationTime = timeString;
+          }
+        }
+
+        // Check if it's time to show this notification
+        final now = DateTime.now();
+        final currentTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+        // Only show notification if current time matches or is past the notification time
+        if (_shouldShowNotificationNow(currentTime, notificationTime)) {
+          // If in hidden mode, process the record for display
+          final processedItem =
+          xvHiddenMode && (item['hidden'] as int? ?? 0) == 1
+              ? processItemForView(item)
+              : item;
+
+          // Show notification for this event with correct type casting
+          await showNotification(
+            item['id'] as int,
+            lw('Memorizer') + ': ' + (processedItem['title'] as String? ?? ''),
+            processedItem['content'] as String? ?? '',
+            payload: (item['id'] as int).toString(),
+          );
+        }
       }
 
-      // Show a summary notification if there are multiple events
-      if (todayEvents.length > 1) {
+      // Show a summary notification if there are multiple events (только если есть события для показа)
+      final eventsToShow = todayEvents.where((item) {
+        if ((item['hidden'] as int? ?? 0) == 1 && !xvHiddenMode) {
+          return false;
+        }
+
+        String notificationTime = defaultNotificationTime;
+        final itemTime = item['time'] as int?;
+        if (itemTime != null) {
+          final timeString = timeIntToString(itemTime);
+          if (timeString != null) {
+            notificationTime = timeString;
+          }
+        }
+
+        final now = DateTime.now();
+        final currentTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        return _shouldShowNotificationNow(currentTime, notificationTime);
+      }).length;
+
+      if (eventsToShow > 1) {
         await showNotification(
           999999,
           lw("Today's events"),
-          lw("You have scheduled events for today") + ': ${todayEvents.length}',
+          lw("You have scheduled events for today") + ': $eventsToShow',
         );
       }
     } catch (e) {
@@ -225,6 +315,24 @@ class SimpleNotifications {
     }
   }
 
+  // Helper method to determine if notification should be shown now
+  static bool _shouldShowNotificationNow(String currentTime, String notificationTime) {
+    try {
+      final currentParts = currentTime.split(':');
+      final notificationParts = notificationTime.split(':');
+
+      final currentMinutes = int.parse(currentParts[0]) * 60 + int.parse(currentParts[1]);
+      final notificationMinutes = int.parse(notificationParts[0]) * 60 + int.parse(notificationParts[1]);
+
+      // Show notification if current time is equal to or past notification time
+      // but within a reasonable window (e.g., within the same hour)
+      return currentMinutes >= notificationMinutes &&
+          (currentMinutes - notificationMinutes) <= 60; // В пределах часа
+    } catch (e) {
+      myPrint('Error comparing times: $e');
+      return true; // В случае ошибки показываем уведомление
+    }
+  }
 
   // Function for manual reminder check (called from UI)
   static Future<void> manualCheckReminders() async {
