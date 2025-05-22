@@ -492,7 +492,6 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
     }
 }
 
-
 /**
  * BroadcastReceiver для обработки напоминаний.
  * Показывает уведомления о событиях, запланированных на сегодня.
@@ -535,9 +534,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY
             )
 
-            // Запрашиваем события на сегодня с включенными напоминаниями
+            // Запрашиваем события на сегодня с включенными напоминаниями, включая поле time
             val cursor = db.rawQuery(
-                "SELECT id, title, content FROM items WHERE remind = 1 AND date = ? AND (hidden = 0 OR hidden IS NULL)",
+                "SELECT id, title, content, time FROM items WHERE remind = 1 AND date = ? AND (hidden = 0 OR hidden IS NULL)",
                 arrayOf(todayDate.toString())
             )
 
@@ -556,30 +555,46 @@ class NotificationReceiver : BroadcastReceiver() {
             // Создаем канал уведомлений
             createNotificationChannel(context)
 
-            // Для каждого события создаем отдельное уведомление
+            // Получаем текущее время
+            val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            val currentMinute = Calendar.getInstance().get(Calendar.MINUTE)
+
+            // Для каждого события проверяем время и создаем уведомление если нужно
             var notificationId = 1
+            var notificationsShown = 0
+
             while (cursor.moveToNext()) {
-                // Используем getColumnIndexOrThrow для безопасного получения индексов колонок
                 val idColumn = cursor.getColumnIndexOrThrow("id")
                 val titleColumn = cursor.getColumnIndexOrThrow("title")
                 val contentColumn = cursor.getColumnIndexOrThrow("content")
+                val timeColumn = cursor.getColumnIndexOrThrow("time")
 
                 val id = cursor.getInt(idColumn)
                 val title = cursor.getString(titleColumn) ?: ""
                 val content = cursor.getString(contentColumn) ?: ""
+                val itemTime = if (cursor.isNull(timeColumn)) null else cursor.getInt(timeColumn)
 
-                Log.d("MemorizerApp", "Showing reminder for event ID: $id, Title: $title")
-                showEventNotification(context, id, "Reminder: $title", content, notificationId)
-                notificationId++
+                // Определяем время уведомления для этой записи
+                val notificationTime = determineNotificationTime(context, itemTime)
+
+                Log.d("MemorizerApp", "Event ID: $id, Title: $title, Item time: $itemTime, Notification time: $notificationTime")
+
+                // Проверяем, нужно ли показывать уведомление сейчас
+                if (shouldShowNotificationNow(currentHour, currentMinute, notificationTime)) {
+                    Log.d("MemorizerApp", "Showing reminder for event ID: $id, Title: $title")
+                    showEventNotification(context, id, "Reminder: $title", content, notificationId)
+                    notificationId++
+                    notificationsShown++
+                }
             }
 
-            // Если событий больше одного, показываем общее уведомление
-            if (eventCount > 1) {
+            // Если показано больше одного уведомления, показываем общее уведомление
+            if (notificationsShown > 1) {
                 showEventNotification(
                     context,
                     0,
                     "Today's events",
-                    "You have $eventCount scheduled events for today",
+                    "You have $notificationsShown scheduled events for today",
                     999999
                 )
             }
@@ -590,14 +605,99 @@ class NotificationReceiver : BroadcastReceiver() {
             // Отправляем сообщение в Flutter для проверки событий
             MainActivity.checkEvents()
 
-            // Планируем следующую проверку на завтра
-            scheduleNextDayCheck(context)
+            // Планируем следующую проверку
+            scheduleNextCheck(context)
 
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error in NotificationReceiver.onReceive: ${e.message}")
             e.printStackTrace()
         }
     }
+
+    // Определяем время уведомления для конкретной записи
+    private fun determineNotificationTime(context: Context, itemTime: Int?): String {
+        return if (itemTime != null) {
+            // Если у записи есть своё время, используем его
+            formatTimeFromInt(itemTime)
+        } else {
+            // Иначе используем время по умолчанию из настроек
+            getNotificationTime(context)
+        }
+    }
+
+    // Форматируем время из integer в строку HH:MM
+    private fun formatTimeFromInt(timeInt: Int): String {
+        val hours = timeInt / 100
+        val minutes = timeInt % 100
+        return String.format("%02d:%02d", hours, minutes)
+    }
+
+    // Проверяем, нужно ли показывать уведомление сейчас
+    private fun shouldShowNotificationNow(currentHour: Int, currentMinute: Int, notificationTime: String): Boolean {
+        return try {
+            val parts = notificationTime.split(":")
+            if (parts.size != 2) return true // В случае ошибки показываем уведомление
+
+            val notificationHour = parts[0].toIntOrNull() ?: return true
+            val notificationMinute = parts[1].toIntOrNull() ?: return true
+
+            val currentTotalMinutes = currentHour * 60 + currentMinute
+            val notificationTotalMinutes = notificationHour * 60 + notificationMinute
+
+            // Показываем уведомление если текущее время равно времени уведомления
+            // или прошло не более 60 минут с времени уведомления
+            currentTotalMinutes >= notificationTotalMinutes &&
+                    (currentTotalMinutes - notificationTotalMinutes) <= 60
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error checking notification time: ${e.message}")
+            true // В случае ошибки показываем уведомление
+        }
+    }
+
+    // Планируем следующую проверку через час или на следующий день
+    private fun scheduleNextCheck(context: Context) {
+        try {
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.CHECK_REMINDERS"
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                NotificationService.REMINDER_REQUEST_CODE + 100, // Используем другой ID
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Планируем проверку через час
+            val calendar = Calendar.getInstance().apply {
+                add(Calendar.HOUR_OF_DAY, 1)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+
+            Log.d("MemorizerApp", "Next check scheduled for: ${calendar.time}")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error scheduling next check: ${e.message}")
+        }
+    }
+
+    // Остальные методы (createNotificationChannel, showEventNotification, isRemindersEnabled, getNotificationTime) остаются без изменений
 
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -701,61 +801,6 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Планируем проверку на следующий день
-    private fun scheduleNextDayCheck(context: Context) {
-        try {
-            // Получаем время напоминаний из настроек
-            val notificationTime = getNotificationTime(context)
-
-            // Parse time string (format: HH:MM)
-            val parts = notificationTime.split(":")
-            val hour = parts[0].toIntOrNull() ?: 8
-            val minute = parts[1].toIntOrNull() ?: 0
-
-            // Создаем календарь на завтра с заданным временем
-            val calendar = Calendar.getInstance().apply {
-                add(Calendar.DAY_OF_YEAR, 1) // Завтра
-                set(Calendar.HOUR_OF_DAY, hour)
-                set(Calendar.MINUTE, minute)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-
-            // Создаем intent для будильника
-            val intent = Intent(context, NotificationReceiver::class.java).apply {
-                action = "com.example.memorizer.CHECK_REMINDERS"
-            }
-
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                NotificationService.REMINDER_REQUEST_CODE,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            // Получаем AlarmManager и устанавливаем точное время
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
-
-            Log.d("MemorizerApp", "Next check scheduled for tomorrow at $hour:$minute")
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error scheduling next day check: ${e.message}")
-        }
-    }
-
     // Получаем время напоминаний из настроек
     private fun getNotificationTime(context: Context): String {
         try {
@@ -804,7 +849,6 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 }
-
 
 /**
  * BroadcastReceiver для восстановления запланированных уведомлений

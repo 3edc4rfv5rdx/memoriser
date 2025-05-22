@@ -570,7 +570,7 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  // Build date field with date picker button
+// Build date field with date picker button
   Widget _buildDateField() {
     return GestureDetector(
       onLongPress: () => showHelp(36), // ID 36 для поля даты и кнопок
@@ -616,6 +616,12 @@ class _EditItemPageState extends State<EditItemPage> {
                 _date = null;
                 // Also clear the reminder checkbox when date is cleared
                 _remind = false;
+                // Clear time field and radio buttons
+                timeController.clear();
+                _time = null;
+                _selectedTimeOption = null;
+                // Clear remove after reminder checkbox
+                _removeAfterReminder = false;
               });
               // Optionally show a message that reminder was cleared
               okInfoBarBlue(lw('Date and reminder cleared'));

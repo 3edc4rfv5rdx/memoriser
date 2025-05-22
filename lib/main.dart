@@ -941,8 +941,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // In the _HomePageState class, we need to modify the AppBar and PopupMenuButton
-
   @override
   Widget build(BuildContext context) {
     globalContext = context;
@@ -1148,10 +1146,12 @@ class _HomePageState extends State<HomePage> {
               )
               : ListView.builder(
             itemCount: _items.length,
+// В методе build() класса _HomePageState, в части ListView.builder
             itemBuilder: (context, index) {
               final item = _items[index];
               final priorityValue = item['priority'] ?? 0;
               final hasDate = item['date'] != null && item['date'] != 0;
+              final hasTime = item['time'] != null; // Проверяем наличие времени
               final isReminder = item['remind'] == 1;
               final hasPhoto = isValidPhotoPath(item['photo']);
 
@@ -1171,6 +1171,15 @@ class _HomePageState extends State<HomePage> {
                   }
                 } catch (e) {
                   myPrint('Error formatting date: $e');
+                }
+              }
+
+              // Format time for display if it exists
+              String? formattedTime;
+              if (hasTime) {
+                formattedTime = timeIntToString(item['time']);
+                if (formattedTime == null) {
+                  myPrint('Warning: Could not format time: ${item['time']}');
                 }
               }
 
@@ -1215,7 +1224,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
 
-                    // Add date information if available
+                    // Add date and time information if available
                     if (hasDate && formattedDate != null)
                       Row(
                         children: [
@@ -1230,12 +1239,25 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
 
-                          // Add reminder bell icon next to the date with more spacing
+                          // Add time display if available
+                          if (hasTime && formattedTime != null) ...[
+                            SizedBox(width: 8),
+                            Icon(Icons.access_time, color: isToday ? clRed : clText, size: 14),
+                            SizedBox(width: 2),
+                            Text(
+                              formattedTime,
+                              style: TextStyle(
+                                fontSize: fsMedium,
+                                color: isReminder || isToday ? clRed : clText,
+                                fontWeight: isReminder || isToday ? fwBold : fwNormal,
+                              ),
+                            ),
+                          ],
+
+                          // Add reminder bell icon next to the date/time with spacing
                           if (isReminder)
                             Padding(
-                              padding: EdgeInsets.only(
-                                left: 8,
-                              ), // Увеличено расстояние между датой и колокольчиком
+                              padding: EdgeInsets.only(left: 8),
                               child: Icon(
                                 Icons.notifications_active,
                                 color: clRed,
@@ -1246,10 +1268,11 @@ class _HomePageState extends State<HomePage> {
                       ),
                   ],
                 ),
+                // Остальной код ListTile остается без изменений...
                 tileColor: _selectedItemId == item['id']
                     ? clSel
                     : isToday
-                    ? Color(0x22FF0000) // Полупрозрачный красный цвет для фона сегодняшних событий
+                    ? Color(0x22FF0000)
                     : clFill,
                 leading: Row(
                   mainAxisSize: MainAxisSize.min,
