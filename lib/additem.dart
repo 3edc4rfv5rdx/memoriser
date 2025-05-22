@@ -6,6 +6,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'globals.dart';
+import 'reminders.dart';
 
 class EditItemPage extends StatefulWidget {
   final int? itemId; // Используем ID вместо целой записи
@@ -175,7 +176,7 @@ class _EditItemPageState extends State<EditItemPage> {
     }
   }
 
-// Функция сохранения, которая напрямую взаимодействует с базой данных
+// Save function that directly interacts with the database
   Future<void> _saveItem() async {
     if (titleController.text.trim().isEmpty) {
       okInfoBarRed(lw('Title cannot be empty'), duration: Duration(seconds: 4));
@@ -183,7 +184,7 @@ class _EditItemPageState extends State<EditItemPage> {
     }
 
     if (_remind) {
-      // Проверяем, задана ли дата
+      // Check if date is set
       if (_date == null) {
         okInfoBarRed(
           lw('Set a date for the reminder'),
@@ -192,7 +193,7 @@ class _EditItemPageState extends State<EditItemPage> {
         return;
       }
 
-      // Проверяем, что дата напоминания не в прошлом
+      // Validate the reminder date is not in the past
       final today = DateTime(
         DateTime.now().year,
         DateTime.now().month,
@@ -208,23 +209,23 @@ class _EditItemPageState extends State<EditItemPage> {
       }
     }
 
-    // Конвертируем дату в формат YYYYMMDD для хранения
+    // Convert date to YYYYMMDD format for storage
     final dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
     final remindValue = _remind ? 1 : 0;
     final hiddenValue = _hidden ? 1 : 0;
     final removeValue = _removeAfterReminder ? 1 : 0;
 
-    // Получаем значение времени (может быть null)
+    // Get time value (may be null)
     final timeValue = _time;
 
-    // Подготовка данных для сохранения
+    // Prepare data for saving
     String titleText = titleController.text.trim();
     String contentText = contentController.text.trim();
     String tagsText = tagsController.text.trim();
     String? photoPath = photoController.text.trim();
     photoPath = photoPath.isEmpty ? null : photoPath;
 
-    // Обфускация данных, если запись скрыта и мы в скрытом режиме
+    // Obfuscate data if the record is hidden and we're in hidden mode
     if (hiddenValue == 1 && xvHiddenMode) {
       titleText = obfuscateText(titleText);
       contentText = obfuscateText(contentText);
@@ -233,7 +234,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
     try {
       if (widget.itemId != null) {
-        // Обновляем существующую запись
+        // Update existing item
         await mainDb.update(
           'items',
           {
@@ -242,7 +243,7 @@ class _EditItemPageState extends State<EditItemPage> {
             'tags': tagsText.isEmpty ? null : tagsText,
             'priority': _priority,
             'date': dateValue,
-            'time': timeValue,  // Добавляем поле времени
+            'time': timeValue,  // Add time field
             'remind': remindValue,
             'hidden': hiddenValue,
             'remove': removeValue,
@@ -252,27 +253,46 @@ class _EditItemPageState extends State<EditItemPage> {
           whereArgs: [widget.itemId],
         );
         myPrint("Item updated: ${widget.itemId} - $titleText - Time: $timeValue");
+
+        // Update/cancel specific reminder for this item
+        await SimpleNotifications.updateSpecificReminder(
+          widget.itemId!,
+          _remind,
+          _date,
+          _time,
+        );
+
       } else {
-        // Вставляем новую запись
-        await mainDb.insert('items', {
+        // Insert new item
+        final insertedId = await mainDb.insert('items', {
           'title': titleText,
           'content': contentText.isEmpty ? null : contentText,
           'tags': tagsText.isEmpty ? null : tagsText,
           'priority': _priority,
           'date': dateValue,
-          'time': timeValue,  // Добавляем поле времени
+          'time': timeValue,  // Add time field
           'remind': remindValue,
           'hidden': hiddenValue,
           'remove': removeValue,
           'photo': photoPath,
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
-        myPrint("Item inserted: $titleText - Time: $timeValue");
+
+        myPrint("Item inserted: $titleText - Time: $timeValue, ID: $insertedId");
+
+        // Schedule specific reminder for new item if needed
+        if (_remind && _date != null) {
+          await SimpleNotifications.scheduleSpecificReminder(
+            insertedId,
+            _date!,
+            _time,
+          );
+        }
       }
 
       Navigator.pop(context, true);
     } catch (e) {
-      // Показываем сообщение об ошибке, если операция с базой данных завершается неудачно
+      // Show error message if database operation fails
       okInfoBarPurple(lw('Error saving item') + ': $e');
       myPrint("Error saving item: $e");
     }

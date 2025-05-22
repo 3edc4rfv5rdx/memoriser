@@ -886,6 +886,9 @@ class _HomePageState extends State<HomePage> {
                     // First check if item has a photo
                     final photoPath = item['photo'];
 
+                    // Cancel specific reminder if it exists
+                    await SimpleNotifications.cancelSpecificReminder(item['id']);
+
                     // Delete item from database
                     await mainDb.delete(
                       'items',
