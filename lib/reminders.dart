@@ -384,6 +384,11 @@ class SimpleNotifications {
   // Schedule a specific reminder for individual item
   static Future<void> scheduleSpecificReminder(int itemId, DateTime date, int? time) async {
     try {
+      myPrint('=== SCHEDULING SPECIFIC REMINDER ===');
+      myPrint('Item ID: $itemId');
+      myPrint('Date: $date');
+      myPrint('Time: $time');
+
       // Check if reminders are enabled
       final enableReminders = await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
       if (enableReminders != "true") {
@@ -420,6 +425,10 @@ class SimpleNotifications {
         hour,
         minute,
       );
+
+      myPrint('Calling platform.invokeMethod with params:');
+      myPrint('itemId: $itemId, year: ${date.year}, month: ${date.month}, day: ${date.day}, hour: $hour, minute: $minute');
+
 
       // Only schedule if notification time is in the future
       if (notificationDateTime.isAfter(DateTime.now())) {

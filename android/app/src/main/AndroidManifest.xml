@@ -46,10 +46,13 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
-                <!-- Добавляем действие для ваших напоминаний -->
+                <!-- Добавляем действие для общих напоминаний -->
                 <action android:name="com.example.memorizer.CHECK_REMINDERS"/>
+                <!-- Добавляем действие для конкретных напоминаний -->
+                <action android:name="com.example.memorizer.SPECIFIC_REMINDER"/>
             </intent-filter>
         </receiver>
+
         <!-- Добавляем новый BootReceiver -->
         <receiver
             android:name=".BootReceiver"

@@ -132,6 +132,91 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
         createNotificationChannel()
     }
 
+    // Планирование конкретного напоминания для отдельного элемента
+    private fun scheduleSpecificReminder(itemId: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, title: String, body: String) {
+        try {
+            Log.d("MemorizerApp", "Scheduling specific reminder for item $itemId at $year-$month-$day $hour:$minute")
+
+            // Создаем intent для конкретного напоминания
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.SPECIFIC_REMINDER"
+                putExtra("itemId", itemId)
+                putExtra("title", title)
+                putExtra("body", body)
+            }
+
+            // Используем itemId как уникальный requestCode для PendingIntent
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                itemId, // Используем itemId как уникальный код
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Устанавливаем время для напоминания
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1) // Calendar месяцы начинаются с 0
+                set(Calendar.DAY_OF_MONTH, day)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            // Планируем точное напоминание только если время в будущем
+            if (calendar.timeInMillis > System.currentTimeMillis()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+
+                Log.d("MemorizerApp", "Specific reminder scheduled for item $itemId at ${calendar.time}")
+            } else {
+                Log.d("MemorizerApp", "Reminder time is in the past for item $itemId, not scheduling")
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error scheduling specific reminder: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    // Отмена конкретного напоминания
+    private fun cancelSpecificReminder(itemId: Int) {
+        try {
+            Log.d("MemorizerApp", "Cancelling specific reminder for item $itemId")
+
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.SPECIFIC_REMINDER"
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                itemId, // Используем тот же itemId как код
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarmManager.cancel(pendingIntent)
+
+            Log.d("MemorizerApp", "Specific reminder cancelled for item $itemId")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error cancelling specific reminder: ${e.message}")
+        }
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -176,6 +261,24 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 } else {
                     result.error("DB_ERROR", "Failed to save notification time", null)
                 }
+            }
+            "scheduleSpecificReminder" -> {
+                val itemId = call.argument<Int>("itemId") ?: 0
+                val year = call.argument<Int>("year") ?: 0
+                val month = call.argument<Int>("month") ?: 0
+                val day = call.argument<Int>("day") ?: 0
+                val hour = call.argument<Int>("hour") ?: 0
+                val minute = call.argument<Int>("minute") ?: 0
+                val title = call.argument<String>("title") ?: ""
+                val body = call.argument<String>("body") ?: ""
+
+                scheduleSpecificReminder(itemId, year, month, day, hour, minute, title, body)
+                result.success(true)
+            }
+            "cancelSpecificReminder" -> {
+                val itemId = call.argument<Int>("itemId") ?: 0
+                cancelSpecificReminder(itemId)
+                result.success(true)
             }
             "cancelAllNotifications" -> {
                 cancelAllNotifications()
@@ -492,6 +595,11 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
     }
 }
 
+
+/**
+ * BroadcastReceiver для обработки напоминаний.
+ * Показывает уведомления о событиях, запланированных на сегодня.
+ */
 /**
  * BroadcastReceiver для обработки напоминаний.
  * Показывает уведомления о событиях, запланированных на сегодня.
@@ -501,13 +609,128 @@ class NotificationReceiver : BroadcastReceiver() {
         Log.d("MemorizerApp", "NotificationReceiver: onReceive triggered with action: ${intent.action}")
 
         try {
-            // Проверяем, что это не перезагрузка устройства
-            if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-                // Передаем управление в BootReceiver
-                Log.d("MemorizerApp", "Boot completed, forwarding to BootReceiver")
+            when (intent.action) {
+                Intent.ACTION_BOOT_COMPLETED -> {
+                    // Передаем управление в BootReceiver
+                    Log.d("MemorizerApp", "Boot completed, forwarding to BootReceiver")
+                    return
+                }
+                "com.example.memorizer.SPECIFIC_REMINDER" -> {
+                    // Обрабатываем конкретное напоминание
+                    handleSpecificReminder(context, intent)
+                    return
+                }
+                "com.example.memorizer.CHECK_REMINDERS" -> {
+                    // Обрабатываем общую проверку (как раньше)
+                    handleGeneralReminderCheck(context, intent)
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error in NotificationReceiver.onReceive: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    // Обработка конкретного напоминания
+    private fun handleSpecificReminder(context: Context, intent: Intent) {
+        try {
+            val itemId = intent.getIntExtra("itemId", 0)
+            val title = intent.getStringExtra("title") ?: "Memorizer"
+            val body = intent.getStringExtra("body") ?: "You have a scheduled event"
+
+            Log.d("MemorizerApp", "Handling specific reminder for item $itemId")
+
+            // Проверяем, включены ли напоминания
+            if (!isRemindersEnabled(context)) {
+                Log.d("MemorizerApp", "Reminders are disabled, skipping specific reminder")
                 return
             }
 
+            // Проверяем, существует ли ещё этот элемент в базе данных и имеет ли он напоминание
+            if (isItemStillActive(context, itemId)) {
+                // Создаем канал уведомлений
+                createNotificationChannel(context)
+
+                // Получаем заголовок и содержимое из базы данных
+                val itemData = getItemData(context, itemId)
+                val itemTitle = if (itemData.first.isNotEmpty()) "Reminder: ${itemData.first}" else title
+                val itemContent = itemData.second.ifEmpty { body }
+
+                // Показываем уведомление
+                showEventNotification(context, itemId, itemTitle, itemContent, itemId)
+
+                Log.d("MemorizerApp", "Specific reminder shown for item $itemId")
+            } else {
+                Log.d("MemorizerApp", "Item $itemId no longer exists or reminder disabled, skipping notification")
+            }
+
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error handling specific reminder: ${e.message}")
+        }
+    }
+
+    // Получаем данные элемента из базы данных
+    private fun getItemData(context: Context, itemId: Int): Pair<String, String> {
+        return try {
+            val dbPath = context.getDatabasePath("memorizer.db")
+            if (!dbPath.exists()) return Pair("", "")
+
+            val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+
+            val cursor = db.rawQuery(
+                "SELECT title, content FROM items WHERE id = ?",
+                arrayOf(itemId.toString())
+            )
+
+            val result = if (cursor.moveToFirst()) {
+                val title = cursor.getString(0) ?: ""
+                val content = cursor.getString(1) ?: ""
+                Pair(title, content)
+            } else {
+                Pair("", "")
+            }
+
+            cursor.close()
+            db.close()
+            result
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error getting item data: ${e.message}")
+            Pair("", "")
+        }
+    }
+
+    // Проверяем, активен ли ещё элемент в базе данных
+    private fun isItemStillActive(context: Context, itemId: Int): Boolean {
+        return try {
+            val dbPath = context.getDatabasePath("memorizer.db")
+            if (!dbPath.exists()) return false
+
+            val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+
+            val cursor = db.rawQuery(
+                "SELECT remind FROM items WHERE id = ?",
+                arrayOf(itemId.toString())
+            )
+
+            val isActive = if (cursor.moveToFirst()) {
+                cursor.getInt(0) == 1 // remind должен быть включен
+            } else {
+                false // элемент не найден
+            }
+
+            cursor.close()
+            db.close()
+            isActive
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error checking if item is active: ${e.message}")
+            false
+        }
+    }
+
+    // Обработка общей проверки напоминаний (старая логика)
+    private fun handleGeneralReminderCheck(context: Context, intent: Intent) {
+        try {
             // Проверяем, включены ли напоминания
             val enabled = isRemindersEnabled(context)
             if (!enabled) {
@@ -609,7 +832,7 @@ class NotificationReceiver : BroadcastReceiver() {
             scheduleNextCheck(context)
 
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error in NotificationReceiver.onReceive: ${e.message}")
+            Log.e("MemorizerApp", "Error in handleGeneralReminderCheck: ${e.message}")
             e.printStackTrace()
         }
     }
@@ -696,8 +919,6 @@ class NotificationReceiver : BroadcastReceiver() {
             Log.e("MemorizerApp", "Error scheduling next check: ${e.message}")
         }
     }
-
-    // Остальные методы (createNotificationChannel, showEventNotification, isRemindersEnabled, getNotificationTime) остаются без изменений
 
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -848,7 +1069,9 @@ class NotificationReceiver : BroadcastReceiver() {
             return MainActivity.DEFAULT_NOTIFICATION_TIME
         }
     }
+
 }
+
 
 /**
  * BroadcastReceiver для восстановления запланированных уведомлений
