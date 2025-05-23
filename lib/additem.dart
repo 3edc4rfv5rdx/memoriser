@@ -353,7 +353,7 @@ class _EditItemPageState extends State<EditItemPage> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            dialogTheme: DialogTheme(backgroundColor: clFill),
+            dialogTheme: DialogThemeData(backgroundColor: clFill),
             // Add custom button styling
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
@@ -690,7 +690,7 @@ class _EditItemPageState extends State<EditItemPage> {
               },
               decoration: InputDecoration(
                 labelText: lw('Time (HH:MM)'),
-                labelStyle: TextStyle(color: _remind ? clText : clText.withOpacity(0.5)),
+                labelStyle: TextStyle(color: _remind ? clText : clText.withValues(alpha: 0.5)),
                 fillColor: clFill,
                 filled: true,
                 border: OutlineInputBorder(),
@@ -698,11 +698,11 @@ class _EditItemPageState extends State<EditItemPage> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.access_time, color: _remind ? clText : clText.withOpacity(0.5)),
+            icon: Icon(Icons.access_time, color: _remind ? clText : clText.withValues(alpha: 0.5)),
             onPressed: _remind ? () => _selectTime(context) : null,
           ),
           IconButton(
-            icon: Icon(Icons.clear, color: _remind ? clText : clText.withOpacity(0.5)),
+            icon: Icon(Icons.clear, color: _remind ? clText : clText.withValues(alpha: 0.5)),
             onPressed: _remind ? () {
               setState(() {
                 timeController.clear();
@@ -740,7 +740,7 @@ class _EditItemPageState extends State<EditItemPage> {
               Text(
                 lw('Morning'),
                 style: TextStyle(
-                  color: _remind ? clText : clText.withOpacity(0.5),
+                  color: _remind ? clText : clText.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -762,7 +762,7 @@ class _EditItemPageState extends State<EditItemPage> {
               Text(
                 lw('Day'),
                 style: TextStyle(
-                  color: _remind ? clText : clText.withOpacity(0.5),
+                  color: _remind ? clText : clText.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -784,7 +784,7 @@ class _EditItemPageState extends State<EditItemPage> {
               Text(
                 lw('Evening'),
                 style: TextStyle(
-                  color: _remind ? clText : clText.withOpacity(0.5),
+                  color: _remind ? clText : clText.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -817,13 +817,13 @@ class _EditItemPageState extends State<EditItemPage> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            dialogTheme: DialogTheme(backgroundColor: clFill),
+            dialogTheme: DialogThemeData(backgroundColor: clFill),
             timePickerTheme: TimePickerThemeData(
               backgroundColor: clFill,
               hourMinuteTextColor: clText,
               dayPeriodTextColor: clText,
               dialHandColor: clUpBar,
-              dialBackgroundColor: clFill.withOpacity(0.8),
+              dialBackgroundColor: clFill.withValues(alpha: 0.8),
               dialTextColor: clText,
             ),
             textButtonTheme: TextButtonThemeData(
@@ -1122,16 +1122,16 @@ class _EditItemPageState extends State<EditItemPage> {
             _buildDateField(),
             SizedBox(height: 10),
 
+            // Reminder checkbox
+            _buildReminderSelector(),
+            SizedBox(height: 10),
+
             // Time field
             _buildTimeField(),
             SizedBox(height: 10),
 
             // Time options (radio buttons)
             _buildTimeOptions(),
-            SizedBox(height: 10),
-
-            // Reminder checkbox
-            _buildReminderSelector(),
             SizedBox(height: 10),
 
             // Remove checkbox (moved down)

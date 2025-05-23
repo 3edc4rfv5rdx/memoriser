@@ -125,26 +125,6 @@ class SimpleNotifications {
     }
   }
 
-// Метод для проверки формата времени
-  static bool _isValidTimeFormat(String time) {
-    try {
-      final parts = time.split(':');
-      if (parts.length != 2) return false;
-
-      final hour = int.tryParse(parts[0]);
-      final minute = int.tryParse(parts[1]);
-
-      if (hour == null || minute == null) return false;
-      if (hour < 0 || hour > 23) return false;
-      if (minute < 0 || minute > 59) return false;
-
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-
   // New method to handle removal of expired items
   static Future<void> removeExpiredItems() async {
     try {

@@ -329,7 +329,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            dialogTheme: DialogTheme(backgroundColor: clFill),
+            dialogTheme: DialogThemeData(backgroundColor: clFill),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
                 backgroundColor: clUpBar,
@@ -372,7 +372,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               onPrimary: clText,
               onSurface: clText,
             ),
-            dialogTheme: DialogTheme(backgroundColor: clFill),
+            dialogTheme: DialogThemeData(backgroundColor: clFill),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
                 backgroundColor: clUpBar,

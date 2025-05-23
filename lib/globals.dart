@@ -209,7 +209,7 @@ ThemeData getAppTheme() {
     appBarTheme: AppBarTheme(backgroundColor: clUpBar, foregroundColor: clText),
     cardColor: clFill,
     // Вместо устаревшего dialogBackgroundColor используем DialogTheme
-    dialogTheme: DialogTheme(backgroundColor: clFill),
+    dialogTheme: DialogThemeData(backgroundColor: clFill),
     textTheme: TextTheme(
       bodyMedium: TextStyle(color: clText),
       bodyLarge: TextStyle(color: clText),
