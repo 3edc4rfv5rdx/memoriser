@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="little fix"
+COMMENT="time reminders and fix translate"
 #
 GLOBVERS='0.9'
 VER=''
