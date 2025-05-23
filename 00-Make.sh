@@ -1,9 +1,9 @@
 #!/bin/bash
 
 
-COMMENT="todays red events"
+COMMENT="little fix"
 #
-GLOBVERS='0.8'
+GLOBVERS='0.9'
 VER=''
 VER_CODE=''
 #
