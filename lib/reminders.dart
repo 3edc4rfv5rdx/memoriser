@@ -420,7 +420,7 @@ class SimpleNotifications {
           'hour': hour,
           'minute': minute,
           'title': lw('Memorizer'),
-          'body': lw('You have a scheduled event'),
+          'body': lw('Reminder'),
         });
 
         myPrint('Scheduled specific reminder for item $itemId at $notificationDateTime');
