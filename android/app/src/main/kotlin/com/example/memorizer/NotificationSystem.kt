@@ -33,7 +33,7 @@ import java.util.Locale
 class MainActivity : FlutterActivity() {
 
     companion object {
-        const val DEFAULT_NOTIFICATION_TIME = "08:00"
+        const val DEFAULT_NOTIFICATION_TIME = "08:15"
         private var methodChannel: MethodChannel? = null
 
         // Function to send message to Flutter
@@ -637,7 +637,7 @@ class NotificationReceiver : BroadcastReceiver() {
         try {
             val itemId = intent.getIntExtra("itemId", 0)
             val title = intent.getStringExtra("title") ?: "Memorizer"
-            val body = intent.getStringExtra("body") ?: "You have a scheduled event"
+            val body = intent.getStringExtra("body") ?: "Reminder"
 
             Log.d("MemorizerApp", "Handling specific reminder for item $itemId")
 
