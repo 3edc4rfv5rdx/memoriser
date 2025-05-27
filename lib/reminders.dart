@@ -459,5 +459,94 @@ class SimpleNotifications {
       myPrint('Failed to update specific reminder: $e');
     }
   }
+
+// Reschedule all reminders after backup restore
+  static Future<void> rescheduleAllReminders() async {
+    try {
+      myPrint('=== RESCHEDULING ALL REMINDERS ===');
+
+      // Check if reminders are enabled
+      final enableReminders = await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
+      if (enableReminders != "true") {
+        myPrint('Reminders are disabled, not rescheduling');
+        return;
+      }
+
+      // First, cancel all existing notifications
+      await cancelAllNotifications();
+      myPrint('All existing notifications cancelled');
+
+      // Get today's date for filtering
+      final now = DateTime.now();
+      final todayDate = dateTimeToYYYYMMDD(now);
+
+      // Get all future reminders from database (including today)
+      final futureReminders = await mainDb.query(
+        'items',
+        where: 'remind = 1 AND date >= ?',
+        whereArgs: [todayDate],
+        orderBy: 'date ASC, time ASC',
+      );
+
+      myPrint('Found ${futureReminders.length} future reminders to reschedule');
+
+      if (futureReminders.isEmpty) {
+        myPrint('No future reminders to reschedule');
+
+        // Still need to reschedule daily check
+        await scheduleReminderCheck();
+        return;
+      }
+
+      // Schedule each individual reminder
+      int scheduledCount = 0;
+      for (var item in futureReminders) {
+        try {
+          final itemId = item['id'] as int;
+          final itemDate = item['date'] as int?;
+          final itemTime = item['time'] as int?;
+
+          if (itemDate == null) {
+            myPrint('Skipping item $itemId - no date');
+            continue;
+          }
+
+          // Convert date back to DateTime
+          final eventDate = yyyymmddToDateTime(itemDate);
+          if (eventDate == null) {
+            myPrint('Skipping item $itemId - invalid date: $itemDate');
+            continue;
+          }
+
+          // Schedule the specific reminder
+          await scheduleSpecificReminder(itemId, eventDate, itemTime);
+          scheduledCount++;
+
+          myPrint('Rescheduled reminder for item $itemId on ${eventDate.toString().substring(0, 10)}');
+
+        } catch (e) {
+          myPrint('Error rescheduling reminder for item ${item['id']}: $e');
+        }
+      }
+
+      // Also reschedule the daily reminder check
+      await scheduleReminderCheck();
+
+      myPrint('=== RESCHEDULING COMPLETE ===');
+      myPrint('Successfully rescheduled $scheduledCount individual reminders');
+
+      // Show success message using existing translations
+      if (scheduledCount > 0) {
+        okInfoBarGreen('${lw('Settings saved')}: $scheduledCount ${lw('reminders')}');
+      } else {
+        okInfoBarBlue(lw('No events for today'));
+      }
+
+    } catch (e) {
+      myPrint('Error rescheduling all reminders: $e');
+      okInfoBarRed('${lw('Error')}: $e');
+    }
+  }
+
 }
 

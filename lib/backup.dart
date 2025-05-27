@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'globals.dart';
-
+import 'reminders.dart';
 
 // Создание резервной копии базы данных
 Future<String> createBackup() async {
@@ -149,7 +149,6 @@ Future<String> exportToCSV() async {
   }
 }
 
-
 // Восстановление из резервной копии
 Future<String> restoreBackup() async {
   try {
@@ -269,6 +268,17 @@ Future<String> restoreBackup() async {
       myPrint('Error reopening database: $openError');
       okInfoBarRed(lw('Error reopening database'));
       return lw('Error reopening database');
+    }
+
+    // НОВОЕ: Перепланируем все напоминания после успешного восстановления
+    myPrint('Rescheduling reminders after restore...');
+    try {
+      await SimpleNotifications.rescheduleAllReminders();
+      myPrint('Reminders rescheduled successfully');
+    } catch (reminderError) {
+      myPrint('Error rescheduling reminders: $reminderError');
+      // Не прерываем процесс восстановления из-за ошибки напоминаний
+      okInfoBarOrange(lw('Database restored. Please restart the app.'));
     }
 
     // Если успешно, возвращаем сообщение с рекомендацией перезапустить
@@ -406,6 +416,7 @@ Future<String> restoreFromCSV() async {
                 row[columnName] = int.tryParse(value) ?? 0;
                 break;
               case 'date':
+              case 'time':
                 row[columnName] = int.tryParse(value); // Может быть null
                 break;
               default:
@@ -418,6 +429,17 @@ Future<String> restoreFromCSV() async {
       }
     });
 
+    // НОВОЕ: Перепланируем все напоминания после успешного восстановления CSV
+    myPrint('Rescheduling reminders after CSV restore...');
+    try {
+      await SimpleNotifications.rescheduleAllReminders();
+      myPrint('Reminders rescheduled successfully after CSV restore');
+    } catch (reminderError) {
+      myPrint('Error rescheduling reminders after CSV restore: $reminderError');
+      // Не прерываем процесс восстановления из-за ошибки напоминаний
+      okInfoBarOrange(lw('Data restored from CSV. Please restart the app.'));
+    }
+
     myPrint('CSV restore completed successfully');
     okInfoBarGreen(lw('Data restored from CSV. Please restart the app.'));
     return lw('Data restored from CSV. Please restart the app.');
@@ -427,7 +449,6 @@ Future<String> restoreFromCSV() async {
     return lw('Error restoring from CSV');
   }
 }
-
 
 // Вспомогательная функция для парсинга строк CSV
 List<String> _parseCSVLine(String line) {
