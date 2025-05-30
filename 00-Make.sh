@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="fix reminders after restore"
+COMMENT="Add save log to file"
 #
 GLOBVERS='0.9'
 VER=''
