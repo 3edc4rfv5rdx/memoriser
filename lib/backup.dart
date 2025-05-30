@@ -178,8 +178,7 @@ Future<String> restoreBackup() async {
     // Сразу открываем выбор файла, а не каталога
     myPrint('Opening file picker...');
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['db'],
+      type: FileType.any,
       initialDirectory: memorizerDir.path,
       dialogTitle: lw('Select DB backup file'),
     );

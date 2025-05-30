@@ -282,7 +282,6 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             }
             "cancelAllNotifications" -> {
                 cancelAllNotifications()
-                saveSqliteSetting("Enable reminders", "false")
                 result.success(true)
             }
             else -> {
