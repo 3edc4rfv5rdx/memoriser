@@ -371,6 +371,9 @@ void main() async {
   } else {
     myPrint('Напоминания отключены, планирование пропущено');
   }
+
+  await initLogging();
+
   runApp(memorizerApp());
 }
 
