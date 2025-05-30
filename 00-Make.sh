@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="time reminders and fix translate"
+COMMENT="fix reminders after restore"
 #
 GLOBVERS='0.9'
 VER=''
