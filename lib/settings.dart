@@ -22,18 +22,20 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentTheme;
   String? _currentLanguage;
   bool _newestFirst = true;
-  int _lastItems = 0; // Last items setting
-  String _remindTime = notifTime; // Default remind time
-  bool _enableReminders = true; // Add this for reminders setting
+  int _lastItems = 0;
+  String _remindTime = notifTime;
+  bool _enableReminders = true;
+  bool _debugLogs = false; // Добавлено
   bool _isLoading = true;
 
   // Temporary values to track changes
   String? _newTheme;
   String? _newLanguage;
   bool? _newNewestFirst;
-  int? _newLastItems; // Temporary value for Last items
-  String? _newRemindTime; // Temporary remind time
-  bool? _newEnableReminders; // Add this for temporary reminders value
+  int? _newLastItems;
+  String? _newRemindTime;
+  bool? _newEnableReminders;
+  bool? _newDebugLogs; // Добавлено
   bool _hasChanges = false;
 
   // Controller for Last items input field
@@ -82,6 +84,11 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
     final enableReminders = enableRemindersValue == "true";
 
+    // Load debug logs setting
+    final debugLogsValue =
+        await getSetting("Debug logs") ?? defSettings["Debug logs"];
+    final debugLogs = debugLogsValue == "true";
+
     _lastItemsController = TextEditingController(text: lastItems.toString());
     _remindTimeController = TextEditingController(text: remindTimeValue);
 
@@ -92,7 +99,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newestFirst = isNewestFirst;
         _lastItems = lastItems;
         _remindTime = remindTimeValue;
-        _enableReminders = enableReminders; // Initialize the checkbox state
+        _enableReminders = enableReminders;
+        _debugLogs = debugLogs;
 
         // Initialize temporary values
         _newTheme = themeValue;
@@ -100,7 +108,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newNewestFirst = isNewestFirst;
         _newLastItems = lastItems;
         _newRemindTime = remindTimeValue;
-        _newEnableReminders = enableReminders; // Initialize the temporary value
+        _newEnableReminders = enableReminders;
+        _newDebugLogs = debugLogs;
 
         _isLoading = false;
         _hasChanges = false;
@@ -117,11 +126,11 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _newNewestFirst != _newestFirst ||
               _newLastItems != _lastItems ||
               _newRemindTime != _remindTime ||
-              _newEnableReminders != _enableReminders; // Add this to the check
+              _newEnableReminders != _enableReminders ||
+              _newDebugLogs != _debugLogs;
     });
   }
 
-  // Save function with improved notifications
   Future<void> _saveChanges() async {
     if (!_hasChanges) {
       okInfoBarBlue(lw('No changes to save'));
@@ -173,6 +182,12 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       reminderSettingsChanged = true;
     }
 
+    // Save debug logs setting if changed
+    if (_newDebugLogs != _debugLogs && _newDebugLogs != null) {
+      await saveSetting("Debug logs", _newDebugLogs.toString());
+      savedSettings.add('debug logs');
+    }
+
     // Update current values
     setState(() {
       _currentTheme = _newTheme;
@@ -181,6 +196,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _lastItems = _newLastItems ?? _lastItems;
       _remindTime = _newRemindTime ?? _remindTime;
       _enableReminders = _newEnableReminders ?? _enableReminders;
+      _debugLogs = _newDebugLogs ?? _debugLogs;
       _hasChanges = false;
     });
 
@@ -424,6 +440,15 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                   helpId:
                   104, // Keep existing ID 104 for remind time setting
                 ),
+
+              SizedBox(height: 10),
+
+              // Debug logs checkbox row
+              _buildSettingsRow(
+                label: lw('Debug logs'),
+                child: _buildDebugLogsCheckbox(),
+                helpId: 106,
+              ),
             ],
           ),
         ),
@@ -642,6 +667,26 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           ),
         ),
       ],
+    );
+  }
+
+  // Function to build debug logs checkbox
+  Widget _buildDebugLogsCheckbox() {
+    return Container(
+      alignment: Alignment.centerLeft,
+      child: Checkbox(
+        value: _newDebugLogs,
+        activeColor: clUpBar,
+        checkColor: clText,
+        onChanged: (bool? value) {
+          if (value != null && value != _newDebugLogs) {
+            setState(() {
+              _newDebugLogs = value;
+            });
+            _checkForChanges();
+          }
+        },
+      ),
     );
   }
 

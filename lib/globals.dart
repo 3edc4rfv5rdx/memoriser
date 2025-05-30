@@ -114,8 +114,12 @@ Map<String, dynamic> defSettings = {
   "Last items": "0",
   "Notification time": notifTime,
   "Enable reminders": "true",
+  "Debug logs": "false",
   //  "Auto-backup": "false",
 };
+
+bool _logsEnabled = false;
+String? _currentLogFile;
 
 const ymdDateFormat = 'yyyy-MM-dd';
 
@@ -178,7 +182,19 @@ Future<void> readLocale(String locale) async {
 }
 
 void myPrint(String msg) {
-  if (xvDebug) print('>>> $msg');
+  if (xvDebug) {
+    print('>>> $msg');
+
+    if (_logsEnabled && _currentLogFile != null) {
+      try {
+        final timestamp = DateFormat('HH:mm:ss').format(DateTime.now());
+        final logFile = File(_currentLogFile!);
+        logFile.writeAsString('$timestamp $msg\n', mode: FileMode.append);
+      } catch (e) {
+        // Игнорируем ошибки
+      }
+    }
+  }
 }
 
 // Get theme index from name
@@ -959,4 +975,33 @@ bool isValidTimeFormat(String? timeString) {
   if (!timeRegex.hasMatch(timeString)) return false;
 
   return true;
+}
+
+Future<void> initLogging() async {
+  final debugLogsEnabled = await getSetting("Debug logs") ?? "false";
+  _logsEnabled = debugLogsEnabled == "true";
+
+  if (_logsEnabled) {
+    try {
+      if (documentsDirectory == null) await initStoragePaths();
+      if (documentsDirectory == null) return;
+
+      // Создаем папку Logs
+      final logsDir = Directory('${documentsDirectory!.path}/Memorizer/Logs');
+      if (!await logsDir.exists()) {
+        await logsDir.create(recursive: true);
+      }
+
+      // Имя файла с датой и временем
+      final now = DateTime.now();
+      final dateTime = DateFormat('yyyyMMdd-HHmmss').format(now);
+      _currentLogFile = '${logsDir.path}/log-$dateTime.txt';
+
+      // Записываем заголовок
+      final startMessage = 'App started at ${DateFormat('yyyy-MM-dd HH:mm:ss').format(now)}\n';
+      await File(_currentLogFile!).writeAsString(startMessage);
+    } catch (e) {
+      // Игнорируем ошибки в логировании
+    }
+  }
 }
