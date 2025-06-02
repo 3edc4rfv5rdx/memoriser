@@ -22,7 +22,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 6, // Увеличиваем версию с 5 до 6 для добавления поля time
+    version: 7, // Increased from 6 to 7 for yearly field
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -37,13 +37,14 @@ Future<void> initDatabases() async {
           created INTEGER DEFAULT 0,
           remove INTEGER DEFAULT 0,
           hidden INTEGER DEFAULT 0,
-          photo TEXT DEFAULT NULL
+          photo TEXT DEFAULT NULL,
+          yearly INTEGER DEFAULT 0
         )
       ''');
     },
     onUpgrade: (db, oldVersion, newVersion) async {
       if (oldVersion < 6) {
-        // Миграция с пересозданием таблицы для вставки поля time после date
+        // Migration for version 6 - recreate table with time field
         await db.execute('''
           CREATE TABLE items_new(
             id INTEGER PRIMARY KEY, 
@@ -61,7 +62,7 @@ Future<void> initDatabases() async {
           )
         ''');
 
-        // Перенос данных из старой таблицы в новую (time будет NULL)
+        // Transfer data from old table to new (time will be NULL)
         await db.execute('''
           INSERT INTO items_new(id, title, content, tags, priority, date, 
                                remind, created, remove, hidden, photo)
@@ -70,11 +71,17 @@ Future<void> initDatabases() async {
           FROM items
         ''');
 
-        // Удаляем старую таблицу и переименовываем новую
+        // Drop old table and rename new one
         await db.execute('DROP TABLE items');
         await db.execute('ALTER TABLE items_new RENAME TO items');
 
         myPrint("Database upgraded to version 6: Added 'time' field after 'date'");
+      }
+
+      if (oldVersion < 7) {
+        // Migration for version 7 - add yearly field
+        await db.execute('ALTER TABLE items ADD COLUMN yearly INTEGER DEFAULT 0');
+        myPrint("Database upgraded to version 7: Added 'yearly' field");
       }
     },
   );
@@ -315,24 +322,77 @@ Future<List<Map<String, dynamic>>> getItemsWithReminders() async {
   );
 }
 
-// Function to remove expired reminders with remove flag set
+// Function to remove expired reminders with remove flag set AND update yearly events
 Future<void> removeExpiredItems() async {
   try {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final todayInt = dateTimeToYYYYMMDD(today);
 
-    // Оптимизированный SQL-запрос с проверкой NULL в начале
+    // FIRST update yearly events
+    await updateYearlyEvents(todayInt!);
+
+    // THEN delete expired records (NOT yearly) with remove flag
     final count = await mainDb.rawDelete(
-        'DELETE FROM items WHERE date IS NOT NULL AND date < ? AND remove = 1',
+        'DELETE FROM items WHERE date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0',
         [todayInt]
     );
 
     if (count > 0) {
-      myPrint('Удалено $count просроченных записей');
+      myPrint('Deleted $count expired items');
     }
   } catch (e) {
-    myPrint('Ошибка при удалении просроченных записей: $e');
+    myPrint('Error removing expired items: $e');
+  }
+}
+
+// New function to update yearly events
+Future<void> updateYearlyEvents(int today) async {
+  try {
+    // Find all yearly events with past dates
+    final yearlyEvents = await mainDb.query(
+      'items',
+      where: 'yearly = 1 AND date < ?',
+      whereArgs: [today],
+    );
+
+    myPrint('Found ${yearlyEvents.length} yearly events to update');
+
+    for (var event in yearlyEvents) {
+      try {
+        final eventId = event['id'] as int;
+        final oldDateInt = event['date'] as int;
+        final oldDate = yyyymmddToDateTime(oldDateInt);
+
+        if (oldDate == null) {
+          myPrint('Invalid date for yearly event $eventId: $oldDateInt');
+          continue;
+        }
+
+        // Update year to next year
+        final newDate = DateTime(oldDate.year + 1, oldDate.month, oldDate.day);
+        final newDateInt = dateTimeToYYYYMMDD(newDate);
+
+        if (newDateInt != null) {
+          await mainDb.update(
+            'items',
+            {'date': newDateInt},
+            where: 'id = ?',
+            whereArgs: [eventId],
+          );
+
+          myPrint('Updated yearly event $eventId: ${oldDate.year} -> ${newDate.year}');
+        }
+      } catch (e) {
+        myPrint('Error updating yearly event ${event['id']}: $e');
+      }
+    }
+
+    if (yearlyEvents.isNotEmpty) {
+      myPrint('Updated ${yearlyEvents.length} yearly events to next year');
+    }
+  } catch (e) {
+    myPrint('Error updating yearly events: $e');
   }
 }
 
@@ -506,7 +566,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Improved reminder check function
+// Improved reminder check function
   Future<void> _checkReminders() async {
     try {
       myPrint('Checking today\'s events...');
@@ -519,19 +579,17 @@ class _HomePageState extends State<HomePage> {
         'items',
         where: 'date = ?',
         whereArgs: [todayInt],
-        orderBy:
-            'remind DESC, priority DESC', // Reminders first, then by priority
+        orderBy: 'remind DESC, priority DESC', // Reminders first, then by priority
       );
 
       myPrint('Found ${items.length} events for today');
 
       if (items.isEmpty) {
-        // Use okInfoBarBlue instead of Orange
         okInfoBarBlue(lw('No events for today'));
         return;
       }
 
-      // Format text for dialog - removed duplicate heading
+      // Format text for dialog
       StringBuffer message = StringBuffer();
 
       // Process each item
@@ -546,8 +604,9 @@ class _HomePageState extends State<HomePage> {
         // Skip hidden records if not in hidden mode
         if (item['hidden'] == 1 && !xvHiddenMode) continue;
 
-        // Add formatting for reminders
+        // Add formatting for reminders and yearly events
         bool isReminder = item['remind'] == 1;
+        bool isYearly = item['yearly'] == 1;
         String priorityStars = '';
 
         // Add stars for priority
@@ -556,11 +615,13 @@ class _HomePageState extends State<HomePage> {
           priorityStars = ' ' + '★' * (priority > 3 ? 3 : priority);
         }
 
-        // Format entry depending on whether it's a reminder or not
+        // Format entry with yearly indicator
         if (isReminder) {
-          message.write('• ! $title$priorityStars\n');
+          String prefix = isYearly ? '• 🔄 ! ' : '• ! ';
+          message.write('$prefix$title$priorityStars\n');
         } else {
-          message.write('• $title$priorityStars\n');
+          String prefix = isYearly ? '• 🔄 ' : '• ';
+          message.write('$prefix$title$priorityStars\n');
         }
       }
 
@@ -1157,11 +1218,12 @@ class _HomePageState extends State<HomePage> {
               final item = _items[index];
               final priorityValue = item['priority'] ?? 0;
               final hasDate = item['date'] != null && item['date'] != 0;
-              final hasTime = item['time'] != null; // Проверяем наличие времени
+              final hasTime = item['time'] != null; // Check for time presence
               final isReminder = item['remind'] == 1;
+              final isYearly = item['yearly'] == 1; // NEW: Check for yearly flag
               final hasPhoto = isValidPhotoPath(item['photo']);
 
-              // Проверяем, является ли дата текущей
+              // Check if date is current
               final todayDate = dateTimeToYYYYMMDD(DateTime.now());
               final isToday = hasDate && item['date'] == todayDate;
 
@@ -1196,6 +1258,16 @@ class _HomePageState extends State<HomePage> {
               return ListTile(
                 title: Row(
                   children: [
+                    // NEW: Add yearly indicator before title
+                    if (isYearly) ...[
+                      Text(
+                        '🔄 ',
+                        style: TextStyle(
+                          fontSize: fsMedium,
+                          color: isToday ? clRed : Colors.green,
+                        ),
+                      ),
+                    ],
                     Expanded(
                       child: Text(
                         item['title'],
@@ -1274,7 +1346,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                   ],
                 ),
-                // Остальной код ListTile остается без изменений...
+                // Rest of ListTile code remains unchanged...
                 tileColor: _selectedItemId == item['id']
                     ? clSel
                     : isToday
@@ -1325,7 +1397,7 @@ class _HomePageState extends State<HomePage> {
                     _selectedItemId = item['id'];
                   });
 
-                  // Сбрасываем таймер автоматического выхода из скрытого режима
+                  // Reset hidden mode timer
                   if (xvHiddenMode) {
                     resetHiddenModeTimer();
                   }
@@ -1334,7 +1406,7 @@ class _HomePageState extends State<HomePage> {
                   // Show context menu with Edit and Delete options
                   _showContextMenu(context, item);
 
-                  // Сбрасываем таймер автоматического выхода из скрытого режима
+                  // Reset hidden mode timer
                   if (xvHiddenMode) {
                     resetHiddenModeTimer();
                   }
