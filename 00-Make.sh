@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="Add save log to file"
+COMMENT="New yearly functionality (birthdays etc)"
 #
 GLOBVERS='0.9'
 VER=''
