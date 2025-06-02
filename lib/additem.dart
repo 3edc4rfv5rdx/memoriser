@@ -27,10 +27,10 @@ class _EditItemPageState extends State<EditItemPage> {
   final ImagePicker _picker = ImagePicker();
 
   late TextEditingController timeController;
-  int? _time; // Значение времени в формате HHMM
-  int? _selectedTimeOption; // 0 - утро, 1 - день, 2 - вечер, null - не выбрано
+  int? _time; // Time value in HHMM format
+  int? _selectedTimeOption; // 0 - morning, 1 - day, 2 - evening, null - none selected
 
-// Константы для опций времени
+  // Time option constants
   static const int TIME_MORNING = 800;  // 08:00
   static const int TIME_DAY = 1230;     // 12:30
   static const int TIME_EVENING = 1700; // 17:00
@@ -39,11 +39,11 @@ class _EditItemPageState extends State<EditItemPage> {
   int _priority = 0; // Default priority value
   bool _remind = false; // Default remind value
   bool _hidden = false; // Default hidden value for privacy feature
-  bool _isLoading = false; // Индикатор загрузки
-  // Add this field next to the other boolean fields
+  bool _isLoading = false; // Loading indicator
   bool _removeAfterReminder = false; // Default value for auto-remove
+  bool _yearly = false; // NEW: Default value for yearly repeat
 
-  // Список тегов для выпадающего списка
+  // List of tags for dropdown
   List<Map<String, dynamic>> _tagsWithCounts = [];
 
   @override
@@ -56,15 +56,16 @@ class _EditItemPageState extends State<EditItemPage> {
     photoController = TextEditingController();
     timeController = TextEditingController();
 
-    // Если передан ID, значит это режим редактирования
+    // If ID is passed, this is edit mode
     if (widget.itemId != null) {
       _loadItem(widget.itemId!);
     } else {
-      // Если ID не передан, это новая запись
-      _hidden = xvHiddenMode; // По умолчанию скрываем в скрытом режиме
+      // If no ID passed, this is a new record
+      _hidden = xvHiddenMode; // Hide by default in hidden mode
+      _yearly = false; // Default off for new records
     }
 
-    // Загружаем все теги при инициализации
+    // Load all tags on initialization
     _loadTagsData();
   }
 
@@ -92,14 +93,14 @@ class _EditItemPageState extends State<EditItemPage> {
     super.dispose();
   }
 
-// Метод для загрузки элемента по ID в _EditItemPageState
+// Method to load item by ID in _EditItemPageState
   Future<void> _loadItem(int itemId) async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Получаем запись из базы данных
+      // Get record from database
       final List<Map<String, dynamic>> result = await mainDb.query(
         'items',
         where: 'id = ?',
@@ -109,7 +110,7 @@ class _EditItemPageState extends State<EditItemPage> {
       if (result.isNotEmpty) {
         final item = result.first;
 
-        // Если запись скрыта и мы в скрытом режиме, декодируем данные
+        // If record is hidden and we're in hidden mode, decode data
         if (item['hidden'] == 1 && xvHiddenMode) {
           final decodedTitle = deobfuscateText(item['title'] ?? '');
           final decodedContent = deobfuscateText(item['content'] ?? '');
@@ -119,28 +120,29 @@ class _EditItemPageState extends State<EditItemPage> {
           contentController.text = decodedContent;
           tagsController.text = decodedTags;
         } else {
-          // Обычные записи используются как есть
+          // Regular records are used as is
           titleController.text = item['title'] ?? '';
           contentController.text = item['content'] ?? '';
           tagsController.text = item['tags'] ?? '';
         }
 
-        // Инициализируем другие поля
+        // Initialize other fields
         _priority = item['priority'] ?? 0;
         _remind = item['remind'] == 1;
         _hidden = item['hidden'] == 1;
         _removeAfterReminder = item['remove'] == 1;
+        _yearly = item['yearly'] == 1; // NEW: Load yearly field
         photoController.text = item['photo'] ?? '';
 
-        // Загружаем время, если оно задано
+        // Load time if set
         _time = item['time'] as int?;
         if (_time != null) {
-          // Преобразуем числовое значение в строку формата HH:MM
+          // Convert numeric value to HH:MM string format
           String? timeStr = timeIntToString(_time);
           if (timeStr != null) {
             timeController.text = timeStr;
 
-            // Проверяем, соответствует ли время одной из предустановленных опций
+            // Check if time matches one of the preset options
             if (_time == TIME_MORNING) {
               _selectedTimeOption = 0;
             } else if (_time == TIME_DAY) {
@@ -153,15 +155,15 @@ class _EditItemPageState extends State<EditItemPage> {
           }
         }
 
-        // Инициализируем дату, если она существует
+        // Initialize date if it exists
         if (item['date'] != null) {
           _date = yyyymmddToDateTime(item['date']);
-          // Устанавливаем текст контроллера даты только если _date не null
+          // Set date controller text only if _date is not null
           if (_date != null) {
-            // Используем оператор принудительного разворачивания (!), так как мы проверили, что _date не null
+            // Use forced unwrapping (!) since we checked that _date is not null
             dateController.text = DateFormat(ymdDateFormat).format(_date!);
           } else {
-            dateController.text = ""; // Очищаем контроллер даты, если дата некорректна
+            dateController.text = ""; // Clear date controller if date is incorrect
             myPrint('Warning: Could not parse date value: ${item['date']}');
           }
         }
@@ -214,6 +216,7 @@ class _EditItemPageState extends State<EditItemPage> {
     final remindValue = _remind ? 1 : 0;
     final hiddenValue = _hidden ? 1 : 0;
     final removeValue = _removeAfterReminder ? 1 : 0;
+    final yearlyValue = _yearly ? 1 : 0; // NEW: Yearly field
 
     // Get time value (may be null)
     final timeValue = _time;
@@ -243,16 +246,17 @@ class _EditItemPageState extends State<EditItemPage> {
             'tags': tagsText.isEmpty ? null : tagsText,
             'priority': _priority,
             'date': dateValue,
-            'time': timeValue,  // Add time field
+            'time': timeValue,
             'remind': remindValue,
             'hidden': hiddenValue,
             'remove': removeValue,
+            'yearly': yearlyValue, // NEW: Add yearly field
             'photo': photoPath,
           },
           where: 'id = ?',
           whereArgs: [widget.itemId],
         );
-        myPrint("Item updated: ${widget.itemId} - $titleText - Time: $timeValue");
+        myPrint("Item updated: ${widget.itemId} - $titleText - Time: $timeValue - Yearly: $yearlyValue");
 
         // Update/cancel specific reminder for this item
         await SimpleNotifications.updateSpecificReminder(
@@ -270,15 +274,16 @@ class _EditItemPageState extends State<EditItemPage> {
           'tags': tagsText.isEmpty ? null : tagsText,
           'priority': _priority,
           'date': dateValue,
-          'time': timeValue,  // Add time field
+          'time': timeValue,
           'remind': remindValue,
           'hidden': hiddenValue,
           'remove': removeValue,
+          'yearly': yearlyValue, // NEW: Add yearly field
           'photo': photoPath,
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-        myPrint("Item inserted: $titleText - Time: $timeValue, ID: $insertedId");
+        myPrint("Item inserted: $titleText - Time: $timeValue - Yearly: $yearlyValue, ID: $insertedId");
 
         // Schedule specific reminder for new item if needed
         if (_remind && _date != null) {
@@ -463,10 +468,10 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-// Обновленный строитель чек-бокса напоминания с обнулением времени
+// UPDATED: Reminder selector with yearly reset logic
   Widget _buildReminderSelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(35), // ID 35 для чекбокса напоминания
+      onLongPress: () => showHelp(35), // ID 35 for reminder checkbox
       child: Row(
         children: [
           Checkbox(
@@ -477,14 +482,16 @@ class _EditItemPageState extends State<EditItemPage> {
               setState(() {
                 _remind = value ?? false;
 
-                // Если включаем напоминание, проверяем дату
+                // If enabling reminder, validate date
                 if (_remind) {
                   _validateReminderDate();
                 } else {
-                  // Если отключаем напоминание, сбрасываем поле времени и радио-кнопки
+                  // If disabling reminder, reset time field, radio buttons, yearly and remove
                   timeController.clear();
                   _time = null;
                   _selectedTimeOption = null;
+                  _yearly = false; // NEW: Reset yearly when reminder is disabled
+                  _removeAfterReminder = false;
                 }
               });
             },
@@ -498,17 +505,18 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-// Новый метод для чек-бокса Remove (внизу формы)
+// UPDATED: Widget for remove after reminder selector
   Widget _buildRemoveAfterReminderSelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(42), // ID 42 для чекбокса Remove
+      onLongPress: () => showHelp(42), // ID 42 for remove checkbox
       child: Row(
         children: [
           Checkbox(
             value: _removeAfterReminder,
             activeColor: clRed,
             checkColor: clText,
-            onChanged: (value) {
+            // Disable if yearly is enabled OR reminder is disabled
+            onChanged: (_yearly || !_remind) ? null : (value) {
               setState(() {
                 _removeAfterReminder = value ?? false;
               });
@@ -516,7 +524,50 @@ class _EditItemPageState extends State<EditItemPage> {
           ),
           Text(
             lw('Remove after reminder'),
-            style: TextStyle(color: clText, fontSize: fsMedium),
+            style: TextStyle(
+              color: (_yearly || !_remind) ? clText.withValues(alpha: 0.5) : clText,
+              fontSize: fsMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // NEW: Widget for yearly repeat selector
+  Widget _buildYearlySelector() {
+    return GestureDetector(
+      onLongPress: () => showHelp(43), // ID 43 for yearly checkbox
+      child: Row(
+        children: [
+          Checkbox(
+            value: _yearly,
+            activeColor: Colors.green,
+            checkColor: clText,
+            // Enable only if reminder is set
+            onChanged: _remind ? (value) {
+              setState(() {
+                _yearly = value ?? false;
+
+                // If yearly is enabled, automatically disable "remove after reminder"
+                if (_yearly) {
+                  _removeAfterReminder = false;
+                }
+              });
+            } : null,
+          ),
+          Text(
+            lw('Yearly repeat'),
+            style: TextStyle(
+              color: _remind ? clText : clText.withValues(alpha: 0.5),
+              fontSize: fsMedium,
+            ),
+          ),
+          SizedBox(width: 4),
+          Icon(
+            Icons.autorenew,
+            color: _remind ? Colors.green : Colors.green.withValues(alpha: 0.5),
+            size: 16,
           ),
         ],
       ),
@@ -1030,14 +1081,14 @@ class _EditItemPageState extends State<EditItemPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.itemId != null; // Проверяем наличие ID
+    final isEditing = widget.itemId != null; // Check if ID exists
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: xvHiddenMode ? Color(0xFFf29238) : clUpBar,
         foregroundColor: clText,
         title: GestureDetector(
-          onLongPress: () => showHelp(30), // ID 30 для заголовка
+          onLongPress: () => showHelp(30), // ID 30 for title
           child: Text(
             isEditing ? lw('Edit Item') : lw('New Item'),
             style: TextStyle(
@@ -1048,7 +1099,7 @@ class _EditItemPageState extends State<EditItemPage> {
           ),
         ),
         leading: GestureDetector(
-          onLongPress: () => showHelp(10), // ID 10 для кнопки назад
+          onLongPress: () => showHelp(10), // ID 10 for back button
           child: IconButton(
             icon: Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
@@ -1056,13 +1107,12 @@ class _EditItemPageState extends State<EditItemPage> {
         ),
         actions: [
           GestureDetector(
-            onLongPress: () => showHelp(12), // ID 12 для кнопки сохранения
+            onLongPress: () => showHelp(12), // ID 12 for save button
             child: IconButton(icon: Icon(Icons.save), onPressed: _saveItem),
           ),
         ],
       ),
-      body:
-      _isLoading
+      body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -1071,8 +1121,7 @@ class _EditItemPageState extends State<EditItemPage> {
           children: [
             // Title field
             GestureDetector(
-              onLongPress:
-                  () => showHelp(31), // ID 31 для поля заголовка
+              onLongPress: () => showHelp(31), // ID 31 for title field
               child: TextField(
                 controller: titleController,
                 style: TextStyle(color: clText),
@@ -1089,8 +1138,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
             // Content field with reduced height
             GestureDetector(
-              onLongPress:
-                  () => showHelp(32), // ID 32 для поля содержимого
+              onLongPress: () => showHelp(32), // ID 32 for content field
               child: TextField(
                 controller: contentController,
                 style: TextStyle(color: clText),
@@ -1110,7 +1158,7 @@ class _EditItemPageState extends State<EditItemPage> {
             _buildTagsField(),
             SizedBox(height: 10),
 
-            // Photo field - add a new field for photos
+            // Photo field
             _buildPhotoField(),
             SizedBox(height: 10),
 
@@ -1134,7 +1182,11 @@ class _EditItemPageState extends State<EditItemPage> {
             _buildTimeOptions(),
             SizedBox(height: 10),
 
-            // Remove checkbox (moved down)
+            // NEW: Yearly repeat checkbox
+            _buildYearlySelector(),
+            SizedBox(height: 10),
+
+            // Remove checkbox (updated)
             _buildRemoveAfterReminderSelector(),
             SizedBox(height: 10),
 
