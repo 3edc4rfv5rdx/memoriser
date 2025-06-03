@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="add logs to ShowPhoto"
+COMMENT="fix logs system"
 #
 GLOBVERS='0.9'
 VER=''
