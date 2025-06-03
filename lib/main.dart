@@ -434,6 +434,11 @@ void main() async {
 
   await initLogging();
 
+  // TEST: Add test logs immediately after initLogging
+  myPrint('=== LOGGING TEST START ===');
+  myPrint('xvDebug value: $xvDebug');
+  myPrint('=== LOGGING TEST END ===');
+
   runApp(memorizerApp());
 }
 
