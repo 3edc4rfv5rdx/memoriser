@@ -526,6 +526,7 @@ class _HomePageState extends State<HomePage> {
     // Original photo display code if file exists
     showDialog(
       context: navigatorKey.currentContext!,
+      barrierColor: Colors.black87, // Dark background overlay
       builder: (BuildContext dialogContext) {
         final screenSize = MediaQuery.of(dialogContext).size;
 
@@ -1220,7 +1221,7 @@ class _HomePageState extends State<HomePage> {
               final hasDate = item['date'] != null && item['date'] != 0;
               final hasTime = item['time'] != null; // Check for time presence
               final isReminder = item['remind'] == 1;
-              final isYearly = item['yearly'] == 1; // NEW: Check for yearly flag
+              final isYearly = item['yearly'] == 1; // Check for yearly flag
               final hasPhoto = isValidPhotoPath(item['photo']);
 
               // Check if date is current
@@ -1258,16 +1259,7 @@ class _HomePageState extends State<HomePage> {
               return ListTile(
                 title: Row(
                   children: [
-                    // NEW: Add yearly indicator before title
-                    if (isYearly) ...[
-                      Text(
-                        '🔄 ',
-                        style: TextStyle(
-                          fontSize: fsMedium,
-                          color: isToday ? clRed : Colors.green,
-                        ),
-                      ),
-                    ],
+                    // REMOVED: yearly indicator from title
                     Expanded(
                       child: Text(
                         item['title'],
@@ -1346,26 +1338,22 @@ class _HomePageState extends State<HomePage> {
                       ),
                   ],
                 ),
-                // Rest of ListTile code remains unchanged...
                 tileColor: _selectedItemId == item['id']
                     ? clSel
                     : isToday
                     ? Color(0x22FF0000)
                     : clFill,
-                leading: Row(
+
+                leading: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (isToday)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4.0),
-                        child: Icon(Icons.today, color: clRed, size: 16),
-                      ),
+                    // First row: only hidden icon if needed
                     if (xvHiddenMode)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4.0),
-                        child: Icon(Icons.lock, color: clText, size: 16),
-                      ),
-                    if (priorityValue > 0)
+                      Icon(Icons.lock, color: clText, size: 16),
+                    // Second row: priority circle
+                    if (priorityValue > 0) ...[
+                      if (xvHiddenMode) SizedBox(height: 2),
                       Container(
                         width: 24,
                         height: 24,
@@ -1383,8 +1371,19 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
+                    ],
+                    // Third row: yearly indicator (only if yearly and has date)
+                    if (isYearly && hasDate) ...[
+                      SizedBox(height: 2),
+                      Icon(
+                        Icons.refresh,
+                        color: isToday ? clRed : clText,
+                        size: 16,
+                      ),
+                    ],
                   ],
                 ),
+
                 trailing: hasPhoto
                     ? IconButton(
                   icon: Icon(Icons.photo, color: isToday ? clRed : clText),
