@@ -186,20 +186,14 @@ void myPrint(String msg) {
     print('>>> $msg');
 
     if (_logsEnabled && _currentLogFile != null) {
-      // Make it async to match initLogging()
-      _writeToLogFile(msg);
+      try {
+        final timestamp = DateFormat('HH:mm:ss').format(DateTime.now());
+        final logFile = File(_currentLogFile!);
+        logFile.writeAsStringSync('$timestamp $msg\n', mode: FileMode.append);
+      } catch (e) {
+        // Ignore errors
+      }
     }
-  }
-}
-
-// Helper function for async file writing
-Future<void> _writeToLogFile(String msg) async {
-  try {
-    final timestamp = DateFormat('HH:mm:ss').format(DateTime.now());
-    final logFile = File(_currentLogFile!);
-    await logFile.writeAsString('$timestamp $msg\n', mode: FileMode.append);
-  } catch (e) {
-    // Ignore logging errors
   }
 }
 
