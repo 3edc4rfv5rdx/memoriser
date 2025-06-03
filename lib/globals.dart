@@ -16,7 +16,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 const String progVersion = '0.9.250603';
-const int buildNumber = 49;
+const int buildNumber = 50;
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -186,14 +186,20 @@ void myPrint(String msg) {
     print('>>> $msg');
 
     if (_logsEnabled && _currentLogFile != null) {
-      try {
-        final timestamp = DateFormat('HH:mm:ss').format(DateTime.now());
-        final logFile = File(_currentLogFile!);
-        logFile.writeAsString('$timestamp $msg\n', mode: FileMode.append);
-      } catch (e) {
-        // Игнорируем ошибки
-      }
+      // Make it async to match initLogging()
+      _writeToLogFile(msg);
     }
+  }
+}
+
+// Helper function for async file writing
+Future<void> _writeToLogFile(String msg) async {
+  try {
+    final timestamp = DateFormat('HH:mm:ss').format(DateTime.now());
+    final logFile = File(_currentLogFile!);
+    await logFile.writeAsString('$timestamp $msg\n', mode: FileMode.append);
+  } catch (e) {
+    // Ignore logging errors
   }
 }
 
