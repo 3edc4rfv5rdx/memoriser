@@ -492,8 +492,32 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showPhoto(String photoPath) {
-    // First check if the file exists
+    // DEBUG: Add detailed logging
+    myPrint('=== PHOTO DEBUG START ===');
+    myPrint('Photo path: $photoPath');
+
     final file = File(photoPath);
+    myPrint('File exists: ${file.existsSync()}');
+
+    if (file.existsSync()) {
+      try {
+        final fileSize = file.lengthSync();
+        final lastModified = file.lastModifiedSync();
+        final canRead = file.readAsBytesSync().length;
+
+        myPrint('File size: $fileSize bytes');
+        myPrint('Last modified: $lastModified');
+        myPrint('Can read bytes: $canRead');
+        myPrint('File is readable: ${canRead > 0}');
+      } catch (e) {
+        myPrint('Error reading file info: $e');
+      }
+    } else {
+      myPrint('File does not exist at path');
+    }
+    myPrint('=== PHOTO DEBUG END ===');
+
+    // Original file existence check
     if (!file.existsSync()) {
       // Show a dialog with a concise message
       showCustomDialog(
@@ -523,51 +547,76 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // Original photo display code if file exists
-    showDialog(
-      context: navigatorKey.currentContext!,
-      barrierColor: Colors.black87, // Dark background overlay
-      builder: (BuildContext dialogContext) {
-        final screenSize = MediaQuery.of(dialogContext).size;
+    // Try to display photo with error handling
+    try {
+      showDialog(
+        context: navigatorKey.currentContext!,
+        barrierColor: Colors.black87, // Dark background overlay
+        builder: (BuildContext dialogContext) {
+          final screenSize = MediaQuery.of(dialogContext).size;
 
-        return Dialog(
-          backgroundColor: clFill,
-          // Make dialog use 90% of screen
-          insetPadding: EdgeInsets.symmetric(
-            horizontal: screenSize.width * 0.05,
-            vertical: screenSize.height * 0.05,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppBar(
-                backgroundColor: clUpBar,
-                foregroundColor: clText,
-                title: Text(lw('Photo')),
-                leading: IconButton(
-                  icon: Icon(Icons.close),
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                ),
-              ),
-              Flexible(
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxHeight: screenSize.height * 0.8,
-                    maxWidth: screenSize.width * 0.9,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Image.file(file, fit: BoxFit.contain),
+          return Dialog(
+            backgroundColor: clFill,
+            // Make dialog use 90% of screen
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: screenSize.width * 0.05,
+              vertical: screenSize.height * 0.05,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppBar(
+                  backgroundColor: clUpBar,
+                  foregroundColor: clText,
+                  title: Text(lw('Photo')),
+                  leading: IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: () => Navigator.of(dialogContext).pop(),
                   ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+                Flexible(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxHeight: screenSize.height * 0.8,
+                      maxWidth: screenSize.width * 0.9,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Image.file(
+                        file,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          myPrint('Error loading image: $error');
+                          return Container(
+                            padding: EdgeInsets.all(20),
+                            child: Column(
+                              children: [
+                                Icon(Icons.error, size: 64, color: clRed),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Error loading image:\n$error',
+                                  style: TextStyle(color: clText),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      myPrint('Error showing photo dialog: $e');
+      okInfoBarRed('Error displaying photo: $e');
+    }
   }
 
-// Improved reminder check function
+  // Improved reminder check function
   Future<void> _checkReminders() async {
     try {
       myPrint('Checking today\'s events...');
