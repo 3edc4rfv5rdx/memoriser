@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="New yearly functionality (birthdays etc)"
+COMMENT="little fixes"
 #
 GLOBVERS='0.9'
 VER=''
