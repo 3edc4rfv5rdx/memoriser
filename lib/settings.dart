@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'backup.dart';
 import 'globals.dart';
-import 'reminders.dart'; // Добавляем импорт
+import 'reminders.dart';
 
 // Function to create settings screen
 Widget buildSettingsScreen() {
@@ -23,9 +23,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentLanguage;
   bool _newestFirst = true;
   int _lastItems = 0;
-  String _remindTime = notifTime;
   bool _enableReminders = true;
-  bool _debugLogs = false; // Добавлено
+  bool _debugLogs = false;
   bool _isLoading = true;
 
   // Temporary values to track changes
@@ -33,16 +32,12 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _newLanguage;
   bool? _newNewestFirst;
   int? _newLastItems;
-  String? _newRemindTime;
   bool? _newEnableReminders;
-  bool? _newDebugLogs; // Добавлено
+  bool? _newDebugLogs;
   bool _hasChanges = false;
 
   // Controller for Last items input field
   late TextEditingController _lastItemsController;
-
-  // Controller for remind time input field
-  late TextEditingController _remindTimeController;
 
   @override
   void initState() {
@@ -53,7 +48,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   @override
   void dispose() {
     _lastItemsController.dispose();
-    _remindTimeController.dispose();
     super.dispose();
   }
 
@@ -76,9 +70,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         await getSetting("Last items") ?? defSettings["Last items"];
     final lastItems = int.tryParse(lastItemsValue) ?? 0;
 
-    // Load remind time setting
-    final remindTimeValue = await getSetting("Notification time") ?? notifTime;
-
     // Load enable reminders setting
     final enableRemindersValue =
         await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
@@ -90,7 +81,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     final debugLogs = debugLogsValue == "true";
 
     _lastItemsController = TextEditingController(text: lastItems.toString());
-    _remindTimeController = TextEditingController(text: remindTimeValue);
 
     if (mounted) {
       setState(() {
@@ -98,7 +88,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _currentLanguage = languageValue.toLowerCase();
         _newestFirst = isNewestFirst;
         _lastItems = lastItems;
-        _remindTime = remindTimeValue;
         _enableReminders = enableReminders;
         _debugLogs = debugLogs;
 
@@ -107,7 +96,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newLanguage = languageValue.toLowerCase();
         _newNewestFirst = isNewestFirst;
         _newLastItems = lastItems;
-        _newRemindTime = remindTimeValue;
         _newEnableReminders = enableReminders;
         _newDebugLogs = debugLogs;
 
@@ -125,7 +113,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _newLanguage != _currentLanguage ||
               _newNewestFirst != _newestFirst ||
               _newLastItems != _lastItems ||
-              _newRemindTime != _remindTime ||
               _newEnableReminders != _enableReminders ||
               _newDebugLogs != _debugLogs;
     });
@@ -167,13 +154,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       savedSettings.add('last items');
     }
 
-    // Save remind time setting if changed
-    if (_newRemindTime != _remindTime && _newRemindTime != null) {
-      await saveSetting("Notification time", _newRemindTime.toString());
-      savedSettings.add('remind time');
-      reminderSettingsChanged = true;
-    }
-
     // Save enable reminders setting if changed
     if (_newEnableReminders != _enableReminders &&
         _newEnableReminders != null) {
@@ -194,18 +174,14 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _currentLanguage = _newLanguage;
       _newestFirst = _newNewestFirst ?? _newestFirst;
       _lastItems = _newLastItems ?? _lastItems;
-      _remindTime = _newRemindTime ?? _remindTime;
       _enableReminders = _newEnableReminders ?? _enableReminders;
       _debugLogs = _newDebugLogs ?? _debugLogs;
       _hasChanges = false;
     });
 
-    // Reschedule reminders if reminder settings changed
+    // Handle reminder changes - only cancel if disabled
     if (reminderSettingsChanged) {
-      if (_newEnableReminders == true) {
-        await SimpleNotifications.scheduleReminderCheck();
-        okInfoBarBlue(lw('Reminder schedule updated'));
-      } else {
+      if (_newEnableReminders == false) {
         // If reminders are disabled, cancel all scheduled notifications
         await SimpleNotifications.cancelAllNotifications();
         okInfoBarBlue(lw('Reminders disabled'));
@@ -231,19 +207,14 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     });
   }
 
-  // Fixed version with correct types
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // canPop: false means we want to control back button behavior
       canPop: !_hasChanges,
-      // onPopInvokedWithResult returns void, not bool
       onPopInvokedWithResult: (didPop, result) async {
-        // If already handled (no changes), do nothing
         if (didPop) return;
 
         if (_hasChanges) {
-          // Use showCustomDialog function from globals.dart for consistent style
           final shouldSave = await showCustomDialog(
             title: lw('Unsaved Changes'),
             content: lw('Do you want to save changes before exiting?'),
@@ -254,7 +225,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                 'value': true,
                 'isDestructive': false,
                 'onPressed': null,
-                // No additional actions, just return value
               },
             ],
           );
@@ -262,7 +232,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           if (shouldSave == true) {
             await _saveChanges();
           } else {
-            // If not saving, just close the screen
             Navigator.of(context).pop();
           }
         }
@@ -271,25 +240,21 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         appBar: AppBar(
           backgroundColor: clUpBar,
           foregroundColor: clText,
-          // Customize back button with long press handler
           leading: GestureDetector(
-            onLongPress: () => showHelp(10), // ID 10 for back button
+            onLongPress: () => showHelp(10),
             child: IconButton(
               icon: Icon(Icons.arrow_back),
               onPressed: () {
-                // Check for changes before exiting
                 if (_hasChanges) {
-                  // Trigger exit check logic via PopScope
                   Navigator.maybePop(context);
                 } else {
-                  // If no changes, just exit
                   Navigator.pop(context);
                 }
               },
             ),
           ),
           title: GestureDetector(
-            onLongPress: () => showHelp(60), // ID 60 for settings screen title
+            onLongPress: () => showHelp(60),
             child: Text(
               lw('Settings'),
               style: TextStyle(
@@ -300,20 +265,18 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             ),
           ),
           actions: [
-
-// Обновленная часть settings.dart для меню бэкапа
             GestureDetector(
-              onLongPress: () => showHelp(44), // ID 44 для кнопки бэкапа
+              onLongPress: () => showHelp(44),
               child: PopupMenuButton<String>(
-                icon: Icon(Icons.save_alt), // Иконка сохранения
-                tooltip: lw('Backup & Restore'), // Обновленный текст подсказки
+                icon: Icon(Icons.save_alt),
+                tooltip: lw('Backup & Restore'),
                 color: clMenu,
                 itemBuilder: (BuildContext context) {
                   return [
                     PopupMenuItem<String>(
                       value: 'create_backup',
                       child: GestureDetector(
-                        onLongPress: () => showHelp(45), // ID 45 для пункта создания бэкапа
+                        onLongPress: () => showHelp(45),
                         child: Text(
                           lw('Create DB backup'),
                           style: TextStyle(color: clText),
@@ -323,7 +286,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     PopupMenuItem<String>(
                       value: 'restore_backup',
                       child: GestureDetector(
-                        onLongPress: () => showHelp(46), // ID 46 для восстановления
+                        onLongPress: () => showHelp(46),
                         child: Text(
                           lw('Restore from DB backup'),
                           style: TextStyle(color: clText),
@@ -333,7 +296,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     PopupMenuItem<String>(
                       value: 'export_csv',
                       child: GestureDetector(
-                        onLongPress: () => showHelp(47), // ID 47 для экспорта CSV
+                        onLongPress: () => showHelp(47),
                         child: Text(
                           lw('Export to CSV'),
                           style: TextStyle(color: clText),
@@ -343,7 +306,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                     PopupMenuItem<String>(
                       value: 'restore_csv',
                       child: GestureDetector(
-                        onLongPress: () => showHelp(48), // ID 48 для восстановления из CSV
+                        onLongPress: () => showHelp(48),
                         child: Text(
                           lw('Restore from CSV'),
                           style: TextStyle(color: clText),
@@ -365,10 +328,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
                 },
               ),
             ),
-
-            // Save button in AppBar (disk icon) with long press handler
             GestureDetector(
-              onLongPress: () => showHelp(12), // ID 12 for save button
+              onLongPress: () => showHelp(12),
               child: IconButton(
                 icon: Icon(Icons.save),
                 tooltip: lw('Save'),
@@ -388,8 +349,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('App language'),
                 child: _buildLanguageDropdown(),
-                helpId:
-                100, // Keep existing ID 100 for language setting
+                helpId: 100,
               ),
 
               SizedBox(height: 10),
@@ -398,7 +358,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('Color theme'),
                 child: _buildThemeDropdown(),
-                helpId: 101, // Keep existing ID 101 for theme setting
+                helpId: 101,
               ),
 
               SizedBox(height: 10),
@@ -407,8 +367,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('Newest first'),
                 child: _buildSortOrderCheckbox(),
-                helpId:
-                102, // Keep existing ID 102 for sort order setting
+                helpId: 102,
               ),
 
               SizedBox(height: 10),
@@ -417,8 +376,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('Last items'),
                 child: _buildLastItemsField(),
-                helpId:
-                103, // Keep existing ID 103 for last items setting
+                helpId: 103,
               ),
 
               SizedBox(height: 10),
@@ -427,19 +385,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _buildSettingsRow(
                 label: lw('Enable reminders'),
                 child: _buildEnableRemindersCheckbox(),
-                helpId: 105, // New ID 105 for enable reminders setting
+                helpId: 105,
               ),
-
-              SizedBox(height: 10),
-
-              // Notification time row (only show if reminders enabled)
-              if (_newEnableReminders == true)
-                _buildSettingsRow(
-                  label: lw('Notification time'),
-                  child: _buildRemindTimeField(),
-                  helpId:
-                  104, // Keep existing ID 104 for remind time setting
-                ),
 
               SizedBox(height: 10),
 
@@ -466,7 +413,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       onLongPress: () => showHelp(helpId),
       child: Row(
         children: [
-          // Left side - Label (60%)
           Expanded(
             flex: 60,
             child: Text(
@@ -474,7 +420,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               style: TextStyle(color: clText, fontSize: fsMedium),
             ),
           ),
-          // Right side - Control (40%)
           Expanded(flex: 40, child: child),
         ],
       ),
@@ -498,7 +443,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         style: TextStyle(color: clText),
         onChanged: (String? newValue) {
           if (newValue != null && newValue != _newLanguage) {
-            // Only update temporary value without saving
             setState(() {
               _newLanguage = newValue;
             });
@@ -533,7 +477,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         style: TextStyle(color: clText),
         onChanged: (String? newValue) {
           if (newValue != null && newValue != _newTheme) {
-            // Only update temporary value without saving
             setState(() {
               _newTheme = newValue;
             });
@@ -558,7 +501,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         checkColor: clText,
         onChanged: (bool? value) {
           if (value != null && value != _newNewestFirst) {
-            // Only update temporary value without saving
             setState(() {
               _newNewestFirst = value;
             });
@@ -591,7 +533,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         onChanged: (value) {
           final parsedValue = int.tryParse(value) ?? 0;
           if (parsedValue >= 0) {
-            // Check that value is non-negative
             setState(() {
               _newLastItems = parsedValue;
             });
@@ -622,54 +563,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     );
   }
 
-  // Function for Notification time input field and clock button outside
-  Widget _buildRemindTimeField() {
-    return Row(
-      children: [
-        // Text input field (takes most of the space)
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: clFill,
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: clUpBar),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: TextField(
-              controller: _remindTimeController,
-              keyboardType: TextInputType.text,
-              textAlign: TextAlign.left,
-              style: TextStyle(color: clText),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: '07:30',
-                hintStyle: TextStyle(color: clText),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _newRemindTime = value;
-                });
-                _checkForChanges();
-              },
-            ),
-          ),
-        ), // Clock icon button (outside the text field)
-        Container(
-          margin: EdgeInsets.only(left: 8),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(4),
-            onTap: () => _selectTime(context),
-            child: Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(4)),
-              child: Icon(Icons.access_time, color: clText, size: 24),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   // Function to build debug logs checkbox
   Widget _buildDebugLogsCheckbox() {
     return Container(
@@ -688,65 +581,5 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         },
       ),
     );
-  }
-
-  // Time picker function with styled buttons
-  Future<void> _selectTime(BuildContext context) async {
-    // Parse current time or use default
-    final List<String> timeParts = (_newRemindTime ?? notifTime).split(":");
-    final int hour = int.tryParse(timeParts[0]) ?? 10;
-    final int minute = int.tryParse(timeParts[1]) ?? 0;
-
-    final TimeOfDay initialTime = TimeOfDay(hour: hour, minute: minute);
-
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-      builder: (BuildContext context, Widget? child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            timePickerTheme: TimePickerThemeData(
-              backgroundColor: clMenu,
-              hourMinuteTextColor: clText,
-              dayPeriodTextColor: clText,
-              dialHandColor: clUpBar,
-              dialBackgroundColor: clFill,
-              dialTextColor: clText,
-              entryModeIconColor: clText,
-            ),
-            colorScheme: ColorScheme.dark(
-              primary: clUpBar,
-              onPrimary: clText,
-              surface: clMenu,
-              onSurface: clText,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: clText,
-                backgroundColor: clUpBar,
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      // Format to HH:MM
-      final String hour = picked.hour.toString().padLeft(2, '0');
-      final String minute = picked.minute.toString().padLeft(2, '0');
-      final String formattedTime = "$hour:$minute";
-
-      setState(() {
-        _newRemindTime = formattedTime;
-        _remindTimeController.text = formattedTime;
-      });
-      _checkForChanges();
-    }
   }
 }

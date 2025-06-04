@@ -42,7 +42,6 @@ bool xvHiddenMode = false;
 String currentPin = '';
 // Константа для ключа в настройках
 const String hiddPinKey = 'hiddpin';
-const String notifTime = "08:15";
 const hidModeColor = Color(0xFFf29238);
 
 // Font setups
@@ -112,10 +111,8 @@ Map<String, dynamic> defSettings = {
   "Color theme": "Light",
   "Newest first": "true",
   "Last items": "0",
-  "Notification time": notifTime,
   "Enable reminders": "true",
   "Debug logs": "false",
-  //  "Auto-backup": "false",
 };
 
 bool _logsEnabled = false;

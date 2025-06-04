@@ -468,7 +468,7 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-// UPDATED: Reminder selector with yearly reset logic
+// UPDATED: Reminder selector with automatic morning selection
   Widget _buildReminderSelector() {
     return GestureDetector(
       onLongPress: () => showHelp(35), // ID 35 for reminder checkbox
@@ -482,15 +482,23 @@ class _EditItemPageState extends State<EditItemPage> {
               setState(() {
                 _remind = value ?? false;
 
-                // If enabling reminder, validate date
+                // If enabling reminder, validate date and set morning time
                 if (_remind) {
                   _validateReminderDate();
+
+                  // If reminder is still enabled after validation, set morning time
+                  if (_remind) {
+                    // Automatically select morning time
+                    _selectedTimeOption = 0;
+                    _time = TIME_MORNING; // 08:00
+                    timeController.text = '08:00';
+                  }
                 } else {
                   // If disabling reminder, reset time field, radio buttons, yearly and remove
                   timeController.clear();
                   _time = null;
                   _selectedTimeOption = null;
-                  _yearly = false; // NEW: Reset yearly when reminder is disabled
+                  _yearly = false; // Reset yearly when reminder is disabled
                   _removeAfterReminder = false;
                 }
               });
