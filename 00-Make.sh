@@ -302,11 +302,11 @@ mkdir -p "$PROJ_ZIP_DIR"
 update_version
 create_archive
 # Disable debug, store value in global variable
-##############disable_debug
+disable_debug
 # Build the app with debug disabled
 build_app
 # Restore debug to original value
-##############restore_debug
+restore_debug
 # Continue with remaining steps
 clean_output
 copy_final_apk
