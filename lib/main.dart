@@ -1349,7 +1349,6 @@ class _HomePageState extends State<HomePage> {
                           fontStyle: FontStyle.italic,
                         ),
                       ),
-
                     // Add date and time information if available
                     if (hasDate && formattedDate != null)
                       Row(
@@ -1365,31 +1364,21 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
 
-                          // Add time display if available
+                          // Add time display if available (только для напоминаний)
                           if (hasTime && formattedTime != null) ...[
                             SizedBox(width: 8),
-                            Icon(Icons.access_time, color: isToday ? clRed : clText, size: 14),
+                            // Показываем звоночек вместо часиков
+                            Icon(Icons.notifications_active, color: clRed, size: 16),
                             SizedBox(width: 2),
                             Text(
                               formattedTime,
                               style: TextStyle(
                                 fontSize: fsMedium,
-                                color: isReminder || isToday ? clRed : clText,
-                                fontWeight: isReminder || isToday ? fwBold : fwNormal,
+                                color: clRed,
+                                fontWeight: fwBold,
                               ),
                             ),
                           ],
-
-                          // Add reminder bell icon next to the date/time with spacing
-                          if (isReminder)
-                            Padding(
-                              padding: EdgeInsets.only(left: 8),
-                              child: Icon(
-                                Icons.notifications_active,
-                                color: clRed,
-                                size: 16,
-                              ),
-                            ),
                         ],
                       ),
                   ],
