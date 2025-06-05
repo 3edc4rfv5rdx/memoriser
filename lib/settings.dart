@@ -179,26 +179,47 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _hasChanges = false;
     });
 
-    // Handle reminder changes - only cancel if disabled
+    // Handle reminder changes
     if (reminderSettingsChanged) {
       if (_newEnableReminders == false) {
         // If reminders are disabled, cancel all scheduled notifications
-        await SimpleNotifications.cancelAllNotifications();
-        okInfoBarBlue(lw('Reminders disabled'));
+        try {
+          await SimpleNotifications.cancelAllNotifications();
+          myPrint('All reminders cancelled - reminders disabled');
+          okInfoBarBlue(lw('Reminders disabled'));
+        } catch (e) {
+          myPrint('Error cancelling reminders: $e');
+          okInfoBarRed(lw('Error disabling reminders'));
+        }
+      } else if (_newEnableReminders == true) {
+        // НОВОЕ: If reminders are enabled, reschedule all reminders
+        try {
+          myPrint('Rescheduling all reminders - reminders enabled...');
+          await SimpleNotifications.rescheduleAllReminders();
+          myPrint('All reminders rescheduled successfully');
+          okInfoBarGreen(lw('Reminders enabled and scheduled'));
+        } catch (e) {
+          myPrint('Error rescheduling reminders: $e');
+          okInfoBarRed(lw('Error enabling reminders'));
+        }
       }
     }
 
-    // Show one common notification for all saved settings
-    if (savedSettings.isNotEmpty) {
+    // Show one common notification for all saved settings (only if no reminder messages shown)
+    if (savedSettings.isNotEmpty && !reminderSettingsChanged) {
       okInfoBarGreen(lw('Settings saved: ') + savedSettings.join(', '));
+    } else if (savedSettings.isNotEmpty && reminderSettingsChanged) {
+      // Give time for reminder message to be seen, then show general save message
+      await Future.delayed(Duration(milliseconds: 2000));
+      okInfoBarGreen(lw('Settings saved: ') + savedSettings.join(', '));
+    }
 
-      // Give time to see first notification
-      await Future.delayed(Duration(milliseconds: 1500));
+    // Give time to see first notification
+    await Future.delayed(Duration(milliseconds: 1500));
 
-      // Show restart notification only if language or theme changed
-      if (languageOrThemeChanged) {
-        okInfoBarOrange(lw('PLEASE RESTART APP'));
-      }
+    // Show restart notification only if language or theme changed
+    if (languageOrThemeChanged) {
+      okInfoBarOrange(lw('PLEASE RESTART APP'));
     }
 
     // Return to main screen after notifications
