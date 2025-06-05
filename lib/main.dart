@@ -396,7 +396,6 @@ Future<void> updateYearlyEvents(int today) async {
   }
 }
 
-// Remove this import and all references to removeExpiredItems and checkTodayEvents
 // Update the main() function:
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -423,6 +422,16 @@ void main() async {
   await readLocale(languageSetting.toLowerCase());
   // Initialize notification system
   await SimpleNotifications.initNotifications();
+
+  // НОВОЕ: Перепланировать все напоминания при каждом запуске приложения
+  try {
+    myPrint('Rescheduling all reminders on app startup...');
+    await SimpleNotifications.rescheduleAllReminders();
+    myPrint('Reminders rescheduled successfully on startup');
+  } catch (e) {
+    myPrint('Error rescheduling reminders on startup: $e');
+    // Не показываем ошибку пользователю при запуске, только логируем
+  }
 
   await initLogging();
 
