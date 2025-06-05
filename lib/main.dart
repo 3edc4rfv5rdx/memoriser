@@ -396,15 +396,17 @@ Future<void> updateYearlyEvents(int today) async {
   }
 }
 
+// Remove this import and all references to removeExpiredItems and checkTodayEvents
+// Update the main() function:
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Используем FFI только на десктопных платформах
+  // Use FFI only on desktop platforms
   if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
   await initDatabases();
-  // Инициализируем пути к директориям хранения
+  // Initialize storage directory paths
   await initStoragePaths();
   // Initialize default settings
   await initDefaultSettings();
@@ -415,22 +417,12 @@ void main() async {
   final themeName =
       await getSetting("Color theme") ?? defSettings["Color theme"];
   setThemeColors(themeName);
-  // Загрузка локализации
+  // Load localization
   final languageSetting =
       await getSetting("Language") ?? defSettings["Language"];
   await readLocale(languageSetting.toLowerCase());
-  // Инициализация системы уведомлений
+  // Initialize notification system
   await SimpleNotifications.initNotifications();
-  // Проверяем, включены ли напоминания перед планированием
-  final enableReminders =
-      await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
-  if (enableReminders == "true") {
-    // Планируем ежедневную проверку напоминаний
-    await SimpleNotifications.scheduleReminderCheck();
-    myPrint('Напоминания включены, запланирована ежедневная проверка');
-  } else {
-    myPrint('Напоминания отключены, планирование пропущено');
-  }
 
   await initLogging();
 
@@ -621,7 +613,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Improved reminder check function
+// Updated _checkReminders function in _HomePageState:
   Future<void> _checkReminders() async {
     try {
       myPrint('Checking today\'s events...');
@@ -670,13 +662,23 @@ class _HomePageState extends State<HomePage> {
           priorityStars = ' ' + '★' * (priority > 3 ? 3 : priority);
         }
 
+        // Add time if available
+        String timeStr = '';
+        final itemTime = item['time'] as int?;
+        if (itemTime != null) {
+          final timeString = timeIntToString(itemTime);
+          if (timeString != null) {
+            timeStr = ' @ $timeString';
+          }
+        }
+
         // Format entry with yearly indicator
         if (isReminder) {
-          String prefix = isYearly ? '• 🔄 ! ' : '• ! ';
-          message.write('$prefix$title$priorityStars\n');
+          String prefix = isYearly ? '• 🔄 🔔 ' : '• 🔔 ';
+          message.write('$prefix$title$timeStr$priorityStars\n');
         } else {
           String prefix = isYearly ? '• 🔄 ' : '• ';
-          message.write('$prefix$title$priorityStars\n');
+          message.write('$prefix$title$timeStr$priorityStars\n');
         }
       }
 
