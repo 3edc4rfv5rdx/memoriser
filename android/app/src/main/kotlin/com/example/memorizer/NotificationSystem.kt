@@ -27,24 +27,10 @@ import java.util.Locale
 
 
 /**
- * Основная активность приложения.
- * Инициализирует Method Channel для связи с Flutter и настраивает уведомления.
+ * Main activity for the application.
+ * Initializes Method Channel for Flutter communication and sets up notifications.
  */
 class MainActivity : FlutterActivity() {
-
-    companion object {
-        const val DEFAULT_NOTIFICATION_TIME = "08:15"
-        private var methodChannel: MethodChannel? = null
-
-        // Function to send message to Flutter
-        fun checkEvents() {
-            try {
-                methodChannel?.invokeMethod("checkEvents", null)
-            } catch (e: Exception) {
-                Log.e("MemorizerApp", "Error invoking checkEvents: ${e.message}")
-            }
-        }
-    }
 
     private lateinit var notificationService: NotificationService
 
@@ -52,18 +38,16 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
 
         try {
-            // Запрос необходимых разрешений
+            // Request required permissions
             requestRequiredPermissions()
 
-            // Инициализируем сервис уведомлений
+            // Initialize notification service
             notificationService = NotificationService(applicationContext)
 
-            // Настраиваем канал связи с Flutter
-            methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.memorizer/notifications")
-            methodChannel?.setMethodCallHandler(notificationService)
+            // Set up method channel for Flutter communication
+            val methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.memorizer/notifications")
+            methodChannel.setMethodCallHandler(notificationService)
 
-            // Проверяем настройки уведомлений и планируем задачу
-            notificationService.restoreNotificationSchedule()
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error configuring flutter engine: ${e.message}")
         }
@@ -71,7 +55,7 @@ class MainActivity : FlutterActivity() {
 
     private fun requestRequiredPermissions() {
         try {
-            // Запрос разрешения на показ уведомлений для Android 13+
+            // Request notification permission for Android 13+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
@@ -86,135 +70,32 @@ class MainActivity : FlutterActivity() {
         super.onNewIntent(intent)
 
         try {
-            // Очищаем все уведомления при запуске приложения
+            // Clear all notifications when app is launched
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancelAll()
 
-            // Проверяем, есть ли payload в intent
+            // Check if there's payload in intent
             if (intent.hasExtra("notification_payload")) {
                 val payload = intent.getStringExtra("notification_payload")
-                methodChannel?.invokeMethod("notificationClick", payload ?: "")
+                // Handle notification click if needed
             }
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error in onNewIntent: ${e.message}")
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (requestCode == 100 && grantResults.isNotEmpty()) {
-            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Если разрешение получено, восстанавливаем планирование уведомлений
-                notificationService.restoreNotificationSchedule()
-            } else {
-                // Информируем Flutter, что разрешение не получено
-                methodChannel?.invokeMethod("permissionDenied", "notifications")
-            }
         }
     }
 }
 
 
 /**
- * Сервис для работы с уведомлениями.
- * Обрабатывает вызовы из Flutter и планирует ежедневные проверки.
+ * Service for handling notifications.
+ * Processes calls from Flutter and schedules individual reminders.
  */
 class NotificationService(private val context: Context) : MethodChannel.MethodCallHandler {
     private val channelId = "memorizer_channel"
     private val notificationManager = NotificationManagerCompat.from(context)
 
-    companion object {
-        const val REMINDER_REQUEST_CODE = 12345
-    }
-
     init {
         createNotificationChannel()
-    }
-
-    // Планирование конкретного напоминания для отдельного элемента
-    private fun scheduleSpecificReminder(itemId: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, title: String, body: String) {
-        try {
-            Log.d("MemorizerApp", "Scheduling specific reminder for item $itemId at $year-$month-$day $hour:$minute")
-
-            // Создаем intent для конкретного напоминания
-            val intent = Intent(context, NotificationReceiver::class.java).apply {
-                action = "com.example.memorizer.SPECIFIC_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("title", title)
-                putExtra("body", body)
-            }
-
-            // Используем itemId как уникальный requestCode для PendingIntent
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                itemId, // Используем itemId как уникальный код
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            // Устанавливаем время для напоминания
-            val calendar = Calendar.getInstance().apply {
-                set(Calendar.YEAR, year)
-                set(Calendar.MONTH, month - 1) // Calendar месяцы начинаются с 0
-                set(Calendar.DAY_OF_MONTH, day)
-                set(Calendar.HOUR_OF_DAY, hour)
-                set(Calendar.MINUTE, minute)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-            // Планируем точное напоминание только если время в будущем
-            if (calendar.timeInMillis > System.currentTimeMillis()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                }
-
-                Log.d("MemorizerApp", "Specific reminder scheduled for item $itemId at ${calendar.time}")
-            } else {
-                Log.d("MemorizerApp", "Reminder time is in the past for item $itemId, not scheduling")
-            }
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error scheduling specific reminder: ${e.message}")
-            e.printStackTrace()
-        }
-    }
-
-    // Отмена конкретного напоминания
-    private fun cancelSpecificReminder(itemId: Int) {
-        try {
-            Log.d("MemorizerApp", "Cancelling specific reminder for item $itemId")
-
-            val intent = Intent(context, NotificationReceiver::class.java).apply {
-                action = "com.example.memorizer.SPECIFIC_REMINDER"
-            }
-
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                itemId, // Используем тот же itemId как код
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarmManager.cancel(pendingIntent)
-
-            Log.d("MemorizerApp", "Specific reminder cancelled for item $itemId")
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error cancelling specific reminder: ${e.message}")
-        }
     }
 
     private fun createNotificationChannel() {
@@ -248,20 +129,6 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 showNotification(id, title, body, payload)
                 result.success(null)
             }
-            "scheduleDaily" -> {
-                val time = call.argument<String>("time") ?: MainActivity.DEFAULT_NOTIFICATION_TIME
-                val title = call.argument<String>("title") ?: ""
-                val body = call.argument<String>("body") ?: ""
-
-                // Сохраняем время проверки в базу данных
-                if (saveSqliteSetting("Notification time", time)) {
-                    // Планируем ежедневную проверку
-                    scheduleDaily(time, title, body)
-                    result.success(true)
-                } else {
-                    result.error("DB_ERROR", "Failed to save notification time", null)
-                }
-            }
             "scheduleSpecificReminder" -> {
                 val itemId = call.argument<Int>("itemId") ?: 0
                 val year = call.argument<Int>("year") ?: 0
@@ -290,98 +157,88 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
         }
     }
 
-    // Проверка правильного формата времени HH:MM
-    private fun isValidTimeFormat(time: String): Boolean {
+    // Schedule a specific reminder for individual item
+    private fun scheduleSpecificReminder(itemId: Int, year: Int, month: Int, day: Int, hour: Int, minute: Int, title: String, body: String) {
         try {
-            val parts = time.split(":")
-            if (parts.size != 2) return false
+            Log.d("MemorizerApp", "Scheduling specific reminder for item $itemId at $year-$month-$day $hour:$minute")
 
-            val hour = parts[0].toIntOrNull() ?: return false
-            val minute = parts[1].toIntOrNull() ?: return false
+            // Create intent for specific reminder
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.SPECIFIC_REMINDER"
+                putExtra("itemId", itemId)
+                putExtra("title", title)
+                putExtra("body", body)
+            }
 
-            if (hour < 0 || hour > 23) return false
-            if (minute < 0 || minute > 59) return false
+            // Use itemId as unique requestCode for PendingIntent
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                itemId, // Use itemId as unique code
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
 
-            return true
+            // Set time for reminder
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1) // Calendar months start from 0
+                set(Calendar.DAY_OF_MONTH, day)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            // Schedule exact reminder only if time is in the future
+            if (calendar.timeInMillis > System.currentTimeMillis()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+
+                Log.d("MemorizerApp", "Specific reminder scheduled for item $itemId at ${calendar.time}")
+            } else {
+                Log.d("MemorizerApp", "Reminder time is in the past for item $itemId, not scheduling")
+            }
         } catch (e: Exception) {
-            return false
+            Log.e("MemorizerApp", "Error scheduling specific reminder: ${e.message}")
+            e.printStackTrace()
         }
     }
 
-    // Сохранение настроек в SQLite
-    private fun saveSqliteSetting(key: String, value: String): Boolean {
+    // Cancel a specific reminder
+    private fun cancelSpecificReminder(itemId: Int) {
         try {
-            val dbPath = context.getDatabasePath("settings.db")
-            if (!dbPath.exists()) {
-                Log.e("MemorizerApp", "Settings database not found")
-                return false
+            Log.d("MemorizerApp", "Cancelling specific reminder for item $itemId")
+
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.SPECIFIC_REMINDER"
             }
 
-            val db = SQLiteDatabase.openDatabase(
-                dbPath.absolutePath,
-                null,
-                SQLiteDatabase.OPEN_READWRITE
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                itemId, // Use same itemId as code
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Проверяем существует ли запись
-            val cursor = db.rawQuery(
-                "SELECT value FROM settings WHERE key = ?",
-                arrayOf(key)
-            )
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarmManager.cancel(pendingIntent)
 
-            val values = ContentValues().apply {
-                put("value", value)
-            }
-
-            if (cursor.moveToFirst()) {
-                // Запись существует, обновляем
-                db.update("settings", values, "key = ?", arrayOf(key))
-            } else {
-                // Записи нет, вставляем новую
-                values.put("key", key)
-                db.insert("settings", null, values)
-            }
-
-            cursor.close()
-            db.close()
-            return true
+            Log.d("MemorizerApp", "Specific reminder cancelled for item $itemId")
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error updating SQLite database: ${e.message}")
-            return false
-        }
-    }
-
-    // Получение настройки из SQLite
-    private fun getSqliteSetting(key: String, defaultValue: String): String {
-        try {
-            val dbPath = context.getDatabasePath("settings.db")
-            if (!dbPath.exists()) {
-                return defaultValue
-            }
-
-            val db = SQLiteDatabase.openDatabase(
-                dbPath.absolutePath,
-                null,
-                SQLiteDatabase.OPEN_READONLY
-            )
-
-            val cursor = db.rawQuery(
-                "SELECT value FROM settings WHERE key = ?",
-                arrayOf(key)
-            )
-
-            val result = if (cursor.moveToFirst()) {
-                cursor.getString(0)
-            } else {
-                defaultValue
-            }
-
-            cursor.close()
-            db.close()
-            return result
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error reading from SQLite database: ${e.message}")
-            return defaultValue
+            Log.e("MemorizerApp", "Error cancelling specific reminder: ${e.message}")
         }
     }
 
@@ -399,10 +256,10 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Создаем цвет - оранжевый
+            // Orange color
             val orangeColor = 0xFFfb8500.toInt()
 
-            // Создаем стиль для большего текста
+            // Big text style
             val bigTextStyle = NotificationCompat.BigTextStyle()
                 .bigText(body)
                 .setBigContentTitle(title)
@@ -433,175 +290,20 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
         }
     }
 
-    private fun scheduleDaily(timeString: String, title: String, body: String) {
-        try {
-            // Проверяем формат времени
-            var timeToUse = timeString
-            if (!isValidTimeFormat(timeToUse)) {
-                timeToUse = MainActivity.DEFAULT_NOTIFICATION_TIME
-                saveSqliteSetting("Notification time", timeToUse)
-            }
-
-            // Parse time string (format: HH:MM)
-            val parts = timeToUse.split(":")
-            val hour = parts[0].toIntOrNull() ?: 8
-            val minute = parts[1].toIntOrNull() ?: 0
-
-            Log.d("MemorizerApp", "Scheduling daily notification at: $hour:$minute")
-
-            // Create intent for the alarm
-            val intent = Intent(context, NotificationReceiver::class.java).apply {
-                action = "com.example.memorizer.CHECK_REMINDERS"
-                putExtra("title", title)
-                putExtra("body", body)
-            }
-
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                REMINDER_REQUEST_CODE,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            // Set the alarm to trigger at the specified time
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val calendar = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, hour)
-                set(Calendar.MINUTE, minute)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-
-                // If time has already passed today, set for tomorrow
-                if (timeInMillis <= System.currentTimeMillis()) {
-                    add(Calendar.DAY_OF_YEAR, 1)
-                }
-            }
-
-            Log.d("MemorizerApp", "Alarm scheduled for: ${calendar.time}")
-
-            // Сначала отменяем предыдущие будильники
-            alarmManager.cancel(pendingIntent)
-
-            // Устанавливаем точный будильник на нужное время
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Для более новых версий Android используем setExactAndAllowWhileIdle
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                // Для старых версий используем setExact
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
-
-            // Также планируем повторение на следующий день
-            val tomorrowCalendar = Calendar.getInstance().apply {
-                timeInMillis = calendar.timeInMillis
-                add(Calendar.DAY_OF_YEAR, 1)
-            }
-
-            val tomorrowIntent = PendingIntent.getBroadcast(
-                context,
-                REMINDER_REQUEST_CODE + 1,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    tomorrowCalendar.timeInMillis,
-                    tomorrowIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    tomorrowCalendar.timeInMillis,
-                    tomorrowIntent
-                )
-            }
-
-            Log.d("MemorizerApp", "Daily alarm set successfully")
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error in scheduleDaily: ${e.message}")
-            e.printStackTrace()
-        }
-    }
-
-    // Восстановление расписания уведомлений при запуске или после перезагрузки
-    fun restoreNotificationSchedule() {
-        try {
-            // Проверяем, включены ли уведомления
-            val enableReminders = getSqliteSetting("Enable reminders", "true")
-
-            if (enableReminders != "true") {
-                Log.d("MemorizerApp", "Reminders are disabled, not restoring schedule")
-                cancelAllNotifications()
-                return
-            }
-
-            // Получаем настройки времени уведомления
-            val notificationTime = getSqliteSetting("Notification time", MainActivity.DEFAULT_NOTIFICATION_TIME)
-
-            // Перепланируем уведомления
-            scheduleDaily(
-                notificationTime,
-                "Memorizer",
-                "Checking for today's events"
-            )
-
-            Log.d("MemorizerApp", "Notification schedule restored for time: $notificationTime")
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error restoring notification schedule: ${e.message}")
-        }
-    }
-
     private fun cancelAllNotifications() {
         try {
-            // Отменяем все активные уведомления
+            // Cancel all active notifications
             notificationManager.cancelAll()
-
-            // Отменяем запланированные проверки
-            val intent = Intent(context, NotificationReceiver::class.java)
-
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                REMINDER_REQUEST_CODE,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val tomorrowPendingIntent = PendingIntent.getBroadcast(
-                context,
-                REMINDER_REQUEST_CODE + 1,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarmManager.cancel(pendingIntent)
-            alarmManager.cancel(tomorrowPendingIntent)
-
-            Log.d("MemorizerApp", "All notifications and scheduled checks cancelled")
+            Log.d("MemorizerApp", "All notifications cancelled")
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error cancelling notifications: ${e.message}")
         }
     }
 }
 
-
 /**
- * BroadcastReceiver для обработки напоминаний.
- * Показывает уведомления о событиях, запланированных на сегодня.
- */
-/**
- * BroadcastReceiver для обработки напоминаний.
- * Показывает уведомления о событиях, запланированных на сегодня.
+ * BroadcastReceiver for handling individual reminders.
+ * Shows notifications for scheduled events.
  */
 class NotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -610,18 +312,13 @@ class NotificationReceiver : BroadcastReceiver() {
         try {
             when (intent.action) {
                 Intent.ACTION_BOOT_COMPLETED -> {
-                    // Передаем управление в BootReceiver
+                    // Let BootReceiver handle this
                     Log.d("MemorizerApp", "Boot completed, forwarding to BootReceiver")
                     return
                 }
                 "com.example.memorizer.SPECIFIC_REMINDER" -> {
-                    // Обрабатываем конкретное напоминание
+                    // Handle specific reminder
                     handleSpecificReminder(context, intent)
-                    return
-                }
-                "com.example.memorizer.CHECK_REMINDERS" -> {
-                    // Обрабатываем общую проверку (как раньше)
-                    handleGeneralReminderCheck(context, intent)
                     return
                 }
             }
@@ -631,7 +328,7 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Обработка конкретного напоминания
+    // Handle specific reminder
     private fun handleSpecificReminder(context: Context, intent: Intent) {
         try {
             val itemId = intent.getIntExtra("itemId", 0)
@@ -640,23 +337,23 @@ class NotificationReceiver : BroadcastReceiver() {
 
             Log.d("MemorizerApp", "Handling specific reminder for item $itemId")
 
-            // Проверяем, включены ли напоминания
+            // Check if reminders are enabled
             if (!isRemindersEnabled(context)) {
                 Log.d("MemorizerApp", "Reminders are disabled, skipping specific reminder")
                 return
             }
 
-            // Проверяем, существует ли ещё этот элемент в базе данных и имеет ли он напоминание
+            // Check if this item is still active in the database
             if (isItemStillActive(context, itemId)) {
-                // Создаем канал уведомлений
+                // Create notification channel
                 createNotificationChannel(context)
 
-                // Получаем заголовок и содержимое из базы данных
+                // Get item data from database
                 val itemData = getItemData(context, itemId)
                 val itemTitle = if (itemData.first.isNotEmpty()) "Reminder: ${itemData.first}" else title
                 val itemContent = itemData.second.ifEmpty { body }
 
-                // Показываем уведомление
+                // Show notification
                 showEventNotification(context, itemId, itemTitle, itemContent, itemId)
 
                 Log.d("MemorizerApp", "Specific reminder shown for item $itemId")
@@ -669,7 +366,7 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Получаем данные элемента из базы данных
+    // Get item data from database
     private fun getItemData(context: Context, itemId: Int): Pair<String, String> {
         return try {
             val dbPath = context.getDatabasePath("memorizer.db")
@@ -699,7 +396,7 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Проверяем, активен ли ещё элемент в базе данных
+    // Check if item is still active in database
     private fun isItemStillActive(context: Context, itemId: Int): Boolean {
         return try {
             val dbPath = context.getDatabasePath("memorizer.db")
@@ -713,9 +410,9 @@ class NotificationReceiver : BroadcastReceiver() {
             )
 
             val isActive = if (cursor.moveToFirst()) {
-                cursor.getInt(0) == 1 // remind должен быть включен
+                cursor.getInt(0) == 1 // remind must be enabled
             } else {
-                false // элемент не найден
+                false // item not found
             }
 
             cursor.close()
@@ -724,198 +421,6 @@ class NotificationReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error checking if item is active: ${e.message}")
             false
-        }
-    }
-
-    // Обработка общей проверки напоминаний (старая логика)
-    private fun handleGeneralReminderCheck(context: Context, intent: Intent) {
-        try {
-            // Проверяем, включены ли напоминания
-            val enabled = isRemindersEnabled(context)
-            if (!enabled) {
-                Log.d("MemorizerApp", "Reminders are disabled, skipping notification check")
-                return
-            }
-
-            // Получаем сегодняшнюю дату в формате YYYYMMDD
-            val calendar = Calendar.getInstance()
-            val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-            val todayDate = dateFormat.format(calendar.time).toInt()
-
-            Log.d("MemorizerApp", "Checking events for today: $todayDate")
-
-            // Пробуем открыть базу данных напрямую
-            val dbPath = context.getDatabasePath("memorizer.db")
-
-            if (!dbPath.exists()) {
-                Log.e("MemorizerApp", "Database file does not exist at path: ${dbPath.absolutePath}")
-                return
-            }
-
-            val db = SQLiteDatabase.openDatabase(
-                dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY
-            )
-
-            // Запрашиваем события на сегодня с включенными напоминаниями, включая поле time
-            val cursor = db.rawQuery(
-                "SELECT id, title, content, time FROM items WHERE remind = 1 AND date = ? AND (hidden = 0 OR hidden IS NULL)",
-                arrayOf(todayDate.toString())
-            )
-
-            // Получаем количество событий
-            val eventCount = cursor.count
-            Log.d("MemorizerApp", "Found $eventCount events with reminders for today")
-
-            // Если нет событий, просто выходим
-            if (eventCount == 0) {
-                cursor.close()
-                db.close()
-                Log.d("MemorizerApp", "No events for today, skipping notifications")
-                return
-            }
-
-            // Создаем канал уведомлений
-            createNotificationChannel(context)
-
-            // Получаем текущее время
-            val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-            val currentMinute = Calendar.getInstance().get(Calendar.MINUTE)
-
-            // Для каждого события проверяем время и создаем уведомление если нужно
-            var notificationId = 1
-            var notificationsShown = 0
-
-            while (cursor.moveToNext()) {
-                val idColumn = cursor.getColumnIndexOrThrow("id")
-                val titleColumn = cursor.getColumnIndexOrThrow("title")
-                val contentColumn = cursor.getColumnIndexOrThrow("content")
-                val timeColumn = cursor.getColumnIndexOrThrow("time")
-
-                val id = cursor.getInt(idColumn)
-                val title = cursor.getString(titleColumn) ?: ""
-                val content = cursor.getString(contentColumn) ?: ""
-                val itemTime = if (cursor.isNull(timeColumn)) null else cursor.getInt(timeColumn)
-
-                // Определяем время уведомления для этой записи
-                val notificationTime = determineNotificationTime(context, itemTime)
-
-                Log.d("MemorizerApp", "Event ID: $id, Title: $title, Item time: $itemTime, Notification time: $notificationTime")
-
-                // Проверяем, нужно ли показывать уведомление сейчас
-                if (shouldShowNotificationNow(currentHour, currentMinute, notificationTime)) {
-                    Log.d("MemorizerApp", "Showing reminder for event ID: $id, Title: $title")
-                    showEventNotification(context, id, "Reminder: $title", content, notificationId)
-                    notificationId++
-                    notificationsShown++
-                }
-            }
-
-            // Если показано больше одного уведомления, показываем общее уведомление
-            if (notificationsShown > 1) {
-                showEventNotification(
-                    context,
-                    0,
-                    "Today's events",
-                    "You have $notificationsShown scheduled events for today",
-                    999999
-                )
-            }
-
-            cursor.close()
-            db.close()
-
-            // Отправляем сообщение в Flutter для проверки событий
-            MainActivity.checkEvents()
-
-            // Планируем следующую проверку
-            scheduleNextCheck(context)
-
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error in handleGeneralReminderCheck: ${e.message}")
-            e.printStackTrace()
-        }
-    }
-
-    // Определяем время уведомления для конкретной записи
-    private fun determineNotificationTime(context: Context, itemTime: Int?): String {
-        return if (itemTime != null) {
-            // Если у записи есть своё время, используем его
-            formatTimeFromInt(itemTime)
-        } else {
-            // Иначе используем время по умолчанию из настроек
-            getNotificationTime(context)
-        }
-    }
-
-    // Форматируем время из integer в строку HH:MM
-    private fun formatTimeFromInt(timeInt: Int): String {
-        val hours = timeInt / 100
-        val minutes = timeInt % 100
-        return String.format("%02d:%02d", hours, minutes)
-    }
-
-    // Проверяем, нужно ли показывать уведомление сейчас
-    private fun shouldShowNotificationNow(currentHour: Int, currentMinute: Int, notificationTime: String): Boolean {
-        return try {
-            val parts = notificationTime.split(":")
-            if (parts.size != 2) return true // В случае ошибки показываем уведомление
-
-            val notificationHour = parts[0].toIntOrNull() ?: return true
-            val notificationMinute = parts[1].toIntOrNull() ?: return true
-
-            val currentTotalMinutes = currentHour * 60 + currentMinute
-            val notificationTotalMinutes = notificationHour * 60 + notificationMinute
-
-            // Показываем уведомление если текущее время равно времени уведомления
-            // или прошло не более 60 минут с времени уведомления
-            currentTotalMinutes >= notificationTotalMinutes &&
-                    (currentTotalMinutes - notificationTotalMinutes) <= 60
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error checking notification time: ${e.message}")
-            true // В случае ошибки показываем уведомление
-        }
-    }
-
-    // Планируем следующую проверку через час или на следующий день
-    private fun scheduleNextCheck(context: Context) {
-        try {
-            val intent = Intent(context, NotificationReceiver::class.java).apply {
-                action = "com.example.memorizer.CHECK_REMINDERS"
-            }
-
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                NotificationService.REMINDER_REQUEST_CODE + 100, // Используем другой ID
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            // Планируем проверку через час
-            val calendar = Calendar.getInstance().apply {
-                add(Calendar.HOUR_OF_DAY, 1)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
-
-            Log.d("MemorizerApp", "Next check scheduled for: ${calendar.time}")
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error scheduling next check: ${e.message}")
         }
     }
 
@@ -951,15 +456,15 @@ class NotificationReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Оранжевый цвет
+            // Orange color
             val orangeColor = 0xFFfb8500.toInt()
 
-            // Стиль для большого текста
+            // Big text style
             val bigTextStyle = NotificationCompat.BigTextStyle()
                 .bigText(content)
                 .setBigContentTitle(title)
 
-            // Создаем уведомление
+            // Create notification
             val builder = NotificationCompat.Builder(context, "memorizer_colored_channel")
                 .setSmallIcon(R.drawable.notification_icon)
                 .setContentTitle(title)
@@ -973,7 +478,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 .setColorized(true)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
 
-            // Показываем уведомление с проверкой разрешений
+            // Show notification with permission check
             try {
                 val notificationManager = NotificationManagerCompat.from(context)
                 notificationManager.notify(notificationId, builder.build())
@@ -987,12 +492,12 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Проверяем, включены ли напоминания в настройках
+    // Check if reminders are enabled in settings
     private fun isRemindersEnabled(context: Context): Boolean {
         try {
             val dbPath = context.getDatabasePath("settings.db")
             if (!dbPath.exists()) {
-                return true // По умолчанию включено
+                return true // Default enabled
             }
 
             val db = SQLiteDatabase.openDatabase(
@@ -1009,7 +514,7 @@ class NotificationReceiver : BroadcastReceiver() {
             val result = if (cursor.moveToFirst()) {
                 cursor.getString(0) == "true"
             } else {
-                true // По умолчанию включено
+                true // Default enabled
             }
 
             cursor.close()
@@ -1017,16 +522,172 @@ class NotificationReceiver : BroadcastReceiver() {
             return result
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error checking if reminders enabled: ${e.message}")
-            return true // По умолчанию, если ошибка
+            return true // Default if error
+        }
+    }
+}
+
+
+/**
+ * BroadcastReceiver for restoring scheduled notifications
+ * after device reboot
+ */
+class BootReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            Log.d("MemorizerApp", "Device rebooted, rescheduling notifications")
+
+            try {
+                // Add delay to let system fully initialize
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    rescheduleAllReminders(context)
+                }, 5000) // 5 second delay
+            } catch (e: Exception) {
+                Log.e("MemorizerApp", "Error rescheduling after boot: ${e.message}")
+            }
         }
     }
 
-    // Получаем время напоминаний из настроек
-    private fun getNotificationTime(context: Context): String {
+    private fun rescheduleAllReminders(context: Context) {
+        try {
+            // Check if reminders are enabled
+            if (!isRemindersEnabled(context)) {
+                Log.d("MemorizerApp", "Reminders are disabled, not rescheduling")
+                return
+            }
+
+            val dbPath = context.getDatabasePath("memorizer.db")
+            if (!dbPath.exists()) {
+                Log.e("MemorizerApp", "Database file does not exist")
+                return
+            }
+
+            val db = SQLiteDatabase.openDatabase(
+                dbPath.absolutePath,
+                null,
+                SQLiteDatabase.OPEN_READONLY
+            )
+
+            // Get today's date in YYYYMMDD format
+            val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+            val todayDate = dateFormat.format(Calendar.getInstance().time).toInt()
+
+            // Query for all future reminders
+            val cursor = db.rawQuery(
+                "SELECT id, title, content, date, time FROM items WHERE remind = 1 AND date >= ?",
+                arrayOf(todayDate.toString())
+            )
+
+            var rescheduledCount = 0
+
+            while (cursor.moveToNext()) {
+                try {
+                    val itemId = cursor.getInt(0)
+                    val title = cursor.getString(1) ?: ""
+                    val content = cursor.getString(2) ?: ""
+                    val date = cursor.getInt(3)
+                    val time = if (cursor.isNull(4)) null else cursor.getInt(4)
+
+                    // Parse date
+                    val year = date / 10000
+                    val month = (date % 10000) / 100
+                    val day = date % 100
+
+                    // Parse time or use default
+                    val hour = time?.let { it / 100 } ?: 8
+                    val minute = time?.let { it % 100 } ?: 0
+
+                    // Schedule the reminder
+                    scheduleSpecificReminder(
+                        context,
+                        itemId,
+                        year,
+                        month,
+                        day,
+                        hour,
+                        minute,
+                        title,
+                        content
+                    )
+
+                    rescheduledCount++
+                } catch (e: Exception) {
+                    Log.e("MemorizerApp", "Error rescheduling item: ${e.message}")
+                }
+            }
+
+            cursor.close()
+            db.close()
+
+            Log.d("MemorizerApp", "Rescheduled $rescheduledCount reminders after reboot")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error in rescheduleAllReminders: ${e.message}")
+        }
+    }
+
+    private fun scheduleSpecificReminder(
+        context: Context,
+        itemId: Int,
+        year: Int,
+        month: Int,
+        day: Int,
+        hour: Int,
+        minute: Int,
+        title: String,
+        body: String
+    ) {
+        try {
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.SPECIFIC_REMINDER"
+                putExtra("itemId", itemId)
+                putExtra("title", "Memorizer")
+                putExtra("body", "Reminder")
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                itemId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, day)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            if (calendar.timeInMillis > System.currentTimeMillis()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error scheduling reminder in boot receiver: ${e.message}")
+        }
+    }
+
+    private fun isRemindersEnabled(context: Context): Boolean {
         try {
             val dbPath = context.getDatabasePath("settings.db")
             if (!dbPath.exists()) {
-                return MainActivity.DEFAULT_NOTIFICATION_TIME
+                return true
             }
 
             val db = SQLiteDatabase.openDatabase(
@@ -1037,60 +698,21 @@ class NotificationReceiver : BroadcastReceiver() {
 
             val cursor = db.rawQuery(
                 "SELECT value FROM settings WHERE key = ?",
-                arrayOf("Notification time")
+                arrayOf("Enable reminders")
             )
 
-            val timeValue = if (cursor.moveToFirst()) {
-                cursor.getString(0)
+            val result = if (cursor.moveToFirst()) {
+                cursor.getString(0) == "true"
             } else {
-                MainActivity.DEFAULT_NOTIFICATION_TIME
+                true
             }
 
             cursor.close()
             db.close()
-
-            // Проверяем формат времени
-            val isValid = try {
-                val parts = timeValue.split(":")
-                if (parts.size != 2) return MainActivity.DEFAULT_NOTIFICATION_TIME
-
-                val hour = parts[0].toInt()
-                val minute = parts[1].toInt()
-
-                hour in 0..23 && minute in 0..59
-            } catch (e: Exception) {
-                false
-            }
-
-            return if (isValid) timeValue else MainActivity.DEFAULT_NOTIFICATION_TIME
+            return result
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error getting notification time: ${e.message}")
-            return MainActivity.DEFAULT_NOTIFICATION_TIME
-        }
-    }
-
-}
-
-
-/**
- * BroadcastReceiver для восстановления запланированных уведомлений
- * после перезагрузки устройства
- */
-class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d("MemorizerApp", "Device rebooted, rescheduling notifications")
-
-            try {
-                // Добавляем небольшую задержку, чтобы система успела полностью инициализироваться
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    val notificationService = NotificationService(context)
-                    notificationService.restoreNotificationSchedule()
-                    Log.d("MemorizerApp", "Reminders rescheduled after device reboot")
-                }, 15000) // Задержка 15 секунд
-            } catch (e: Exception) {
-                Log.e("MemorizerApp", "Error rescheduling after boot: ${e.message}")
-            }
+            Log.e("MemorizerApp", "Error checking if reminders enabled: ${e.message}")
+            return true
         }
     }
 }
