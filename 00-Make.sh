@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="change reminders system"
+COMMENT="Fix resheduling reminders"
 #
 GLOBVERS='0.9'
 VER=''
