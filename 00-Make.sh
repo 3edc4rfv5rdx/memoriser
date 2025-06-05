@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="fix logs system"
+COMMENT="change reminders system"
 #
 GLOBVERS='0.9'
 VER=''
