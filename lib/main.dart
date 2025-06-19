@@ -332,7 +332,31 @@ Future<void> removeExpiredItems() async {
     // FIRST update yearly events
     await updateYearlyEvents(todayInt!);
 
-    // THEN delete expired records (NOT yearly) with remove flag
+    // THEN get expired records (NOT yearly) with remove flag to delete their photos first
+    final expiredItems = await mainDb.query(
+      'items',
+      where: 'date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0',
+      whereArgs: [todayInt],
+    );
+
+    myPrint('Found ${expiredItems.length} expired items to delete');
+
+    // Delete photo files for expired items
+    int deletedPhotos = 0;
+    for (var item in expiredItems) {
+      final photoPath = item['photo'] as String?;
+      if (isValidPhotoPath(photoPath)) {
+        try {
+          await deletePhotoFile(photoPath!);
+          deletedPhotos++;
+          myPrint('Deleted photo file: $photoPath');
+        } catch (e) {
+          myPrint('Error deleting photo file $photoPath: $e');
+        }
+      }
+    }
+
+    // Now delete the expired records from database
     final count = await mainDb.rawDelete(
         'DELETE FROM items WHERE date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0',
         [todayInt]
@@ -340,6 +364,9 @@ Future<void> removeExpiredItems() async {
 
     if (count > 0) {
       myPrint('Deleted $count expired items');
+      if (deletedPhotos > 0) {
+        myPrint('Deleted $deletedPhotos photo files');
+      }
     }
   } catch (e) {
     myPrint('Error removing expired items: $e');
