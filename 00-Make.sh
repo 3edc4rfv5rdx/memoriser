@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="Change photo viewer"
+COMMENT="Change photo viewer, remove help"
 #
 GLOBVERS='0.9'
 VER=''
