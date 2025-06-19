@@ -579,24 +579,7 @@ class _HomePageState extends State<HomePage> {
                     icon: Icon(Icons.close),
                     onPressed: () => Navigator.of(dialogContext).pop(),
                   ),
-                  actions: [
-                    // Добавляем кнопку с подсказкой о том, как использовать просмотрщик
-                    IconButton(
-                      icon: Icon(Icons.help_outline),
-                      onPressed: () {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              lw('Pinch to zoom, drag to move photo'),
-                              style: TextStyle(color: Colors.white),
-                            ),
-                            backgroundColor: Colors.black87,
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+
                 ),
                 Flexible(
                   child: Container(
