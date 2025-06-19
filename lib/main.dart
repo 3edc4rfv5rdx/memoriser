@@ -579,6 +579,24 @@ class _HomePageState extends State<HomePage> {
                     icon: Icon(Icons.close),
                     onPressed: () => Navigator.of(dialogContext).pop(),
                   ),
+                  actions: [
+                    // Добавляем кнопку с подсказкой о том, как использовать просмотрщик
+                    IconButton(
+                      icon: Icon(Icons.help_outline),
+                      onPressed: () {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              lw('Pinch to zoom, drag to move photo'),
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            backgroundColor: Colors.black87,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
                 Flexible(
                   child: Container(
@@ -586,7 +604,21 @@ class _HomePageState extends State<HomePage> {
                       maxHeight: screenSize.height * 0.8,
                       maxWidth: screenSize.width * 0.9,
                     ),
-                    child: SingleChildScrollView(
+                    child: InteractiveViewer(
+                      // Настройки масштабирования
+                      minScale: 0.5,           // Минимальный масштаб (можно уменьшить)
+                      maxScale: 5.0,           // Максимальный масштаб (можно увеличить в 5 раз)
+
+                      // Включаем ограничение панорамирования только при увеличении
+                      constrained: true,
+
+                      // Настройки взаимодействия
+                      scaleEnabled: true,      // Включаем масштабирование
+                      panEnabled: true,        // Включаем перемещение
+
+                      // Границы панорамирования
+                      boundaryMargin: EdgeInsets.all(20.0),
+
                       child: Image.file(
                         file,
                         fit: BoxFit.contain,
