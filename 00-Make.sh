@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="Fix resheduling reminders"
+COMMENT="Change photo viewer"
 #
 GLOBVERS='0.9'
 VER=''
