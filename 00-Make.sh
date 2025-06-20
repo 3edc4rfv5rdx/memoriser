@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="Change photo viewer, remove help"
+COMMENT="remove photo in removed items - work"
 #
 GLOBVERS='0.9'
 VER=''

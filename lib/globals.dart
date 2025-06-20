@@ -15,8 +15,8 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-const String progVersion = '0.9.250619';
-const int buildNumber = 57;
+const String progVersion = '0.9.250620';
+const int buildNumber = 58;
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
