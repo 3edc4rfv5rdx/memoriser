@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="remove photo in removed items - work"
+COMMENT="add Swipe to edit/delete to main list"
 #
 GLOBVERS='0.9'
 VER=''
