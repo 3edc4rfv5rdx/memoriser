@@ -345,11 +345,16 @@ Future<void> removeExpiredItems() async {
     int deletedPhotos = 0;
     for (var item in expiredItems) {
       final photoPath = item['photo'] as String?;
-      if (isValidPhotoPath(photoPath)) {
+
+      if (photoPath != null && photoPath.isNotEmpty) {
         try {
-          await deletePhotoFile(photoPath!);
-          deletedPhotos++;
-          myPrint('Deleted photo file: $photoPath');
+          final file = File(photoPath);
+          if (file.existsSync()) {
+            // Delete file directly without UI dependencies
+            await file.delete();
+            deletedPhotos++;
+            myPrint('Deleted photo file: $photoPath');
+          }
         } catch (e) {
           myPrint('Error deleting photo file $photoPath: $e');
         }
