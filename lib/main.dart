@@ -1324,16 +1324,17 @@ class _HomePageState extends State<HomePage> {
                   style: TextStyle(color: clText, fontSize: fsMedium),
                 ),
               )
-              : ListView.builder(
+              : // Замените существующий ListView.builder в методе build() на этот код:
+
+          ListView.builder(
             itemCount: _items.length,
-// В методе build() класса _HomePageState, в части ListView.builder
             itemBuilder: (context, index) {
               final item = _items[index];
               final priorityValue = item['priority'] ?? 0;
               final hasDate = item['date'] != null && item['date'] != 0;
-              final hasTime = item['time'] != null; // Check for time presence
+              final hasTime = item['time'] != null;
               final isReminder = item['remind'] == 1;
-              final isYearly = item['yearly'] == 1; // Check for yearly flag
+              final isYearly = item['yearly'] == 1;
               final hasPhoto = isValidPhotoPath(item['photo']);
 
               // Check if date is current
@@ -1368,149 +1369,253 @@ class _HomePageState extends State<HomePage> {
               final String content = item['content'] ?? '';
               final String tags = item['tags'] ?? '';
 
-              return ListTile(
-                title: Row(
-                  children: [
-                    // REMOVED: yearly indicator from title
-                    Expanded(
-                      child: Text(
-                        item['title'],
-                        style: TextStyle(
-                          fontWeight: fwBold,
-                          color: isToday ? clRed : clText,
-                        ),
-                      ),
-                    ),
-                    // Display priority as stars
-                    if (priorityValue > 0)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(
-                          priorityValue > 3 ? 3 : priorityValue,
-                              (i) => Icon(Icons.star, color: clUpBar, size: 34),
-                        ),
-                      ),
-                  ],
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(content, style: TextStyle(color: isToday ? clRed : clText)),
-                    if (tags.isNotEmpty)
-                      Text(
-                        'Tags: $tags',
-                        style: TextStyle(
-                          fontSize: fsNormal,
-                          color: isToday ? clRed : clText,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    // Add date and time information if available
-                    if (hasDate && formattedDate != null)
-                      Row(
-                        children: [
-                          Icon(Icons.event, color: isToday ? clRed : clText, size: 16),
-                          SizedBox(width: 4),
-                          Text(
-                            formattedDate,
-                            style: TextStyle(
-                              fontSize: fsMedium,
-                              color: isReminder || isToday ? clRed : clText,
-                              fontWeight: isReminder || isToday ? fwBold : fwNormal,
-                            ),
-                          ),
+              return Dismissible(
+                key: Key('item_${item['id']}'),
 
-                          // Add time display if available (только для напоминаний)
-                          if (hasTime && formattedTime != null) ...[
-                            SizedBox(width: 8),
-                            // Показываем звоночек вместо часиков
-                            Icon(Icons.notifications_active, color: clRed, size: 16),
-                            SizedBox(width: 2),
+                // Background for swipe right (edit) - синий фон
+                background: Container(
+                  color: clUpBar,
+                  alignment: Alignment.centerLeft,
+                  padding: EdgeInsets.only(left: 20),
+                  child: Icon(
+                    Icons.edit,
+                    color: clText,
+                    size: 30,
+                  ),
+                ),
+
+                // Background for swipe left (delete) - красный фон
+                secondaryBackground: Container(
+                  color: clRed,
+                  alignment: Alignment.centerRight,
+                  padding: EdgeInsets.only(right: 20),
+                  child: Icon(
+                    Icons.delete,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                ),
+
+                // Handle swipe actions
+                confirmDismiss: (direction) async {
+                  if (direction == DismissDirection.startToEnd) {
+                    // Swipe right - EDIT
+                    // Не удаляем элемент, просто открываем редактор
+                    Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditItemPage(itemId: item['id']),
+                      ),
+                    ).then((updated) {
+                      if (updated == true) {
+                        _refreshItems();
+                      }
+                    });
+
+                    // Reset hidden mode timer
+                    if (xvHiddenMode) {
+                      resetHiddenModeTimer();
+                    }
+
+                    return false; // Не удаляем элемент из списка
+
+                  } else if (direction == DismissDirection.endToStart) {
+                    // Swipe left - DELETE
+                    // Показываем диалог подтверждения
+                    final shouldDelete = await showCustomDialog(
+                      title: lw('Delete Item'),
+                      content: lw('Are you sure you want to delete this item?'),
+                      actions: [
+                        {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
+                        {'label': lw('Delete'), 'value': true, 'isDestructive': true},
+                      ],
+                    );
+
+                    if (shouldDelete == true) {
+                      // Выполняем удаление
+                      try {
+                        final photoPath = item['photo'];
+
+                        // Cancel specific reminder if it exists
+                        await SimpleNotifications.cancelSpecificReminder(item['id']);
+
+                        // Delete item from database
+                        await mainDb.delete(
+                          'items',
+                          where: 'id = ?',
+                          whereArgs: [item['id']],
+                        );
+
+                        // Delete photo file if exists
+                        if (isValidPhotoPath(photoPath)) {
+                          await deletePhotoFile(photoPath);
+                        }
+
+                        _refreshItems();
+
+                        // Reset hidden mode timer
+                        if (xvHiddenMode) {
+                          resetHiddenModeTimer();
+                        }
+
+                        return true; // Разрешаем удаление элемента из списка
+                      } catch (e) {
+                        myPrint('Error deleting item: $e');
+                        okInfoBarRed(lw('Error deleting item'));
+                        return false; // Не удаляем при ошибке
+                      }
+                    } else {
+                      return false; // Пользователь отменил - не удаляем
+                    }
+                  }
+                  return false;
+                },
+
+                // Оригинальный ListTile
+                child: ListTile(
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item['title'],
+                          style: TextStyle(
+                            fontWeight: fwBold,
+                            color: isToday ? clRed : clText,
+                          ),
+                        ),
+                      ),
+                      // Display priority as stars
+                      if (priorityValue > 0)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(
+                            priorityValue > 3 ? 3 : priorityValue,
+                                (i) => Icon(Icons.star, color: clUpBar, size: 34),
+                          ),
+                        ),
+                    ],
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(content, style: TextStyle(color: isToday ? clRed : clText)),
+                      if (tags.isNotEmpty)
+                        Text(
+                          'Tags: $tags',
+                          style: TextStyle(
+                            fontSize: fsNormal,
+                            color: isToday ? clRed : clText,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      // Add date and time information if available
+                      if (hasDate && formattedDate != null)
+                        Row(
+                          children: [
+                            Icon(Icons.event, color: isToday ? clRed : clText, size: 16),
+                            SizedBox(width: 4),
                             Text(
-                              formattedTime,
+                              formattedDate,
                               style: TextStyle(
                                 fontSize: fsMedium,
-                                color: clRed,
-                                fontWeight: fwBold,
+                                color: isReminder || isToday ? clRed : clText,
+                                fontWeight: isReminder || isToday ? fwBold : fwNormal,
                               ),
                             ),
-                          ],
-                        ],
-                      ),
-                  ],
-                ),
-                tileColor: _selectedItemId == item['id']
-                    ? clSel
-                    : isToday
-                    ? Color(0x22FF0000)
-                    : clFill,
 
-                leading: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // First row: only hidden icon if needed
-                    if (xvHiddenMode)
-                      Icon(Icons.lock, color: clText, size: 16),
-                    // Second row: priority circle
-                    if (priorityValue > 0) ...[
-                      if (xvHiddenMode) SizedBox(height: 2),
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: clUpBar,
-                          shape: BoxShape.circle,
+                            // Add time display if available
+                            if (hasTime && formattedTime != null) ...[
+                              SizedBox(width: 8),
+                              Icon(Icons.notifications_active, color: clRed, size: 16),
+                              SizedBox(width: 2),
+                              Text(
+                                formattedTime,
+                                style: TextStyle(
+                                  fontSize: fsMedium,
+                                  color: clRed,
+                                  fontWeight: fwBold,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          priorityValue.toString(),
-                          style: TextStyle(
-                            color: clText,
-                            fontWeight: fwBold,
-                            fontSize: fsSmall,
+                    ],
+                  ),
+                  tileColor: _selectedItemId == item['id']
+                      ? clSel
+                      : isToday
+                      ? Color(0x22FF0000)
+                      : clFill,
+
+                  leading: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // First row: only hidden icon if needed
+                      if (xvHiddenMode)
+                        Icon(Icons.lock, color: clText, size: 16),
+                      // Second row: priority circle
+                      if (priorityValue > 0) ...[
+                        if (xvHiddenMode) SizedBox(height: 2),
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: clUpBar,
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            priorityValue.toString(),
+                            style: TextStyle(
+                              color: clText,
+                              fontWeight: fwBold,
+                              fontSize: fsSmall,
+                            ),
                           ),
                         ),
-                      ),
+                      ],
+                      // Third row: yearly indicator
+                      if (isYearly && hasDate) ...[
+                        SizedBox(height: 2),
+                        Icon(
+                          Icons.refresh,
+                          color: isToday ? clRed : clText,
+                          size: 16,
+                        ),
+                      ],
                     ],
-                    // Third row: yearly indicator (only if yearly and has date)
-                    if (isYearly && hasDate) ...[
-                      SizedBox(height: 2),
-                      Icon(
-                        Icons.refresh,
-                        color: isToday ? clRed : clText,
-                        size: 16,
-                      ),
-                    ],
-                  ],
+                  ),
+
+                  trailing: hasPhoto
+                      ? IconButton(
+                    icon: Icon(Icons.photo, color: isToday ? clRed : clText),
+                    onPressed: () => _showPhoto(item['photo']),
+                  )
+                      : null,
+
+                  onTap: () {
+                    // Just select the item and highlight it
+                    setState(() {
+                      _selectedItemId = item['id'];
+                    });
+
+                    // Reset hidden mode timer
+                    if (xvHiddenMode) {
+                      resetHiddenModeTimer();
+                    }
+                  },
+
+                  onLongPress: () {
+                    // Show context menu with Edit and Delete options
+                    _showContextMenu(context, item);
+
+                    // Reset hidden mode timer
+                    if (xvHiddenMode) {
+                      resetHiddenModeTimer();
+                    }
+                  },
                 ),
-
-                trailing: hasPhoto
-                    ? IconButton(
-                  icon: Icon(Icons.photo, color: isToday ? clRed : clText),
-                  onPressed: () => _showPhoto(item['photo']),
-                )
-                    : null,
-                onTap: () {
-                  // Just select the item and highlight it
-                  setState(() {
-                    _selectedItemId = item['id'];
-                  });
-
-                  // Reset hidden mode timer
-                  if (xvHiddenMode) {
-                    resetHiddenModeTimer();
-                  }
-                },
-                onLongPress: () {
-                  // Show context menu with Edit and Delete options
-                  _showContextMenu(context, item);
-
-                  // Reset hidden mode timer
-                  if (xvHiddenMode) {
-                    resetHiddenModeTimer();
-                  }
-                },
               );
             },
           ),
