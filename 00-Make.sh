@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="add Swipe to edit/delete to main list"
+COMMENT="rewrite reminder channels"
 #
 GLOBVERS='0.9'
 VER=''
