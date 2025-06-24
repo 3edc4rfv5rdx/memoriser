@@ -91,7 +91,7 @@ class MainActivity : FlutterActivity() {
  * Processes calls from Flutter and schedules individual reminders.
  */
 class NotificationService(private val context: Context) : MethodChannel.MethodCallHandler {
-    private val channelId = "memorizer_channel"
+    private val channelId = "memorizer_reminders"
     private val notificationManager = NotificationManagerCompat.from(context)
 
     init {
@@ -427,11 +427,11 @@ class NotificationReceiver : BroadcastReceiver() {
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                "memorizer_colored_channel",
-                "Memorizer Colored Reminders",
+                "memorizer_reminders",
+                "Memorizer Reminders",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Colored reminders for Memorizer app"
+                description = "Reminders for Memorizer app" // ← ИСПРАВЛЕНО описание
                 enableLights(true)
                 enableVibration(true)
                 setShowBadge(true)
@@ -465,7 +465,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 .setBigContentTitle(title)
 
             // Create notification
-            val builder = NotificationCompat.Builder(context, "memorizer_colored_channel")
+            val builder = NotificationCompat.Builder(context, "memorizer_reminders") // ← ИСПРАВЛЕНО
                 .setSmallIcon(R.drawable.notification_icon)
                 .setContentTitle(title)
                 .setContentText(content)
