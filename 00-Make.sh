@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="rewrite reminder channels"
+COMMENT="Add virtual folder Yearly"
 #
 GLOBVERS='0.9'
 VER=''
