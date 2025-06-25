@@ -515,6 +515,7 @@ class _HomePageState extends State<HomePage> {
   // Переменные для обработки множественного тапа
   int _tapCount = 0;
   Timer? _tapTimer;
+  bool _isInYearlyFolder = false;
 
   @override
   void initState() {
@@ -527,6 +528,74 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _tapTimer?.cancel();
     super.dispose();
+  }
+
+  void _enterYearlyFolder() {
+    setState(() {
+      _isInYearlyFolder = true;
+      xvFilter = 'yearly:true'; // Устанавливаем фильтр на ежегодные
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  void _exitYearlyFolder() {
+    setState(() {
+      _isInYearlyFolder = false;
+      xvFilter = ''; // Очищаем фильтр
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  Map<String, dynamic> _createBackItem() {
+    return {
+      'id': -1, // Специальный ID для виртуального элемента
+      'isVirtual': true,
+      'type': 'back',
+      'title': lw('Back to main'),
+      'content': '',
+      'tags': '',
+      'priority': 0,
+      'date': null,
+      'time': null,
+      'remind': 0,
+      'yearly': 0,
+      'hidden': 0,
+      'photo': null,
+    };
+  }
+
+  Map<String, dynamic> _createYearlyFolderItem() {
+    return {
+      'id': -2, // Специальный ID для виртуального элемента
+      'isVirtual': true,
+      'type': 'yearly_folder',
+      'title': lw('Yearly Events'),
+      'content': '',
+      'tags': '',
+      'priority': 0,
+      'date': null,
+      'time': null,
+      'remind': 0,
+      'yearly': 0,
+      'hidden': 0,
+      'photo': null,
+    };
+  }
+
+  Future<int> _getYearlyItemsCount() async {
+    try {
+      // Подсчитываем количество ежегодных записей
+      final count = await mainDb.rawQuery(
+        'SELECT COUNT(*) as count FROM items WHERE yearly = 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
+      );
+
+      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
+    } catch (e) {
+      myPrint('Error counting yearly items: $e');
+      return 0;
+    }
   }
 
   void _showPhoto(String photoPath) {
@@ -983,6 +1052,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       xvTagFilter = '';
       xvFilter = '';
+      _isInYearlyFolder = false;
     });
     _refreshItems();
     okInfoBarBlue(lw('All filters cleared'));
@@ -995,6 +1065,90 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Widget _buildVirtualItem(Map<String, dynamic> item) {
+    final type = item['type'] as String;
+
+    if (type == 'back') {
+      // Кнопка "Назад"
+      return ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: clUpBar,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.arrow_back, color: clText, size: 20),
+        ),
+        title: Text(
+          item['title'],
+          style: TextStyle(
+            fontWeight: fwBold,
+            color: clText,
+            fontSize: fsMedium,
+          ),
+        ),
+        subtitle: Text(
+          lw('Return to main list'),
+          style: TextStyle(color: clText, fontStyle: FontStyle.italic),
+        ),
+        tileColor: clFill,
+        onTap: () {
+          _exitYearlyFolder();
+
+          // Reset hidden mode timer
+          if (xvHiddenMode) {
+            resetHiddenModeTimer();
+          }
+        },
+      );
+    } else if (type == 'yearly_folder') {
+      // Виртуальная папка "Yearly"
+      return ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.green,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.refresh, color: clText, size: 20),
+        ),
+        title: Text(
+          item['title'],
+          style: TextStyle(
+            fontWeight: fwBold,
+            color: clText,
+            fontSize: fsMedium,
+          ),
+        ),
+        subtitle: FutureBuilder<int>(
+          future: _getYearlyItemsCount(),
+          builder: (context, snapshot) {
+            final count = snapshot.data ?? 0;
+            return Text(
+              '$count ${lw('items')}',
+              style: TextStyle(color: clText, fontStyle: FontStyle.italic),
+            );
+          },
+        ),
+        trailing: Icon(Icons.folder_open, color: Colors.green),
+        tileColor: clFill,
+        onTap: () {
+          _enterYearlyFolder();
+
+          // Reset hidden mode timer
+          if (xvHiddenMode) {
+            resetHiddenModeTimer();
+          }
+        },
+      );
+    }
+
+    // Fallback для неизвестных типов
+    return SizedBox.shrink();
+  }
+
   Future<void> _refreshItems() async {
     setState(() {
       _isLoading = true;
@@ -1002,11 +1156,36 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final items = await getItems();
+
+      // Добавляем виртуальные элементы
+      List<Map<String, dynamic>> finalItems = [];
+
+      if (_isInYearlyFolder) {
+        // В папке Yearly - кнопка "Назад" ВВЕРХУ (логично для навигации)
+        finalItems.add(_createBackItem());
+
+        // Добавляем ТОЛЬКО ежегодные записи
+        final yearlyItems = items.where((item) => item['yearly'] == 1).toList();
+        finalItems.addAll(yearlyItems);
+
+      } else {
+        // На главном уровне - сначала обычные записи
+        final nonYearlyItems = items.where((item) => item['yearly'] != 1).toList();
+        finalItems.addAll(nonYearlyItems);
+
+        // ИЗМЕНЕНО: Виртуальные папки в КОНЦЕ списка
+        final yearlyCount = await _getYearlyItemsCount();
+        if (yearlyCount > 0) {
+          // Добавляем виртуальную папку "Yearly" в конец
+          finalItems.add(_createYearlyFolderItem());
+        }
+      }
+
       setState(() {
-        _items = items;
+        _items = finalItems;
         _isLoading = false;
       });
-      _updateFilterStatus(); // Обновляем статус фильтра после обновления элементов
+      _updateFilterStatus();
     } catch (e) {
       myPrint('Error loading items: $e');
       setState(() {
@@ -1129,12 +1308,12 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: xvHiddenMode ? hidModeColor : clUpBar,
         foregroundColor: clText,
         title: GestureDetector(
-          onLongPress: () => showHelp(20), // ID 20 для заголовка
-          onTap: _handleMultipleTap, // Добавляем обработчик множественного тапа
+          onLongPress: () => showHelp(20),
+          onTap: _handleMultipleTap,
           child: Row(
             children: [
               Text(
-                lw('Memorizer'),
+                _isInYearlyFolder ? lw('Yearly Events') : lw('Memorizer'),
                 style: TextStyle(fontSize: fsLarge, fontWeight: fwBold),
               ),
               if (xvHiddenMode)
@@ -1312,313 +1491,319 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body:
-          _isLoading
-              ? Center(child: CircularProgressIndicator())
-              : _items.isEmpty
-              ? Center(
-                child: Text(
-                  xvHiddenMode
-                      ? lw('No private items yet. Press + to add.')
-                      : lw('No items yet. Press + to add.'),
-                  style: TextStyle(color: clText, fontSize: fsMedium),
-                ),
-              )
-              : // Замените существующий ListView.builder в методе build() на этот код:
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : _items.isEmpty
+          ? Center(
+        child: Text(
+          _isInYearlyFolder
+              ? lw('No yearly events yet.')
+              : xvHiddenMode
+              ? lw('No private items yet. Press + to add.')
+              : lw('No items yet. Press + to add.'),
+          style: TextStyle(color: clText, fontSize: fsMedium),
+        ),
+      )
+          : ListView.builder(
+        itemCount: _items.length,
+        itemBuilder: (context, index) {
+          final item = _items[index];
 
-          ListView.builder(
-            itemCount: _items.length,
-            itemBuilder: (context, index) {
-              final item = _items[index];
-              final priorityValue = item['priority'] ?? 0;
-              final hasDate = item['date'] != null && item['date'] != 0;
-              final hasTime = item['time'] != null;
-              final isReminder = item['remind'] == 1;
-              final isYearly = item['yearly'] == 1;
-              final hasPhoto = isValidPhotoPath(item['photo']);
+          // НОВОЕ: Обработка виртуальных элементов
+          if (item['isVirtual'] == true) {
+            return _buildVirtualItem(item);
+          }
 
-              // Check if date is current
-              final todayDate = dateTimeToYYYYMMDD(DateTime.now());
-              final isToday = hasDate && item['date'] == todayDate;
+          // Обычные элементы - код остается как был
+          final priorityValue = item['priority'] ?? 0;
+          final hasDate = item['date'] != null && item['date'] != 0;
+          final hasTime = item['time'] != null;
+          final isReminder = item['remind'] == 1;
+          final isYearly = item['yearly'] == 1;
+          final hasPhoto = isValidPhotoPath(item['photo']);
 
-              // Format date for display if it exists
-              String? formattedDate;
-              if (hasDate) {
-                try {
-                  final eventDate = yyyymmddToDateTime(item['date']);
-                  if (eventDate != null) {
-                    formattedDate = DateFormat(ymdDateFormat).format(eventDate);
-                  } else {
-                    myPrint('Warning: Could not format date: ${item['date']}');
+          // Check if date is current
+          final todayDate = dateTimeToYYYYMMDD(DateTime.now());
+          final isToday = hasDate && item['date'] == todayDate;
+
+          // Format date for display if it exists
+          String? formattedDate;
+          if (hasDate) {
+            try {
+              final eventDate = yyyymmddToDateTime(item['date']);
+              if (eventDate != null) {
+                formattedDate = DateFormat(ymdDateFormat).format(eventDate);
+              } else {
+                myPrint('Warning: Could not format date: ${item['date']}');
+              }
+            } catch (e) {
+              myPrint('Error formatting date: $e');
+            }
+          }
+
+          // Format time for display if it exists
+          String? formattedTime;
+          if (hasTime) {
+            formattedTime = timeIntToString(item['time']);
+            if (formattedTime == null) {
+              myPrint('Warning: Could not format time: ${item['time']}');
+            }
+          }
+
+          // Safely get content and tags with null checks
+          final String content = item['content'] ?? '';
+          final String tags = item['tags'] ?? '';
+
+          return Dismissible(
+            key: Key('item_${item['id']}'),
+
+            // Background for swipe right (edit) - синий фон
+            background: Container(
+              color: clUpBar,
+              alignment: Alignment.centerLeft,
+              padding: EdgeInsets.only(left: 20),
+              child: Icon(
+                Icons.edit,
+                color: clText,
+                size: 30,
+              ),
+            ),
+
+            // Background for swipe left (delete) - красный фон
+            secondaryBackground: Container(
+              color: clRed,
+              alignment: Alignment.centerRight,
+              padding: EdgeInsets.only(right: 20),
+              child: Icon(
+                Icons.delete,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+
+            // Handle swipe actions
+            confirmDismiss: (direction) async {
+              if (direction == DismissDirection.startToEnd) {
+                // Swipe right - EDIT
+                // Не удаляем элемент, просто открываем редактор
+                Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditItemPage(itemId: item['id']),
+                  ),
+                ).then((updated) {
+                  if (updated == true) {
+                    _refreshItems();
                   }
-                } catch (e) {
-                  myPrint('Error formatting date: $e');
+                });
+
+                // Reset hidden mode timer
+                if (xvHiddenMode) {
+                  resetHiddenModeTimer();
                 }
-              }
 
-              // Format time for display if it exists
-              String? formattedTime;
-              if (hasTime) {
-                formattedTime = timeIntToString(item['time']);
-                if (formattedTime == null) {
-                  myPrint('Warning: Could not format time: ${item['time']}');
-                }
-              }
+                return false; // Не удаляем элемент из списка
 
-              // Safely get content and tags with null checks
-              final String content = item['content'] ?? '';
-              final String tags = item['tags'] ?? '';
+              } else if (direction == DismissDirection.endToStart) {
+                // Swipe left - DELETE
+                // Показываем диалог подтверждения
+                final shouldDelete = await showCustomDialog(
+                  title: lw('Delete Item'),
+                  content: lw('Are you sure you want to delete this item?'),
+                  actions: [
+                    {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
+                    {'label': lw('Delete'), 'value': true, 'isDestructive': true},
+                  ],
+                );
 
-              return Dismissible(
-                key: Key('item_${item['id']}'),
+                if (shouldDelete == true) {
+                  // Выполняем удаление
+                  try {
+                    final photoPath = item['photo'];
 
-                // Background for swipe right (edit) - синий фон
-                background: Container(
-                  color: clUpBar,
-                  alignment: Alignment.centerLeft,
-                  padding: EdgeInsets.only(left: 20),
-                  child: Icon(
-                    Icons.edit,
-                    color: clText,
-                    size: 30,
-                  ),
-                ),
+                    // Cancel specific reminder if it exists
+                    await SimpleNotifications.cancelSpecificReminder(item['id']);
 
-                // Background for swipe left (delete) - красный фон
-                secondaryBackground: Container(
-                  color: clRed,
-                  alignment: Alignment.centerRight,
-                  padding: EdgeInsets.only(right: 20),
-                  child: Icon(
-                    Icons.delete,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                ),
-
-                // Handle swipe actions
-                confirmDismiss: (direction) async {
-                  if (direction == DismissDirection.startToEnd) {
-                    // Swipe right - EDIT
-                    // Не удаляем элемент, просто открываем редактор
-                    Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditItemPage(itemId: item['id']),
-                      ),
-                    ).then((updated) {
-                      if (updated == true) {
-                        _refreshItems();
-                      }
-                    });
-
-                    // Reset hidden mode timer
-                    if (xvHiddenMode) {
-                      resetHiddenModeTimer();
-                    }
-
-                    return false; // Не удаляем элемент из списка
-
-                  } else if (direction == DismissDirection.endToStart) {
-                    // Swipe left - DELETE
-                    // Показываем диалог подтверждения
-                    final shouldDelete = await showCustomDialog(
-                      title: lw('Delete Item'),
-                      content: lw('Are you sure you want to delete this item?'),
-                      actions: [
-                        {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
-                        {'label': lw('Delete'), 'value': true, 'isDestructive': true},
-                      ],
+                    // Delete item from database
+                    await mainDb.delete(
+                      'items',
+                      where: 'id = ?',
+                      whereArgs: [item['id']],
                     );
 
-                    if (shouldDelete == true) {
-                      // Выполняем удаление
-                      try {
-                        final photoPath = item['photo'];
-
-                        // Cancel specific reminder if it exists
-                        await SimpleNotifications.cancelSpecificReminder(item['id']);
-
-                        // Delete item from database
-                        await mainDb.delete(
-                          'items',
-                          where: 'id = ?',
-                          whereArgs: [item['id']],
-                        );
-
-                        // Delete photo file if exists
-                        if (isValidPhotoPath(photoPath)) {
-                          await deletePhotoFile(photoPath);
-                        }
-
-                        _refreshItems();
-
-                        // Reset hidden mode timer
-                        if (xvHiddenMode) {
-                          resetHiddenModeTimer();
-                        }
-
-                        return true; // Разрешаем удаление элемента из списка
-                      } catch (e) {
-                        myPrint('Error deleting item: $e');
-                        okInfoBarRed(lw('Error deleting item'));
-                        return false; // Не удаляем при ошибке
-                      }
-                    } else {
-                      return false; // Пользователь отменил - не удаляем
+                    // Delete photo file if exists
+                    if (isValidPhotoPath(photoPath)) {
+                      await deletePhotoFile(photoPath);
                     }
-                  }
-                  return false;
-                },
 
-                // Оригинальный ListTile
-                child: ListTile(
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item['title'],
+                    _refreshItems();
+
+                    // Reset hidden mode timer
+                    if (xvHiddenMode) {
+                      resetHiddenModeTimer();
+                    }
+
+                    return true; // Разрешаем удаление элемента из списка
+                  } catch (e) {
+                    myPrint('Error deleting item: $e');
+                    okInfoBarRed(lw('Error deleting item'));
+                    return false; // Не удаляем при ошибке
+                  }
+                } else {
+                  return false; // Пользователь отменил - не удаляем
+                }
+              }
+              return false;
+            },
+
+            // Оригинальный ListTile
+            child: ListTile(
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item['title'],
+                      style: TextStyle(
+                        fontWeight: fwBold,
+                        color: isToday ? clRed : clText,
+                      ),
+                    ),
+                  ),
+                  // Display priority as stars
+                  if (priorityValue > 0)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        priorityValue > 3 ? 3 : priorityValue,
+                            (i) => Icon(Icons.star, color: clUpBar, size: 34),
+                      ),
+                    ),
+                ],
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(content, style: TextStyle(color: isToday ? clRed : clText)),
+                  if (tags.isNotEmpty)
+                    Text(
+                      'Tags: $tags',
+                      style: TextStyle(
+                        fontSize: fsNormal,
+                        color: isToday ? clRed : clText,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  // Add date and time information if available
+                  if (hasDate && formattedDate != null)
+                    Row(
+                      children: [
+                        Icon(Icons.event, color: isToday ? clRed : clText, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          formattedDate,
                           style: TextStyle(
-                            fontWeight: fwBold,
-                            color: isToday ? clRed : clText,
+                            fontSize: fsMedium,
+                            color: isReminder || isToday ? clRed : clText,
+                            fontWeight: isReminder || isToday ? fwBold : fwNormal,
                           ),
+                        ),
+
+                        // Add time display if available
+                        if (hasTime && formattedTime != null) ...[
+                          SizedBox(width: 8),
+                          Icon(Icons.notifications_active, color: clRed, size: 16),
+                          SizedBox(width: 2),
+                          Text(
+                            formattedTime,
+                            style: TextStyle(
+                              fontSize: fsMedium,
+                              color: clRed,
+                              fontWeight: fwBold,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                ],
+              ),
+              tileColor: _selectedItemId == item['id']
+                  ? clSel
+                  : isToday
+                  ? Color(0x22FF0000)
+                  : clFill,
+
+              leading: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // First row: only hidden icon if needed
+                  if (xvHiddenMode)
+                    Icon(Icons.lock, color: clText, size: 16),
+                  // Second row: priority circle
+                  if (priorityValue > 0) ...[
+                    if (xvHiddenMode) SizedBox(height: 2),
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: clUpBar,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        priorityValue.toString(),
+                        style: TextStyle(
+                          color: clText,
+                          fontWeight: fwBold,
+                          fontSize: fsSmall,
                         ),
                       ),
-                      // Display priority as stars
-                      if (priorityValue > 0)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: List.generate(
-                            priorityValue > 3 ? 3 : priorityValue,
-                                (i) => Icon(Icons.star, color: clUpBar, size: 34),
-                          ),
-                        ),
-                    ],
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(content, style: TextStyle(color: isToday ? clRed : clText)),
-                      if (tags.isNotEmpty)
-                        Text(
-                          'Tags: $tags',
-                          style: TextStyle(
-                            fontSize: fsNormal,
-                            color: isToday ? clRed : clText,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      // Add date and time information if available
-                      if (hasDate && formattedDate != null)
-                        Row(
-                          children: [
-                            Icon(Icons.event, color: isToday ? clRed : clText, size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              formattedDate,
-                              style: TextStyle(
-                                fontSize: fsMedium,
-                                color: isReminder || isToday ? clRed : clText,
-                                fontWeight: isReminder || isToday ? fwBold : fwNormal,
-                              ),
-                            ),
+                    ),
+                  ],
+                  // Third row: yearly indicator
+                  if (isYearly && hasDate) ...[
+                    SizedBox(height: 2),
+                    Icon(
+                      Icons.refresh,
+                      color: isToday ? clRed : clText,
+                      size: 16,
+                    ),
+                  ],
+                ],
+              ),
 
-                            // Add time display if available
-                            if (hasTime && formattedTime != null) ...[
-                              SizedBox(width: 8),
-                              Icon(Icons.notifications_active, color: clRed, size: 16),
-                              SizedBox(width: 2),
-                              Text(
-                                formattedTime,
-                                style: TextStyle(
-                                  fontSize: fsMedium,
-                                  color: clRed,
-                                  fontWeight: fwBold,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                    ],
-                  ),
-                  tileColor: _selectedItemId == item['id']
-                      ? clSel
-                      : isToday
-                      ? Color(0x22FF0000)
-                      : clFill,
+              trailing: hasPhoto
+                  ? IconButton(
+                icon: Icon(Icons.photo, color: isToday ? clRed : clText),
+                onPressed: () => _showPhoto(item['photo']),
+              )
+                  : null,
 
-                  leading: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // First row: only hidden icon if needed
-                      if (xvHiddenMode)
-                        Icon(Icons.lock, color: clText, size: 16),
-                      // Second row: priority circle
-                      if (priorityValue > 0) ...[
-                        if (xvHiddenMode) SizedBox(height: 2),
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: clUpBar,
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            priorityValue.toString(),
-                            style: TextStyle(
-                              color: clText,
-                              fontWeight: fwBold,
-                              fontSize: fsSmall,
-                            ),
-                          ),
-                        ),
-                      ],
-                      // Third row: yearly indicator
-                      if (isYearly && hasDate) ...[
-                        SizedBox(height: 2),
-                        Icon(
-                          Icons.refresh,
-                          color: isToday ? clRed : clText,
-                          size: 16,
-                        ),
-                      ],
-                    ],
-                  ),
+              onTap: () {
+                // Just select the item and highlight it
+                setState(() {
+                  _selectedItemId = item['id'];
+                });
 
-                  trailing: hasPhoto
-                      ? IconButton(
-                    icon: Icon(Icons.photo, color: isToday ? clRed : clText),
-                    onPressed: () => _showPhoto(item['photo']),
-                  )
-                      : null,
+                // Reset hidden mode timer
+                if (xvHiddenMode) {
+                  resetHiddenModeTimer();
+                }
+              },
 
-                  onTap: () {
-                    // Just select the item and highlight it
-                    setState(() {
-                      _selectedItemId = item['id'];
-                    });
+              onLongPress: () {
+                // Show context menu with Edit and Delete options
+                _showContextMenu(context, item);
 
-                    // Reset hidden mode timer
-                    if (xvHiddenMode) {
-                      resetHiddenModeTimer();
-                    }
-                  },
-
-                  onLongPress: () {
-                    // Show context menu with Edit and Delete options
-                    _showContextMenu(context, item);
-
-                    // Reset hidden mode timer
-                    if (xvHiddenMode) {
-                      resetHiddenModeTimer();
-                    }
-                  },
-                ),
-              );
-            },
-          ),
+                // Reset hidden mode timer
+                if (xvHiddenMode) {
+                  resetHiddenModeTimer();
+                }
+              },
+            ),
+          );
+        },
+      ),
 
       floatingActionButton: GestureDetector(
         onLongPress: () => showHelp(29), // ID 29 для кнопки добавления
