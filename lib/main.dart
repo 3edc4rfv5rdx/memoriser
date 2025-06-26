@@ -1065,83 +1065,90 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+// Функция для построения виртуальных элементов
   Widget _buildVirtualItem(Map<String, dynamic> item) {
     final type = item['type'] as String;
 
     if (type == 'back') {
       // Кнопка "Назад"
-      return ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: clUpBar,
-            shape: BoxShape.circle,
+      return GestureDetector(
+        onLongPress: () => showHelp(131),
+        child: ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: clUpBar,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.arrow_back, color: clText, size: 20),
           ),
-          child: Icon(Icons.arrow_back, color: clText, size: 20),
-        ),
-        title: Text(
-          item['title'],
-          style: TextStyle(
-            fontWeight: fwBold,
-            color: clText,
-            fontSize: fsMedium,
+          title: Text(
+            lw('Back to main'),
+            style: TextStyle(
+              fontWeight: fwBold,
+              color: clText,
+              fontSize: fsMedium,
+            ),
           ),
-        ),
-        subtitle: Text(
-          lw('Return to main list'),
-          style: TextStyle(color: clText, fontStyle: FontStyle.italic),
-        ),
-        tileColor: clFill,
-        onTap: () {
-          _exitYearlyFolder();
+          subtitle: Text(
+            lw('Return to main list'),
+            style: TextStyle(color: clText, fontStyle: FontStyle.italic),
+          ),
+          tileColor: clFill,
+          onTap: () {
+            _exitYearlyFolder();
 
-          // Reset hidden mode timer
-          if (xvHiddenMode) {
-            resetHiddenModeTimer();
-          }
-        },
+            // Reset hidden mode timer
+            if (xvHiddenMode) {
+              resetHiddenModeTimer();
+            }
+          },
+        ),
       );
     } else if (type == 'yearly_folder') {
       // Виртуальная папка "Yearly"
-      return ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.green,
-            shape: BoxShape.circle,
+      return GestureDetector(
+        onLongPress: () => showHelp(130),
+        child: ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.refresh, color: clText, size: 20),
           ),
-          child: Icon(Icons.refresh, color: clText, size: 20),
-        ),
-        title: Text(
-          item['title'],
-          style: TextStyle(
-            fontWeight: fwBold,
-            color: clText,
-            fontSize: fsMedium,
+          title: Text(
+            lw('Yearly Events'),
+            style: TextStyle(
+              fontWeight: fwBold,
+              color: clText,
+              fontSize: fsMedium,
+            ),
           ),
-        ),
-        subtitle: FutureBuilder<int>(
-          future: _getYearlyItemsCount(),
-          builder: (context, snapshot) {
-            final count = snapshot.data ?? 0;
-            return Text(
-              '$count ${lw('items')}',
-              style: TextStyle(color: clText, fontStyle: FontStyle.italic),
-            );
+          subtitle: FutureBuilder<int>(
+            future: _getYearlyItemsCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return Text(
+                '$count ${lw('items')}',
+                style: TextStyle(color: clText, fontStyle: FontStyle.italic),
+              );
+            },
+          ),
+          trailing: Icon(Icons.folder_open, color: Colors.green),
+          tileColor: clFill,
+          onTap: () {
+            _enterYearlyFolder();
+
+            // Reset hidden mode timer
+            if (xvHiddenMode) {
+              resetHiddenModeTimer();
+            }
           },
         ),
-        trailing: Icon(Icons.folder_open, color: Colors.green),
-        tileColor: clFill,
-        onTap: () {
-          _enterYearlyFolder();
-
-          // Reset hidden mode timer
-          if (xvHiddenMode) {
-            resetHiddenModeTimer();
-          }
-        },
       );
     }
 
