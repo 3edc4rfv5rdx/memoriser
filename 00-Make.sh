@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="Add virtual folder Yearly"
+COMMENT="Add localization to virtual folder Yearly"
 #
 GLOBVERS='0.9'
 VER=''
