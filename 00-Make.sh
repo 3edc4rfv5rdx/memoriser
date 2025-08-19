@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="Back button for Early events"
+COMMENT="New virtual folder - notes, help and locales"
 #
 GLOBVERS='0.9'
 VER=''
