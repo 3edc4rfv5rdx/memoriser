@@ -548,24 +548,6 @@ class _HomePageState extends State<HomePage> {
     _updateFilterStatus();
   }
 
-  Map<String, dynamic> _createBackItem() {
-    return {
-      'id': -1, // Специальный ID для виртуального элемента
-      'isVirtual': true,
-      'type': 'back',
-      'title': lw('Back to main'),
-      'content': '',
-      'tags': '',
-      'priority': 0,
-      'date': null,
-      'time': null,
-      'remind': 0,
-      'yearly': 0,
-      'hidden': 0,
-      'photo': null,
-    };
-  }
-
   Map<String, dynamic> _createYearlyFolderItem() {
     return {
       'id': -2, // Специальный ID для виртуального элемента
@@ -1065,49 +1047,10 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-// Функция для построения виртуальных элементов
   Widget _buildVirtualItem(Map<String, dynamic> item) {
     final type = item['type'] as String;
 
-    if (type == 'back') {
-      // Кнопка "Назад"
-      return GestureDetector(
-        onLongPress: () => showHelp(131),
-        child: ListTile(
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: clUpBar,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.arrow_back, color: clText, size: 20),
-          ),
-          title: Text(
-            lw('Back to main'),
-            style: TextStyle(
-              fontWeight: fwBold,
-              color: clText,
-              fontSize: fsMedium,
-            ),
-          ),
-          subtitle: Text(
-            lw('Return to main list'),
-            style: TextStyle(color: clText, fontStyle: FontStyle.italic),
-          ),
-          tileColor: clFill,
-          onTap: () {
-            _exitYearlyFolder();
-
-            // Reset hidden mode timer
-            if (xvHiddenMode) {
-              resetHiddenModeTimer();
-            }
-          },
-        ),
-      );
-    } else if (type == 'yearly_folder') {
-      // Виртуальная папка "Yearly"
+    if (type == 'yearly_folder') {
       return GestureDetector(
         onLongPress: () => showHelp(130),
         child: ListTile(
@@ -1143,7 +1086,6 @@ class _HomePageState extends State<HomePage> {
           onTap: () {
             _enterYearlyFolder();
 
-            // Reset hidden mode timer
             if (xvHiddenMode) {
               resetHiddenModeTimer();
             }
@@ -1151,8 +1093,6 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     }
-
-    // Fallback для неизвестных типов
     return SizedBox.shrink();
   }
 
@@ -1168,9 +1108,7 @@ class _HomePageState extends State<HomePage> {
       List<Map<String, dynamic>> finalItems = [];
 
       if (_isInYearlyFolder) {
-        // В папке Yearly - кнопка "Назад" ВВЕРХУ (логично для навигации)
-        finalItems.add(_createBackItem());
-
+        // В папке Yearly - убираем кнопку "Назад" из списка
         // Добавляем ТОЛЬКО ежегодные записи
         final yearlyItems = items.where((item) => item['yearly'] == 1).toList();
         finalItems.addAll(yearlyItems);
@@ -1180,10 +1118,9 @@ class _HomePageState extends State<HomePage> {
         final nonYearlyItems = items.where((item) => item['yearly'] != 1).toList();
         finalItems.addAll(nonYearlyItems);
 
-        // ИЗМЕНЕНО: Виртуальные папки в КОНЦЕ списка
+        // Виртуальные папки в КОНЦЕ списка
         final yearlyCount = await _getYearlyItemsCount();
         if (yearlyCount > 0) {
-          // Добавляем виртуальную папку "Yearly" в конец
           finalItems.add(_createYearlyFolderItem());
         }
       }
@@ -1320,7 +1257,7 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               Text(
-                _isInYearlyFolder ? lw('Yearly Events') : lw('Memorizer'),
+                _isInYearlyFolder ? lw('Yearly') : lw('Memorizer'),
                 style: TextStyle(fontSize: fsLarge, fontWeight: fwBold),
               ),
               if (xvHiddenMode)
@@ -1332,16 +1269,20 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         leading: GestureDetector(
-          onLongPress: () => showHelp(21), // ID 21 для кнопки закрытия
+          onLongPress: () => showHelp(21),
           child: IconButton(
-            icon: const Icon(Icons.close),
+            icon: Icon(_isInYearlyFolder ? Icons.arrow_back : Icons.close),
             onPressed: () async {
-              // Vacuum the databases before closing
-              await vacuumDatabases();
-              // Close the app when X button is pressed from main screen
-              Navigator.of(context).canPop()
-                  ? Navigator.of(context).pop()
-                  : SystemNavigator.pop();
+              if (_isInYearlyFolder) {
+                // Если в папке Yearly - возврат к основному списку
+                _exitYearlyFolder();
+              } else {
+                // Если на главном экране - закрытие приложения
+                await vacuumDatabases();
+                Navigator.of(context).canPop()
+                    ? Navigator.of(context).pop()
+                    : SystemNavigator.pop();
+              }
             },
           ),
         ),
@@ -1349,7 +1290,6 @@ class _HomePageState extends State<HomePage> {
           // Добавляем кнопку проверки напоминаний
           GestureDetector(
             onLongPress: () => showHelp(40),
-            // ID 40 для кнопки проверки напоминаний
             child: IconButton(
               icon: Icon(Icons.notifications),
               tooltip: lw('Check reminders'),
@@ -1358,7 +1298,7 @@ class _HomePageState extends State<HomePage> {
           ),
           // Индикатор состояния фильтра
           GestureDetector(
-            onLongPress: () => showHelp(22), // ID 22 для индикатора фильтра
+            onLongPress: () => showHelp(22),
             child: Center(
               child: Text(
                 _filterStatus,
@@ -1370,10 +1310,9 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          // Removed Filter and Tag filter buttons here
           // Меню
           GestureDetector(
-            onLongPress: () => showHelp(25), // ID 25 для кнопки меню
+            onLongPress: () => showHelp(25),
             child: PopupMenuButton<String>(
               icon: Icon(Icons.menu),
               color: clMenu,
@@ -1393,7 +1332,6 @@ class _HomePageState extends State<HomePage> {
                 } else if (result == 'clear_filters') {
                   _clearAllFilters();
                 } else if (result == 'filters') {
-                  // Added handler for Filters option
                   Navigator.push<bool>(
                     context,
                     MaterialPageRoute(builder: (context) => FiltersScreen()),
@@ -1403,7 +1341,6 @@ class _HomePageState extends State<HomePage> {
                     }
                   });
                 } else if (result == 'tag_filter') {
-                  // Added handler for Tag filter option
                   Navigator.push<bool>(
                     context,
                     MaterialPageRoute(builder: (context) => TagsCloudScreen()),
@@ -1427,31 +1364,26 @@ class _HomePageState extends State<HomePage> {
                     value: 'clear_filters',
                     child: GestureDetector(
                       onLongPress: () => showHelp(26),
-                      // ID 26 для пункта меню очистки фильтров
                       child: Text(
                         lw('Clear all filters'),
                         style: TextStyle(color: clText),
                       ),
                     ),
                   ),
-                  // Added Filter option
                   PopupMenuItem<String>(
                     value: 'filters',
                     child: GestureDetector(
                       onLongPress: () => showHelp(23),
-                      // Reusing ID 23 from former filter button
                       child: Text(
                         lw('Filters'),
                         style: TextStyle(color: clText),
                       ),
                     ),
                   ),
-                  // Added Tag filter option
                   PopupMenuItem<String>(
                     value: 'tag_filter',
                     child: GestureDetector(
                       onLongPress: () => showHelp(24),
-                      // Reusing ID 24 from former tag filter button
                       child: Text(
                         lw('Tag filter'),
                         style: TextStyle(color: clText),
@@ -1462,7 +1394,6 @@ class _HomePageState extends State<HomePage> {
                     value: 'settings',
                     child: GestureDetector(
                       onLongPress: () => showHelp(27),
-                      // ID 27 для пункта меню настроек
                       child: Text(
                         lw('Settings'),
                         style: TextStyle(color: clText),
@@ -1473,13 +1404,11 @@ class _HomePageState extends State<HomePage> {
                     value: 'about',
                     child: GestureDetector(
                       onLongPress: () => showHelp(28),
-                      // ID 28 для пункта меню "О программе"
                       child: Text(lw('About'), style: TextStyle(color: clText)),
                     ),
                   ),
                 ];
 
-                // Добавляем опцию выхода из режима скрытых записей, если мы в нем
                 if (xvHiddenMode) {
                   menuItems.add(
                     PopupMenuItem<String>(
@@ -1516,12 +1445,12 @@ class _HomePageState extends State<HomePage> {
         itemBuilder: (context, index) {
           final item = _items[index];
 
-          // НОВОЕ: Обработка виртуальных элементов
+          // Обработка виртуальных элементов
           if (item['isVirtual'] == true) {
             return _buildVirtualItem(item);
           }
 
-          // Обычные элементы - код остается как был
+          // Остальной код ListView.builder остается без изменений
           final priorityValue = item['priority'] ?? 0;
           final hasDate = item['date'] != null && item['date'] != 0;
           final hasTime = item['time'] != null;
@@ -1529,11 +1458,9 @@ class _HomePageState extends State<HomePage> {
           final isYearly = item['yearly'] == 1;
           final hasPhoto = isValidPhotoPath(item['photo']);
 
-          // Check if date is current
           final todayDate = dateTimeToYYYYMMDD(DateTime.now());
           final isToday = hasDate && item['date'] == todayDate;
 
-          // Format date for display if it exists
           String? formattedDate;
           if (hasDate) {
             try {
@@ -1548,7 +1475,6 @@ class _HomePageState extends State<HomePage> {
             }
           }
 
-          // Format time for display if it exists
           String? formattedTime;
           if (hasTime) {
             formattedTime = timeIntToString(item['time']);
@@ -1557,14 +1483,11 @@ class _HomePageState extends State<HomePage> {
             }
           }
 
-          // Safely get content and tags with null checks
           final String content = item['content'] ?? '';
           final String tags = item['tags'] ?? '';
 
           return Dismissible(
             key: Key('item_${item['id']}'),
-
-            // Background for swipe right (edit) - синий фон
             background: Container(
               color: clUpBar,
               alignment: Alignment.centerLeft,
@@ -1575,8 +1498,6 @@ class _HomePageState extends State<HomePage> {
                 size: 30,
               ),
             ),
-
-            // Background for swipe left (delete) - красный фон
             secondaryBackground: Container(
               color: clRed,
               alignment: Alignment.centerRight,
@@ -1587,12 +1508,8 @@ class _HomePageState extends State<HomePage> {
                 size: 30,
               ),
             ),
-
-            // Handle swipe actions
             confirmDismiss: (direction) async {
               if (direction == DismissDirection.startToEnd) {
-                // Swipe right - EDIT
-                // Не удаляем элемент, просто открываем редактор
                 Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
@@ -1604,16 +1521,13 @@ class _HomePageState extends State<HomePage> {
                   }
                 });
 
-                // Reset hidden mode timer
                 if (xvHiddenMode) {
                   resetHiddenModeTimer();
                 }
 
-                return false; // Не удаляем элемент из списка
+                return false;
 
               } else if (direction == DismissDirection.endToStart) {
-                // Swipe left - DELETE
-                // Показываем диалог подтверждения
                 final shouldDelete = await showCustomDialog(
                   title: lw('Delete Item'),
                   content: lw('Are you sure you want to delete this item?'),
@@ -1624,46 +1538,39 @@ class _HomePageState extends State<HomePage> {
                 );
 
                 if (shouldDelete == true) {
-                  // Выполняем удаление
                   try {
                     final photoPath = item['photo'];
 
-                    // Cancel specific reminder if it exists
                     await SimpleNotifications.cancelSpecificReminder(item['id']);
 
-                    // Delete item from database
                     await mainDb.delete(
                       'items',
                       where: 'id = ?',
                       whereArgs: [item['id']],
                     );
 
-                    // Delete photo file if exists
                     if (isValidPhotoPath(photoPath)) {
                       await deletePhotoFile(photoPath);
                     }
 
                     _refreshItems();
 
-                    // Reset hidden mode timer
                     if (xvHiddenMode) {
                       resetHiddenModeTimer();
                     }
 
-                    return true; // Разрешаем удаление элемента из списка
+                    return true;
                   } catch (e) {
                     myPrint('Error deleting item: $e');
                     okInfoBarRed(lw('Error deleting item'));
-                    return false; // Не удаляем при ошибке
+                    return false;
                   }
                 } else {
-                  return false; // Пользователь отменил - не удаляем
+                  return false;
                 }
               }
               return false;
             },
-
-            // Оригинальный ListTile
             child: ListTile(
               title: Row(
                 children: [
@@ -1676,7 +1583,6 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
-                  // Display priority as stars
                   if (priorityValue > 0)
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1700,7 +1606,6 @@ class _HomePageState extends State<HomePage> {
                         fontStyle: FontStyle.italic,
                       ),
                     ),
-                  // Add date and time information if available
                   if (hasDate && formattedDate != null)
                     Row(
                       children: [
@@ -1714,8 +1619,6 @@ class _HomePageState extends State<HomePage> {
                             fontWeight: isReminder || isToday ? fwBold : fwNormal,
                           ),
                         ),
-
-                        // Add time display if available
                         if (hasTime && formattedTime != null) ...[
                           SizedBox(width: 8),
                           Icon(Icons.notifications_active, color: clRed, size: 16),
@@ -1738,15 +1641,12 @@ class _HomePageState extends State<HomePage> {
                   : isToday
                   ? Color(0x22FF0000)
                   : clFill,
-
               leading: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // First row: only hidden icon if needed
                   if (xvHiddenMode)
                     Icon(Icons.lock, color: clText, size: 16),
-                  // Second row: priority circle
                   if (priorityValue > 0) ...[
                     if (xvHiddenMode) SizedBox(height: 2),
                     Container(
@@ -1767,7 +1667,6 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ],
-                  // Third row: yearly indicator
                   if (isYearly && hasDate) ...[
                     SizedBox(height: 2),
                     Icon(
@@ -1778,31 +1677,24 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ],
               ),
-
               trailing: hasPhoto
                   ? IconButton(
                 icon: Icon(Icons.photo, color: isToday ? clRed : clText),
                 onPressed: () => _showPhoto(item['photo']),
               )
                   : null,
-
               onTap: () {
-                // Just select the item and highlight it
                 setState(() {
                   _selectedItemId = item['id'];
                 });
 
-                // Reset hidden mode timer
                 if (xvHiddenMode) {
                   resetHiddenModeTimer();
                 }
               },
-
               onLongPress: () {
-                // Show context menu with Edit and Delete options
                 _showContextMenu(context, item);
 
-                // Reset hidden mode timer
                 if (xvHiddenMode) {
                   resetHiddenModeTimer();
                 }
@@ -1811,14 +1703,12 @@ class _HomePageState extends State<HomePage> {
           );
         },
       ),
-
       floatingActionButton: GestureDetector(
-        onLongPress: () => showHelp(29), // ID 29 для кнопки добавления
+        onLongPress: () => showHelp(29),
         child: FloatingActionButton(
           backgroundColor: xvHiddenMode ? Color(0xFFf29238) : clUpBar,
           foregroundColor: clText,
           onPressed: () async {
-            // Сбрасываем таймер автоматического выхода из скрытого режима
             if (xvHiddenMode) {
               resetHiddenModeTimer();
             }
@@ -1826,9 +1716,7 @@ class _HomePageState extends State<HomePage> {
             final result = await Navigator.push<bool>(
               context,
               MaterialPageRoute(
-                builder:
-                    (context) =>
-                        EditItemPage(), // Без параметров для новой записи
+                builder: (context) => EditItemPage(),
               ),
             );
 
