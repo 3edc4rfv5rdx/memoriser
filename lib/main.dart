@@ -516,6 +516,7 @@ class _HomePageState extends State<HomePage> {
   int _tapCount = 0;
   Timer? _tapTimer;
   bool _isInYearlyFolder = false;
+  bool _isInNotesFolder = false;
 
   @override
   void initState() {
@@ -528,6 +529,25 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _tapTimer?.cancel();
     super.dispose();
+  }
+
+  void _enterNotesFolder() {
+    setState(() {
+      _isInNotesFolder = true;
+      _isInYearlyFolder = false; // Убеждаемся что другие папки закрыты
+      xvFilter = 'notes:true'; // Устанавливаем фильтр на заметки
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  void _exitNotesFolder() {
+    setState(() {
+      _isInNotesFolder = false;
+      xvFilter = ''; // Очищаем фильтр
+    });
+    _refreshItems();
+    _updateFilterStatus();
   }
 
   void _enterYearlyFolder() {
@@ -566,6 +586,24 @@ class _HomePageState extends State<HomePage> {
     };
   }
 
+  Map<String, dynamic> _createNotesFolderItem() {
+    return {
+      'id': -3, // Специальный ID для виртуального элемента
+      'isVirtual': true,
+      'type': 'notes_folder',
+      'title': lw('Notes'),
+      'content': '',
+      'tags': '',
+      'priority': 0,
+      'date': null,
+      'time': null,
+      'remind': 0,
+      'yearly': 0,
+      'hidden': 0,
+      'photo': null,
+    };
+  }
+
   Future<int> _getYearlyItemsCount() async {
     try {
       // Подсчитываем количество ежегодных записей
@@ -576,6 +614,20 @@ class _HomePageState extends State<HomePage> {
       return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
     } catch (e) {
       myPrint('Error counting yearly items: $e');
+      return 0;
+    }
+  }
+
+  Future<int> _getNotesItemsCount() async {
+    try {
+      // Подсчитываем количество записей без времени и не ежегодных
+      final count = await mainDb.rawQuery(
+        'SELECT COUNT(*) as count FROM items WHERE time IS NULL AND yearly != 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
+      );
+
+      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
+    } catch (e) {
+      myPrint('Error counting notes items: $e');
       return 0;
     }
   }
@@ -1035,6 +1087,7 @@ class _HomePageState extends State<HomePage> {
       xvTagFilter = '';
       xvFilter = '';
       _isInYearlyFolder = false;
+      _isInNotesFolder = false;
     });
     _refreshItems();
     okInfoBarBlue(lw('All filters cleared'));
@@ -1092,7 +1145,50 @@ class _HomePageState extends State<HomePage> {
           },
         ),
       );
+    } else if (type == 'notes_folder') {
+      return GestureDetector(
+        onLongPress: () => showHelp(132),
+        child: ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.blue,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.note, color: clText, size: 20),
+          ),
+          title: Text(
+            lw('Notes'),
+            style: TextStyle(
+              fontWeight: fwBold,
+              color: clText,
+              fontSize: fsMedium,
+            ),
+          ),
+          subtitle: FutureBuilder<int>(
+            future: _getNotesItemsCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return Text(
+                '$count ${lw('items')}',
+                style: TextStyle(color: clText, fontStyle: FontStyle.italic),
+              );
+            },
+          ),
+          trailing: Icon(Icons.folder_open, color: Colors.blue),
+          tileColor: clFill,
+          onTap: () {
+            _enterNotesFolder();
+
+            if (xvHiddenMode) {
+              resetHiddenModeTimer();
+            }
+          },
+        ),
+      );
     }
+
     return SizedBox.shrink();
   }
 
@@ -1108,20 +1204,31 @@ class _HomePageState extends State<HomePage> {
       List<Map<String, dynamic>> finalItems = [];
 
       if (_isInYearlyFolder) {
-        // В папке Yearly - убираем кнопку "Назад" из списка
-        // Добавляем ТОЛЬКО ежегодные записи
+        // В папке Yearly - только ежегодные записи
         final yearlyItems = items.where((item) => item['yearly'] == 1).toList();
         finalItems.addAll(yearlyItems);
 
+      } else if (_isInNotesFolder) {
+        // В папке Notes - только записи без времени и не ежегодные
+        final notesItems = items.where((item) =>
+        item['time'] == null && item['yearly'] != 1).toList();
+        finalItems.addAll(notesItems);
+
       } else {
         // На главном уровне - сначала обычные записи
-        final nonYearlyItems = items.where((item) => item['yearly'] != 1).toList();
-        finalItems.addAll(nonYearlyItems);
+        final normalItems = items.where((item) =>
+        item['yearly'] != 1 && item['time'] != null).toList();
+        finalItems.addAll(normalItems);
 
         // Виртуальные папки в КОНЦЕ списка
         final yearlyCount = await _getYearlyItemsCount();
         if (yearlyCount > 0) {
           finalItems.add(_createYearlyFolderItem());
+        }
+
+        final notesCount = await _getNotesItemsCount();
+        if (notesCount > 0) {
+          finalItems.add(_createNotesFolderItem());
         }
       }
 
@@ -1257,7 +1364,9 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               Text(
-                _isInYearlyFolder ? lw('Yearly') : lw('Memorizer'),
+                _isInYearlyFolder ? lw('Yearly') :
+                _isInNotesFolder ? lw('Notes') :
+                lw('Memorizer'),
                 style: TextStyle(fontSize: fsLarge, fontWeight: fwBold),
               ),
               if (xvHiddenMode)
@@ -1271,13 +1380,13 @@ class _HomePageState extends State<HomePage> {
         leading: GestureDetector(
           onLongPress: () => showHelp(21),
           child: IconButton(
-            icon: Icon(_isInYearlyFolder ? Icons.arrow_back : Icons.close),
+            icon: Icon((_isInYearlyFolder || _isInNotesFolder) ? Icons.arrow_back : Icons.close),
             onPressed: () async {
               if (_isInYearlyFolder) {
-                // Если в папке Yearly - возврат к основному списку
                 _exitYearlyFolder();
+              } else if (_isInNotesFolder) {
+                _exitNotesFolder();
               } else {
-                // Если на главном экране - закрытие приложения
                 await vacuumDatabases();
                 Navigator.of(context).canPop()
                     ? Navigator.of(context).pop()
@@ -1287,7 +1396,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         actions: [
-          // Добавляем кнопку проверки напоминаний
+          // Кнопка проверки напоминаний
           GestureDetector(
             onLongPress: () => showHelp(40),
             child: IconButton(
@@ -1434,6 +1543,8 @@ class _HomePageState extends State<HomePage> {
         child: Text(
           _isInYearlyFolder
               ? lw('No yearly events yet.')
+              : _isInNotesFolder
+              ? lw('No notes yet.')
               : xvHiddenMode
               ? lw('No private items yet. Press + to add.')
               : lw('No items yet. Press + to add.'),
@@ -1729,6 +1840,8 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+
 }
 
 void _showAbout() {
