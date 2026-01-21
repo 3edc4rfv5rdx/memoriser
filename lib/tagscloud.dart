@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'globals.dart';
 
 class TagsCloudScreen extends StatefulWidget {
+  const TagsCloudScreen({super.key});
+
   @override
   _TagsCloudScreenState createState() => _TagsCloudScreenState();
 }
@@ -253,8 +255,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
                           _selectedTags.isEmpty
                               ? Container() // Empty container when no tags selected
                               : Text(
-                                lw('Selected tags') +
-                                    ': ${_selectedTags.join(", ")}',
+                                '${lw('Selected tags')}: ${_selectedTags.join(", ")}',
                                 style: TextStyle(
                                   color: clText,
                                   fontSize: fsMedium,

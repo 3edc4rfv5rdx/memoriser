@@ -45,6 +45,8 @@ class FilterData {
 }
 
 class FiltersScreen extends StatefulWidget {
+  const FiltersScreen({super.key});
+
   @override
   _FiltersScreenState createState() => _FiltersScreenState();
 }
@@ -410,7 +412,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
         return AlertDialog(
           backgroundColor: clFill,
           title: Text(lw('Select tag'), style: TextStyle(color: clText)),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite,
             height: 300,
             child: ListView.builder(
@@ -465,7 +467,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
       if (!existingTags.contains(tag)) {
         // Добавляем тег с запятой
-        _tagsController.text = currentTags + ', ' + tag;
+        _tagsController.text = '$currentTags, $tag';
       } else {
         // Тег уже есть, показываем сообщение
         okInfoBarBlue(lw('Tag already added'));

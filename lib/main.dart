@@ -265,7 +265,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
     }
 
     // Собираем окончательный WHERE
-    String whereClause = whereConditions.isEmpty ? "" : "WHERE " + whereConditions.join(' AND ');
+    String whereClause = whereConditions.isEmpty ? "" : "WHERE ${whereConditions.join(' AND ')}";
 
     // Определяем множитель направления сортировки (-1 для DESC, 1 для ASC)
     // SQLite не позволяет использовать DESC/ASC в выражениях CASE,
@@ -276,10 +276,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
     // Формируем ORDER BY как строку с правильным синтаксисом SQLite
     // Вместо использования DESC/ASC в выражениях, умножаем значения на -1 для обратной сортировки
     String orderByClause =
-        "CASE WHEN date = $todayDate THEN 1 WHEN date IS NOT NULL AND date > 0 THEN 2 ELSE 3 END ASC, " +
-            "priority DESC, " +
-            "CASE WHEN date = $todayDate THEN 0 WHEN date IS NOT NULL AND date > 0 THEN ${dateFactor} * date ELSE 0 END, " +
-            "CASE WHEN date IS NULL OR date = 0 THEN ${createdFactor} * created ELSE 0 END";
+        "CASE WHEN date = $todayDate THEN 1 WHEN date IS NOT NULL AND date > 0 THEN 2 ELSE 3 END ASC, " "priority DESC, " "CASE WHEN date = $todayDate THEN 0 WHEN date IS NOT NULL AND date > 0 THEN $dateFactor * date ELSE 0 END, " "CASE WHEN date IS NULL OR date = 0 THEN $createdFactor * created ELSE 0 END";
 
     // Формируем полный SQL-запрос
     String sqlQuery = "SELECT * FROM items $whereClause ORDER BY $orderByClause";
@@ -502,6 +499,8 @@ Widget memorizerApp() => MaterialApp(
 
 // StatefulWidget implementation for HomePage
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -818,7 +817,7 @@ class _HomePageState extends State<HomePage> {
         // Add stars for priority
         int priority = item['priority'] ?? 0;
         if (priority > 0) {
-          priorityStars = ' ' + '★' * (priority > 3 ? 3 : priority);
+          priorityStars = ' ${'★' * (priority > 3 ? 3 : priority)}';
         }
 
         // Add time if available

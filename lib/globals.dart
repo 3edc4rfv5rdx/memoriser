@@ -511,7 +511,7 @@ void showHelp(int id) async {
     myPrint('Showing help for ID: $helpId');
   } catch (e) {
     myPrint('Error showing help: $e');
-    okInfo(lw('Error loading help') + ': $e');
+    okInfo('${lw('Error loading help')}: $e');
   }
 }
 

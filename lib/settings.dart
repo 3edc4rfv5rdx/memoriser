@@ -12,7 +12,7 @@ Widget buildSettingsScreen() {
 
 // Internal StatefulWidget to manage settings state
 class _SettingsScreenImpl extends StatefulWidget {
-  const _SettingsScreenImpl({Key? key}) : super(key: key);
+  const _SettingsScreenImpl();
 
   @override
   _SettingsScreenImplState createState() => _SettingsScreenImplState();

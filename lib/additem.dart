@@ -11,7 +11,7 @@ import 'reminders.dart';
 class EditItemPage extends StatefulWidget {
   final int? itemId; // Используем ID вместо целой записи
 
-  const EditItemPage({Key? key, this.itemId}) : super(key: key);
+  const EditItemPage({super.key, this.itemId});
 
   @override
   _EditItemPageState createState() => _EditItemPageState();
@@ -298,7 +298,7 @@ class _EditItemPageState extends State<EditItemPage> {
       Navigator.pop(context, true);
     } catch (e) {
       // Show error message if database operation fails
-      okInfoBarPurple(lw('Error saving item') + ': $e');
+      okInfoBarPurple('${lw('Error saving item')}: $e');
       myPrint("Error saving item: $e");
     }
   }
@@ -986,7 +986,7 @@ class _EditItemPageState extends State<EditItemPage> {
         return AlertDialog(
           backgroundColor: clFill,
           title: Text(lw('Select tag'), style: TextStyle(color: clText)),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite,
             height: 300,
             child: ListView.builder(
@@ -1041,7 +1041,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
       if (!existingTags.contains(tag)) {
         // Добавляем тег с запятой
-        tagsController.text = currentTags + ', ' + tag;
+        tagsController.text = '$currentTags, $tag';
       } else {
         // Тег уже есть, показываем сообщение
         okInfoBarBlue(lw('Tag already added'));

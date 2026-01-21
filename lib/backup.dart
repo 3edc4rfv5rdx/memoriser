@@ -79,7 +79,7 @@ Future<String> createBackup() async {
     await listBackupFiles();
 
     myPrint('Backup created successfully at $mainBackupPath');
-    okInfoBarGreen(lw('Backup created successfully') + ' ' + lw('in Documents folder'));
+    okInfoBarGreen('${lw('Backup created successfully')} ${lw('in Documents folder')}');
     return lw('Backup created successfully');
   } catch (e) {
     myPrint('Error creating backup: $e');
@@ -140,7 +140,7 @@ Future<String> exportToCSV() async {
     await sink.close();
 
     myPrint('CSV export completed successfully at ${csvFile.path}');
-    okInfoBarGreen(lw('CSV export completed successfully') + ' ' + lw('in Documents folder'));
+    okInfoBarGreen('${lw('CSV export completed successfully')} ${lw('in Documents folder')}');
     return lw('CSV export completed successfully');
   } catch (e) {
     myPrint('Error exporting to CSV: $e');
