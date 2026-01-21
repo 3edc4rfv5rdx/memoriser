@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="New virtual folder - notes, help and locales"
+COMMENT="xxx"
 #
 GLOBVERS='0.9'
 VER=''
