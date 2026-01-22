@@ -22,8 +22,12 @@ class _EditItemPageState extends State<EditItemPage> {
   late TextEditingController contentController;
   late TextEditingController tagsController;
   late TextEditingController dateController;
-  late TextEditingController photoController;
 
+  // Multi-photo support
+  List<String> _photoPaths = [];
+  String? _currentPhotoDir; // Current photo directory (temp for new, item_X for edit)
+  bool _isNewItem = true; // Track if this is a new item
+  bool _isSaved = false; // Track if item was saved
   final ImagePicker _picker = ImagePicker();
 
   late TextEditingController timeController;
@@ -53,20 +57,31 @@ class _EditItemPageState extends State<EditItemPage> {
     contentController = TextEditingController();
     tagsController = TextEditingController();
     dateController = TextEditingController();
-    photoController = TextEditingController();
     timeController = TextEditingController();
+    _photoPaths = [];
+    _isSaved = false;
 
     // If ID is passed, this is edit mode
     if (widget.itemId != null) {
+      _isNewItem = false;
       _loadItem(widget.itemId!);
     } else {
       // If no ID passed, this is a new record
+      _isNewItem = true;
       _hidden = xvHiddenMode; // Hide by default in hidden mode
       _yearly = false; // Default off for new records
+      // Create temp directory for new item photos
+      _initTempPhotoDir();
     }
 
     // Load all tags on initialization
     _loadTagsData();
+  }
+
+  // Initialize temp photo directory for new items
+  Future<void> _initTempPhotoDir() async {
+    _currentPhotoDir = await createTempPhotoDir();
+    myPrint('Initialized temp photo dir: $_currentPhotoDir');
   }
 
   // Функция для загрузки данных тегов
@@ -84,12 +99,17 @@ class _EditItemPageState extends State<EditItemPage> {
 
   @override
   void dispose() {
+    // Clean up temp photo directory if not saved (only for new items)
+    if (!_isSaved && _isNewItem && _currentPhotoDir != null) {
+      myPrint('Cleaning up temp photo dir: $_currentPhotoDir');
+      deleteTempPhotoDir(_currentPhotoDir);
+    }
+
     timeController.dispose();
     titleController.dispose();
     contentController.dispose();
     tagsController.dispose();
     dateController.dispose();
-    photoController.dispose();
     super.dispose();
   }
 
@@ -132,7 +152,11 @@ class _EditItemPageState extends State<EditItemPage> {
         _hidden = item['hidden'] == 1;
         _removeAfterReminder = item['remove'] == 1;
         _yearly = item['yearly'] == 1; // NEW: Load yearly field
-        photoController.text = item['photo'] ?? '';
+
+        // Set up photo directory for existing item
+        _currentPhotoDir = getItemPhotoDirPath(itemId);
+        // Load photos from item directory (filesystem is the source of truth)
+        _photoPaths = await getItemPhotoPaths(itemId);
 
         // Load time if set
         _time = item['time'] as int?;
@@ -225,8 +249,6 @@ class _EditItemPageState extends State<EditItemPage> {
     String titleText = titleController.text.trim();
     String contentText = contentController.text.trim();
     String tagsText = tagsController.text.trim();
-    String? photoPath = photoController.text.trim();
-    photoPath = photoPath.isEmpty ? null : photoPath;
 
     // Obfuscate data if the record is hidden and we're in hidden mode
     if (hiddenValue == 1 && xvHiddenMode) {
@@ -237,7 +259,9 @@ class _EditItemPageState extends State<EditItemPage> {
 
     try {
       if (widget.itemId != null) {
-        // Update existing item
+        // Update existing item - photos are already in item_X directory
+        final photoData = encodePhotoPaths(_photoPaths);
+
         await mainDb.update(
           'items',
           {
@@ -250,13 +274,13 @@ class _EditItemPageState extends State<EditItemPage> {
             'remind': remindValue,
             'hidden': hiddenValue,
             'remove': removeValue,
-            'yearly': yearlyValue, // NEW: Add yearly field
-            'photo': photoPath,
+            'yearly': yearlyValue,
+            'photo': photoData,
           },
           where: 'id = ?',
           whereArgs: [widget.itemId],
         );
-        myPrint("Item updated: ${widget.itemId} - $titleText - Time: $timeValue - Yearly: $yearlyValue");
+        myPrint("Item updated: ${widget.itemId} - $titleText - Photos: ${_photoPaths.length}");
 
         // Update/cancel specific reminder for this item
         await SimpleNotifications.updateSpecificReminder(
@@ -267,7 +291,7 @@ class _EditItemPageState extends State<EditItemPage> {
         );
 
       } else {
-        // Insert new item
+        // Insert new item first to get the ID
         final insertedId = await mainDb.insert('items', {
           'title': titleText,
           'content': contentText.isEmpty ? null : contentText,
@@ -278,12 +302,28 @@ class _EditItemPageState extends State<EditItemPage> {
           'remind': remindValue,
           'hidden': hiddenValue,
           'remove': removeValue,
-          'yearly': yearlyValue, // NEW: Add yearly field
-          'photo': photoPath,
+          'yearly': yearlyValue,
+          'photo': null, // Will update after moving photos
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-        myPrint("Item inserted: $titleText - Time: $timeValue - Yearly: $yearlyValue, ID: $insertedId");
+        myPrint("Item inserted with ID: $insertedId");
+
+        // Move photos from temp directory to item directory
+        if (_currentPhotoDir != null && _photoPaths.isNotEmpty) {
+          final newPaths = await movePhotosFromTempToItem(_currentPhotoDir!, insertedId);
+          _photoPaths = newPaths;
+
+          // Update the photo field with new paths
+          final photoData = encodePhotoPaths(_photoPaths);
+          await mainDb.update(
+            'items',
+            {'photo': photoData},
+            where: 'id = ?',
+            whereArgs: [insertedId],
+          );
+          myPrint("Updated photo paths for item $insertedId: ${_photoPaths.length} photos");
+        }
 
         // Schedule specific reminder for new item if needed
         if (_remind && _date != null) {
@@ -295,6 +335,7 @@ class _EditItemPageState extends State<EditItemPage> {
         }
       }
 
+      _isSaved = true; // Mark as saved so dispose won't delete photos
       Navigator.pop(context, true);
     } catch (e) {
       // Show error message if database operation fails
@@ -304,32 +345,49 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   Future<void> _takePicture() async {
+    // Check limit
+    if (_photoPaths.length >= maxPhotosPerItem) {
+      okInfoBarOrange(lw('Maximum photos reached'));
+      return;
+    }
+
     try {
       // Get the image from the camera
       final XFile? image = await _picker.pickImage(source: ImageSource.camera);
 
       if (image != null) {
-        // Проверяем инициализацию путей
-        if (photoDirectory == null) {
-          await initStoragePaths();
+        // Ensure we have a photo directory
+        if (_currentPhotoDir == null) {
+          if (_isNewItem) {
+            await _initTempPhotoDir();
+          } else {
+            _currentPhotoDir = getItemPhotoDirPath(widget.itemId!);
+            await getItemPhotoDir(widget.itemId!); // Create if needed
+          }
         }
 
-        if (photoDirectory == null) {
+        if (_currentPhotoDir == null) {
           throw Exception('Photo directory is not available');
+        }
+
+        // Ensure directory exists
+        final dir = Directory(_currentPhotoDir!);
+        if (!await dir.exists()) {
+          await dir.create(recursive: true);
         }
 
         // Generate a unique filename with timestamp
         final now = DateTime.now();
         final formattedDate = DateFormat('yyyyMMdd-HHmmss').format(now);
-        final fileName = 'mem-$formattedDate.jpg';
+        final fileName = 'photo-$formattedDate.jpg';
 
-        // Copy the image to our app's directory
-        final File newImage = File('${photoDirectory!.path}/$fileName');
+        // Copy the image to the photo directory
+        final File newImage = File('$_currentPhotoDir/$fileName');
         await File(image.path).copy(newImage.path);
 
-        // Update the photo controller with the new path
+        // Add to photo list
         setState(() {
-          photoController.text = newImage.path;
+          _photoPaths.add(newImage.path);
         });
 
         okInfoBarGreen(lw('Photo saved'));
@@ -338,6 +396,151 @@ class _EditItemPageState extends State<EditItemPage> {
       myPrint('Error taking picture: $e');
       okInfoBarRed(lw('Failed to take picture'));
     }
+  }
+
+  // Pick multiple photos from gallery
+  Future<void> _pickFromGallery() async {
+    // Calculate how many more photos can be added
+    final remaining = maxPhotosPerItem - _photoPaths.length;
+    if (remaining <= 0) {
+      okInfoBarOrange(lw('Maximum photos reached'));
+      return;
+    }
+
+    try {
+      // Pick multiple images from gallery
+      final List<XFile> images = await _picker.pickMultiImage();
+
+      if (images.isEmpty) return;
+
+      // Limit to remaining slots
+      final imagesToProcess = images.take(remaining).toList();
+
+      // Ensure we have a photo directory
+      if (_currentPhotoDir == null) {
+        if (_isNewItem) {
+          await _initTempPhotoDir();
+        } else {
+          _currentPhotoDir = getItemPhotoDirPath(widget.itemId!);
+          await getItemPhotoDir(widget.itemId!); // Create if needed
+        }
+      }
+
+      if (_currentPhotoDir == null) {
+        throw Exception('Photo directory is not available');
+      }
+
+      // Ensure directory exists
+      final dir = Directory(_currentPhotoDir!);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      int addedCount = 0;
+      for (var image in imagesToProcess) {
+        if (_photoPaths.length >= maxPhotosPerItem) break;
+
+        // Generate a unique filename with timestamp
+        final now = DateTime.now();
+        final formattedDate = DateFormat('yyyyMMdd-HHmmss').format(now);
+        final fileName = 'photo-$formattedDate-$addedCount.jpg';
+
+        // Copy the image to the photo directory
+        final File newImage = File('$_currentPhotoDir/$fileName');
+        await File(image.path).copy(newImage.path);
+
+        _photoPaths.add(newImage.path);
+        addedCount++;
+      }
+
+      if (addedCount > 0) {
+        setState(() {});
+        okInfoBarGreen('$addedCount ${lw('photos added')}');
+      }
+    } catch (e) {
+      myPrint('Error picking images: $e');
+      okInfoBarRed(lw('Failed to pick images'));
+    }
+  }
+
+  // Remove a single photo from the list
+  Future<void> _removePhoto(int index) async {
+    if (index < 0 || index >= _photoPaths.length) return;
+
+    final path = _photoPaths[index];
+    final confirmed = await showCustomDialog(
+      title: lw('Delete Photo'),
+      content: lw('Are you sure you want to delete this photo?'),
+      actions: [
+        {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
+        {'label': lw('Delete'), 'value': true, 'isDestructive': true},
+      ],
+    );
+
+    if (confirmed == true) {
+      // Delete file
+      await deletePhotoFileWithoutConfirmation(path);
+
+      // Remove from list
+      setState(() {
+        _photoPaths.removeAt(index);
+      });
+    }
+  }
+
+  // Show photo in fullscreen
+  void _showPhotoFullscreen(String path) {
+    final file = File(path);
+    if (!file.existsSync()) {
+      okInfoBarRed(lw('Photo Not Found'));
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (BuildContext dialogContext) {
+        final screenSize = MediaQuery.of(dialogContext).size;
+
+        return Dialog(
+          backgroundColor: clFill,
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: screenSize.width * 0.05,
+            vertical: screenSize.height * 0.05,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppBar(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+                title: Text(lw('Photo')),
+                leading: IconButton(
+                  icon: Icon(Icons.close),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                ),
+              ),
+              Flexible(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: screenSize.height * 0.8,
+                    maxWidth: screenSize.width * 0.9,
+                  ),
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 5.0,
+                    child: Image.file(
+                      file,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // Method to show date picker
@@ -924,52 +1127,158 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
 
-  // Build photo field and camera button
-  // Build photo field and camera button
-  Widget _buildPhotoField() {
+  // Build multi-photo section with horizontal thumbnail list
+  Widget _buildPhotoSection() {
     return GestureDetector(
-      onLongPress: () => showHelp(38), // New help ID for photo field
-      child: Row(
+      onLongPress: () => showHelp(38),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: TextField(
-              controller: photoController,
-              style: TextStyle(color: clText),
-              readOnly: true,
-              decoration: InputDecoration(
-                labelText: lw('Photo'),
-                labelStyle: TextStyle(color: clText),
-                fillColor: clFill,
-                filled: true,
-                border: OutlineInputBorder(),
-              ),
+          // Header with count
+          Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              '${lw('Photo')} (${_photoPaths.length}/$maxPhotosPerItem)',
+              style: TextStyle(color: clText, fontSize: fsMedium),
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.camera_alt, color: clText),
-            tooltip: lw('Take photo'),
-            onPressed: _takePicture,
-          ),
-          IconButton(
-            icon: Icon(Icons.clear, color: clText),
-            tooltip: lw('Clear photo'),
-            onPressed: () async {
-              if (photoController.text.isNotEmpty) {
-                final wasDeleted = await deletePhotoFile(photoController.text);
-                if (wasDeleted) {
-                  setState(() {
-                    photoController.clear();
-                  });
+          // Horizontal list of thumbnails
+          SizedBox(
+            height: photoThumbnailSize + 24, // Extra space for delete button
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _photoPaths.length + 1, // +1 for add button
+              itemBuilder: (context, index) {
+                if (index == _photoPaths.length) {
+                  // Add button at the end
+                  return _buildAddPhotoButton();
                 }
-              } else {
-                setState(() {
-                  photoController.clear();
-                });
-              }
-            },
+                return _buildPhotoThumbnail(index);
+              },
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  // Build a single photo thumbnail with delete button
+  Widget _buildPhotoThumbnail(int index) {
+    final path = _photoPaths[index];
+    final file = File(path);
+    final exists = file.existsSync();
+
+    return Padding(
+      padding: EdgeInsets.only(right: 8),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Thumbnail image
+          GestureDetector(
+            onTap: () => _showPhotoFullscreen(path),
+            child: Container(
+              width: photoThumbnailSize,
+              height: photoThumbnailSize,
+              decoration: BoxDecoration(
+                border: Border.all(color: clUpBar, width: 2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: exists
+                    ? Image.file(
+                        file,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: clFill,
+                            child: Icon(Icons.broken_image, color: clText),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: clFill,
+                        child: Icon(Icons.broken_image, color: clRed),
+                      ),
+              ),
+            ),
+          ),
+          // Delete button
+          Positioned(
+            top: -8,
+            right: -8,
+            child: GestureDetector(
+              onTap: () => _removePhoto(index),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: clRed,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.close, color: clWhite, size: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build add photo button with popup menu
+  Widget _buildAddPhotoButton() {
+    final canAdd = _photoPaths.length < maxPhotosPerItem;
+
+    return PopupMenuButton<String>(
+      enabled: canAdd,
+      onSelected: (value) {
+        if (value == 'camera') {
+          _takePicture();
+        } else if (value == 'gallery') {
+          _pickFromGallery();
+        }
+      },
+      offset: Offset(0, 40),
+      color: clMenu,
+      child: Container(
+        width: photoThumbnailSize,
+        height: photoThumbnailSize,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: canAdd ? clUpBar : clText.withValues(alpha: 0.3),
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          color: clFill,
+        ),
+        child: Icon(
+          Icons.add_a_photo,
+          color: canAdd ? clUpBar : clText.withValues(alpha: 0.3),
+          size: 32,
+        ),
+      ),
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          value: 'camera',
+          child: Row(
+            children: [
+              Icon(Icons.camera_alt, color: clText),
+              SizedBox(width: 8),
+              Text(lw('Take photo'), style: TextStyle(color: clText)),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'gallery',
+          child: Row(
+            children: [
+              Icon(Icons.photo_library, color: clText),
+              SizedBox(width: 8),
+              Text(lw('Choose from gallery'), style: TextStyle(color: clText)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1166,8 +1475,8 @@ class _EditItemPageState extends State<EditItemPage> {
             _buildTagsField(),
             SizedBox(height: 10),
 
-            // Photo field
-            _buildPhotoField(),
+            // Multi-photo section
+            _buildPhotoSection(),
             SizedBox(height: 10),
 
             // Priority section

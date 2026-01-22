@@ -1,5 +1,6 @@
 // main.dart
 import 'dart:async'; // Для Timer
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -22,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 7, // Increased from 6 to 7 for yearly field
+    version: 9, // Increased from 8 to 9 for item photo folders
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -83,6 +84,36 @@ Future<void> initDatabases() async {
         await db.execute('ALTER TABLE items ADD COLUMN yearly INTEGER DEFAULT 0');
         myPrint("Database upgraded to version 7: Added 'yearly' field");
       }
+
+      if (oldVersion < 8) {
+        // Migration for version 8 - convert single photo paths to JSON arrays
+        myPrint("Starting migration to version 8: Converting photo paths to JSON arrays");
+        final items = await db.query('items', columns: ['id', 'photo']);
+        int convertedCount = 0;
+        for (var item in items) {
+          final photoPath = item['photo'];
+          if (photoPath != null && (photoPath as String).isNotEmpty) {
+            // Check if it's already a JSON array
+            if (!photoPath.startsWith('[')) {
+              final jsonArray = jsonEncode([photoPath]);
+              await db.update(
+                'items',
+                {'photo': jsonArray},
+                where: 'id = ?',
+                whereArgs: [item['id']],
+              );
+              convertedCount++;
+            }
+          }
+        }
+        myPrint("Database upgraded to version 8: Converted $convertedCount photo paths to JSON arrays");
+      }
+
+      if (oldVersion < 9) {
+        // Migration for version 9 - move photos to item folders
+        myPrint("Starting migration to version 9: Moving photos to item folders");
+        await _migratePhotosToItemFolders(db);
+      }
     },
   );
 
@@ -95,6 +126,73 @@ Future<void> initDatabases() async {
       );
     },
   );
+}
+
+// Migration function to move photos to item folders
+Future<void> _migratePhotosToItemFolders(Database db) async {
+  try {
+    // Ensure storage paths are initialized
+    if (photoDirectory == null) {
+      await initStoragePaths();
+    }
+    if (photoDirectory == null) {
+      myPrint("Cannot migrate photos: photoDirectory is null");
+      return;
+    }
+
+    final items = await db.query('items', columns: ['id', 'photo']);
+    int migratedCount = 0;
+
+    for (var item in items) {
+      final itemId = item['id'] as int;
+      final photoPaths = parsePhotoPaths(item['photo']);
+
+      if (photoPaths.isEmpty) continue;
+
+      // Create item folder
+      final itemDir = Directory('${photoDirectory!.path}/item_$itemId');
+      if (!await itemDir.exists()) {
+        await itemDir.create(recursive: true);
+      }
+
+      List<String> newPaths = [];
+      for (var oldPath in photoPaths) {
+        final oldFile = File(oldPath);
+        if (await oldFile.exists()) {
+          final fileName = oldPath.split('/').last;
+          final newPath = '${itemDir.path}/$fileName';
+
+          // Move file to item folder
+          try {
+            await oldFile.copy(newPath);
+            await oldFile.delete();
+            newPaths.add(newPath);
+            myPrint("Migrated photo: $oldPath -> $newPath");
+          } catch (e) {
+            myPrint("Error migrating photo $oldPath: $e");
+            // Keep old path if migration fails
+            newPaths.add(oldPath);
+          }
+        }
+      }
+
+      // Update database with new paths
+      if (newPaths.isNotEmpty) {
+        final newPhotoData = jsonEncode(newPaths);
+        await db.update(
+          'items',
+          {'photo': newPhotoData},
+          where: 'id = ?',
+          whereArgs: [itemId],
+        );
+        migratedCount++;
+      }
+    }
+
+    myPrint("Database upgraded to version 9: Migrated photos for $migratedCount items");
+  } catch (e) {
+    myPrint("Error during photo migration: $e");
+  }
 }
 
 // Функция для получения текста состояния фильтра
@@ -338,23 +436,15 @@ Future<void> removeExpiredItems() async {
 
     myPrint('Found ${expiredItems.length} expired items to delete');
 
-    // Delete photo files for expired items
-    int deletedPhotos = 0;
+    // Delete photo folders for expired items
+    int deletedFolders = 0;
     for (var item in expiredItems) {
-      final photoPath = item['photo'] as String?;
-
-      if (photoPath != null && photoPath.isNotEmpty) {
-        try {
-          final file = File(photoPath);
-          if (file.existsSync()) {
-            // Delete file directly without UI dependencies
-            await file.delete();
-            deletedPhotos++;
-            myPrint('Deleted photo file: $photoPath');
-          }
-        } catch (e) {
-          myPrint('Error deleting photo file $photoPath: $e');
-        }
+      final itemId = item['id'] as int;
+      try {
+        await deleteItemPhotoDir(itemId);
+        deletedFolders++;
+      } catch (e) {
+        myPrint('Error deleting photo folder for item $itemId: $e');
       }
     }
 
@@ -366,8 +456,8 @@ Future<void> removeExpiredItems() async {
 
     if (count > 0) {
       myPrint('Deleted $count expired items');
-      if (deletedPhotos > 0) {
-        myPrint('Deleted $deletedPhotos photo files');
+      if (deletedFolders > 0) {
+        myPrint('Deleted $deletedFolders photo folders');
       }
     }
   } catch (e) {
@@ -436,6 +526,8 @@ void main() async {
   await initDatabases();
   // Initialize storage directory paths
   await initStoragePaths();
+  // Cleanup orphaned temp photo directories
+  await cleanupOrphanedTempDirs();
   // Initialize default settings
   await initDefaultSettings();
 
@@ -631,35 +723,17 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _showPhoto(String photoPath) {
-    // DEBUG: Add detailed logging
-    myPrint('=== PHOTO DEBUG START ===');
-    myPrint('Photo path: $photoPath');
+  void _showPhotoGallery(List<String> photoPaths) {
+    if (photoPaths.isEmpty) return;
 
-    final file = File(photoPath);
-    myPrint('File exists: ${file.existsSync()}');
+    // Filter to only valid paths
+    final validPaths = photoPaths.where((path) {
+      final file = File(path);
+      return file.existsSync();
+    }).toList();
 
-    if (file.existsSync()) {
-      try {
-        final fileSize = file.lengthSync();
-        final lastModified = file.lastModifiedSync();
-        final canRead = file.readAsBytesSync().length;
-
-        myPrint('File size: $fileSize bytes');
-        myPrint('Last modified: $lastModified');
-        myPrint('Can read bytes: $canRead');
-        myPrint('File is readable: ${canRead > 0}');
-      } catch (e) {
-        myPrint('Error reading file info: $e');
-      }
-    } else {
-      myPrint('File does not exist at path');
-    }
-    myPrint('=== PHOTO DEBUG END ===');
-
-    // Original file existence check
-    if (!file.existsSync()) {
-      // Show a dialog with a concise message
+    if (validPaths.isEmpty) {
+      // All photos are missing
       showCustomDialog(
         title: lw('Photo Not Found'),
         content: lw('The photo file is missing. Remove the reference?'),
@@ -687,88 +761,17 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // Try to display photo with error handling
-    try {
-      showDialog(
-        context: navigatorKey.currentContext!,
-        barrierColor: Colors.black87, // Dark background overlay
-        builder: (BuildContext dialogContext) {
-          final screenSize = MediaQuery.of(dialogContext).size;
-
-          return Dialog(
-            backgroundColor: clFill,
-            // Make dialog use 90% of screen
-            insetPadding: EdgeInsets.symmetric(
-              horizontal: screenSize.width * 0.05,
-              vertical: screenSize.height * 0.05,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppBar(
-                  backgroundColor: clUpBar,
-                  foregroundColor: clText,
-                  title: Text(lw('Photo')),
-                  leading: IconButton(
-                    icon: Icon(Icons.close),
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                  ),
-
-                ),
-                Flexible(
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxHeight: screenSize.height * 0.8,
-                      maxWidth: screenSize.width * 0.9,
-                    ),
-                    child: InteractiveViewer(
-                      // Настройки масштабирования
-                      minScale: 0.5,           // Минимальный масштаб (можно уменьшить)
-                      maxScale: 5.0,           // Максимальный масштаб (можно увеличить в 5 раз)
-
-                      // Включаем ограничение панорамирования только при увеличении
-                      constrained: true,
-
-                      // Настройки взаимодействия
-                      scaleEnabled: true,      // Включаем масштабирование
-                      panEnabled: true,        // Включаем перемещение
-
-                      // Границы панорамирования
-                      boundaryMargin: EdgeInsets.all(20.0),
-
-                      child: Image.file(
-                        file,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          myPrint('Error loading image: $error');
-                          return Container(
-                            padding: EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                Icon(Icons.error, size: 64, color: clRed),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Error loading image:\n$error',
-                                  style: TextStyle(color: clText),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    } catch (e) {
-      myPrint('Error showing photo dialog: $e');
-      okInfoBarRed('Error displaying photo: $e');
-    }
+    // Show gallery dialog
+    showDialog(
+      context: navigatorKey.currentContext!,
+      barrierColor: Colors.black87,
+      builder: (BuildContext dialogContext) {
+        return _PhotoGalleryDialog(
+          photoPaths: validPaths,
+          onClose: () => Navigator.of(dialogContext).pop(),
+        );
+      },
+    );
   }
 
 // Updated _checkReminders function in _HomePageState:
@@ -1289,8 +1292,8 @@ class _HomePageState extends State<HomePage> {
                   'value': true,
                   'isDestructive': true,
                   'onPressed': () async {
-                    // First check if item has a photo
-                    final photoPath = item['photo'];
+                    // Delete item photo folder
+                    await deleteItemPhotoDir(item['id']);
 
                     // Cancel specific reminder if it exists
                     await SimpleNotifications.cancelSpecificReminder(item['id']);
@@ -1301,11 +1304,6 @@ class _HomePageState extends State<HomePage> {
                       where: 'id = ?',
                       whereArgs: [item['id']],
                     );
-
-                    // Delete photo file if exists
-                    if (isValidPhotoPath(photoPath)) {
-                      await deletePhotoFile(photoPath);
-                    }
 
                     _refreshItems();
                   },
@@ -1566,7 +1564,9 @@ class _HomePageState extends State<HomePage> {
           final hasTime = item['time'] != null;
           final isReminder = item['remind'] == 1;
           final isYearly = item['yearly'] == 1;
-          final hasPhoto = isValidPhotoPath(item['photo']);
+          final photoPaths = parsePhotoPaths(item['photo']);
+          final hasPhoto = photoPaths.isNotEmpty;
+          final photoCount = photoPaths.length;
 
           final todayDate = dateTimeToYYYYMMDD(DateTime.now());
           final isToday = hasDate && item['date'] == todayDate;
@@ -1649,7 +1649,8 @@ class _HomePageState extends State<HomePage> {
 
                 if (shouldDelete == true) {
                   try {
-                    final photoPath = item['photo'];
+                    // Delete item photo folder
+                    await deleteItemPhotoDir(item['id']);
 
                     await SimpleNotifications.cancelSpecificReminder(item['id']);
 
@@ -1658,10 +1659,6 @@ class _HomePageState extends State<HomePage> {
                       where: 'id = ?',
                       whereArgs: [item['id']],
                     );
-
-                    if (isValidPhotoPath(photoPath)) {
-                      await deletePhotoFile(photoPath);
-                    }
 
                     _refreshItems();
 
@@ -1788,10 +1785,40 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               trailing: hasPhoto
-                  ? IconButton(
-                icon: Icon(Icons.photo, color: isToday ? clRed : clText),
-                onPressed: () => _showPhoto(item['photo']),
-              )
+                  ? Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.photo, color: isToday ? clRed : clText),
+                          onPressed: () => _showPhotoGallery(photoPaths),
+                        ),
+                        if (photoCount > 1)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              padding: EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: clUpBar,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
+                              child: Text(
+                                photoCount.toString(),
+                                style: TextStyle(
+                                  color: clText,
+                                  fontSize: 10,
+                                  fontWeight: fwBold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    )
                   : null,
               onTap: () {
                 setState(() {
@@ -1841,6 +1868,167 @@ class _HomePageState extends State<HomePage> {
   }
 
 
+}
+
+// Photo Gallery Dialog Widget
+class _PhotoGalleryDialog extends StatefulWidget {
+  final List<String> photoPaths;
+  final VoidCallback onClose;
+
+  const _PhotoGalleryDialog({
+    required this.photoPaths,
+    required this.onClose,
+  });
+
+  @override
+  _PhotoGalleryDialogState createState() => _PhotoGalleryDialogState();
+}
+
+class _PhotoGalleryDialogState extends State<_PhotoGalleryDialog> {
+  late PageController _pageController;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final photoCount = widget.photoPaths.length;
+
+    return Dialog(
+      backgroundColor: clFill,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: screenSize.width * 0.05,
+        vertical: screenSize.height * 0.05,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // AppBar with counter
+          AppBar(
+            backgroundColor: clUpBar,
+            foregroundColor: clText,
+            title: Text(
+              photoCount > 1
+                  ? '${lw('Photo')} ${_currentPage + 1} / $photoCount'
+                  : lw('Photo'),
+            ),
+            leading: IconButton(
+              icon: Icon(Icons.close),
+              onPressed: widget.onClose,
+            ),
+          ),
+          // Photo viewer
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: screenSize.height * 0.75,
+                maxWidth: screenSize.width * 0.9,
+              ),
+              child: photoCount == 1
+                  ? _buildSinglePhoto(widget.photoPaths[0])
+                  : _buildPhotoPageView(),
+            ),
+          ),
+          // Page indicators (dots) for multiple photos
+          if (photoCount > 1)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(photoCount, (index) {
+                  return Container(
+                    margin: EdgeInsets.symmetric(horizontal: 4),
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: index == _currentPage ? clUpBar : clText.withValues(alpha: 0.3),
+                    ),
+                  );
+                }),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSinglePhoto(String path) {
+    return InteractiveViewer(
+      minScale: 0.5,
+      maxScale: 5.0,
+      constrained: true,
+      scaleEnabled: true,
+      panEnabled: true,
+      boundaryMargin: EdgeInsets.all(20.0),
+      child: Image.file(
+        File(path),
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildErrorWidget(error);
+        },
+      ),
+    );
+  }
+
+  Widget _buildPhotoPageView() {
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: widget.photoPaths.length,
+      onPageChanged: (index) {
+        setState(() {
+          _currentPage = index;
+        });
+      },
+      itemBuilder: (context, index) {
+        return InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 5.0,
+          constrained: true,
+          scaleEnabled: true,
+          panEnabled: true,
+          boundaryMargin: EdgeInsets.all(20.0),
+          child: Image.file(
+            File(widget.photoPaths[index]),
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildErrorWidget(error);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorWidget(Object error) {
+    myPrint('Error loading image: $error');
+    return Container(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error, size: 64, color: clRed),
+          SizedBox(height: 16),
+          Text(
+            'Error loading image:\n$error',
+            style: TextStyle(color: clText),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 void _showAbout() {

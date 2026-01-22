@@ -75,6 +75,9 @@ Future<String> createBackup() async {
       return lw('Error: backup file was not created');
     }
 
+    // Backup Photo folder
+    await _backupPhotoFolder(backupDirPath);
+
     // Список всех файлов в директории бэкапа
     await listBackupFiles();
 
@@ -85,6 +88,117 @@ Future<String> createBackup() async {
     myPrint('Error creating backup: $e');
     okInfoBarRed(lw('Error creating backup'));
     return lw('Error creating backup');
+  }
+}
+
+// Backup Photo folder to backup directory
+Future<void> _backupPhotoFolder(String backupDirPath) async {
+  try {
+    if (photoDirectory == null) {
+      await initStoragePaths();
+    }
+    if (photoDirectory == null || !await photoDirectory!.exists()) {
+      myPrint('No Photo folder to backup');
+      return;
+    }
+
+    final backupPhotoDir = Directory('$backupDirPath/Photo');
+    if (!await backupPhotoDir.exists()) {
+      await backupPhotoDir.create(recursive: true);
+    }
+
+    // Copy all item folders
+    final entities = await photoDirectory!.list().toList();
+    int copiedFolders = 0;
+    int copiedFiles = 0;
+
+    for (var entity in entities) {
+      if (entity is Directory) {
+        final dirName = entity.path.split('/').last;
+        // Skip temp folders
+        if (dirName.startsWith('temp_')) continue;
+
+        // Copy item folder
+        final targetDir = Directory('${backupPhotoDir.path}/$dirName');
+        if (!await targetDir.exists()) {
+          await targetDir.create(recursive: true);
+        }
+
+        // Copy all files in the folder
+        final files = await entity.list().toList();
+        for (var file in files) {
+          if (file is File) {
+            final fileName = file.path.split('/').last;
+            await file.copy('${targetDir.path}/$fileName');
+            copiedFiles++;
+          }
+        }
+        copiedFolders++;
+      }
+    }
+
+    myPrint('Backed up $copiedFolders photo folders with $copiedFiles files');
+  } catch (e) {
+    myPrint('Error backing up Photo folder: $e');
+  }
+}
+
+// Restore Photo folder from backup directory
+Future<void> _restorePhotoFolder(String backupDirPath) async {
+  try {
+    final backupPhotoDir = Directory('$backupDirPath/Photo');
+    if (!await backupPhotoDir.exists()) {
+      myPrint('No Photo folder in backup to restore');
+      return;
+    }
+
+    if (photoDirectory == null) {
+      await initStoragePaths();
+    }
+    if (photoDirectory == null) {
+      myPrint('Cannot restore photos: photoDirectory is null');
+      return;
+    }
+
+    // Ensure target Photo directory exists
+    if (!await photoDirectory!.exists()) {
+      await photoDirectory!.create(recursive: true);
+    }
+
+    // Copy all item folders from backup
+    final entities = await backupPhotoDir.list().toList();
+    int restoredFolders = 0;
+    int restoredFiles = 0;
+
+    for (var entity in entities) {
+      if (entity is Directory) {
+        final dirName = entity.path.split('/').last;
+
+        // Create target item folder
+        final targetDir = Directory('${photoDirectory!.path}/$dirName');
+
+        // Remove existing folder if exists (to avoid duplicates)
+        if (await targetDir.exists()) {
+          await targetDir.delete(recursive: true);
+        }
+        await targetDir.create(recursive: true);
+
+        // Copy all files
+        final files = await entity.list().toList();
+        for (var file in files) {
+          if (file is File) {
+            final fileName = file.path.split('/').last;
+            await file.copy('${targetDir.path}/$fileName');
+            restoredFiles++;
+          }
+        }
+        restoredFolders++;
+      }
+    }
+
+    myPrint('Restored $restoredFolders photo folders with $restoredFiles files');
+  } catch (e) {
+    myPrint('Error restoring Photo folder: $e');
   }
 }
 
@@ -268,6 +382,10 @@ Future<String> restoreBackup() async {
       okInfoBarRed(lw('Error reopening database'));
       return lw('Error reopening database');
     }
+
+    // Restore Photo folder if exists in backup
+    final backupDir = Directory(filePath).parent;
+    await _restorePhotoFolder(backupDir.path);
 
     // НОВОЕ: Перепланируем все напоминания после успешного восстановления
     myPrint('Rescheduling reminders after restore...');

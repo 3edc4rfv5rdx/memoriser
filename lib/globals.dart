@@ -44,6 +44,11 @@ String currentPin = '';
 const String hiddPinKey = 'hiddpin';
 const hidModeColor = Color(0xFFf29238);
 
+// Multi-photo constants
+const int maxPhotosPerItem = 10;
+const double photoThumbnailSize = 80.0;
+const String tempPhotoFolderPrefix = 'temp_';
+
 // Font setups
 const double fsSmall = 13;
 const double fsNormal = 15;
@@ -890,6 +895,288 @@ bool isValidPhotoPath(dynamic photoValue) {
   String path = photoValue.toString().trim();
   if (path.isEmpty || path == "\"\"" || path == "\"") return false;
   return true;
+}
+
+// Multi-photo utility functions
+
+/// Parse photo paths from database value (JSON array or single path)
+List<String> parsePhotoPaths(dynamic photoValue) {
+  if (photoValue == null) return [];
+
+  String value = photoValue.toString().trim();
+  if (value.isEmpty) return [];
+
+  // Try to parse as JSON array
+  if (value.startsWith('[')) {
+    try {
+      final List<dynamic> parsed = json.decode(value);
+      return parsed
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    } catch (e) {
+      myPrint('Error parsing photo JSON: $e');
+      // If JSON parsing fails, treat as single path
+      return [value];
+    }
+  }
+
+  // Single path (legacy format)
+  return [value];
+}
+
+/// Encode photo paths to JSON string for database storage
+String? encodePhotoPaths(List<String> paths) {
+  if (paths.isEmpty) return null;
+  if (paths.length == 1) {
+    // For single photo, still use JSON array for consistency
+    return json.encode(paths);
+  }
+  return json.encode(paths);
+}
+
+/// Get count of photos from database value
+int getPhotoCount(dynamic photoValue) {
+  return parsePhotoPaths(photoValue).length;
+}
+
+/// Check if there are any photos
+bool hasPhotos(dynamic photoValue) {
+  return parsePhotoPaths(photoValue).isNotEmpty;
+}
+
+/// Delete a single photo file without confirmation dialog
+Future<bool> deletePhotoFileWithoutConfirmation(String photoPath) async {
+  if (!isValidPhotoPath(photoPath)) return false;
+
+  try {
+    final file = File(photoPath);
+    if (await file.exists()) {
+      await file.delete();
+      myPrint('Deleted photo file: $photoPath');
+      return true;
+    }
+    return true; // File doesn't exist, consider it deleted
+  } catch (e) {
+    myPrint('Error deleting photo file: $e');
+    return false;
+  }
+}
+
+/// Delete all photos with a single confirmation dialog
+Future<bool> deleteAllPhotosWithConfirmation(List<String> paths) async {
+  if (paths.isEmpty) return true;
+
+  // Filter to only existing files
+  List<String> existingPaths = [];
+  for (var path in paths) {
+    if (isValidPhotoPath(path)) {
+      final file = File(path);
+      if (await file.exists()) {
+        existingPaths.add(path);
+      }
+    }
+  }
+
+  if (existingPaths.isEmpty) return true;
+
+  // Show confirmation dialog
+  final confirmed = await showCustomDialog(
+    title: lw('Delete Photos'),
+    content: existingPaths.length == 1
+        ? lw('Are you sure you want to delete this photo?')
+        : '${lw('Are you sure you want to delete')} ${existingPaths.length} ${lw('photos')}?',
+    actions: [
+      {'label': lw('Cancel'), 'value': false, 'isDestructive': false},
+      {'label': lw('Delete'), 'value': true, 'isDestructive': true},
+    ],
+  );
+
+  if (confirmed == true) {
+    int deletedCount = 0;
+    for (var path in existingPaths) {
+      if (await deletePhotoFileWithoutConfirmation(path)) {
+        deletedCount++;
+      }
+    }
+    myPrint('Deleted $deletedCount of ${existingPaths.length} photos');
+    return true;
+  }
+
+  return false;
+}
+
+// ============ Item Photo Folder Utilities ============
+
+/// Get the photo directory path for a specific item
+String getItemPhotoDirPath(int itemId) {
+  if (photoDirectory == null) return '';
+  return '${photoDirectory!.path}/item_$itemId';
+}
+
+/// Get or create the photo directory for a specific item
+Future<Directory?> getItemPhotoDir(int itemId) async {
+  if (photoDirectory == null) {
+    await initStoragePaths();
+  }
+  if (photoDirectory == null) return null;
+
+  final dir = Directory(getItemPhotoDirPath(itemId));
+  if (!await dir.exists()) {
+    await dir.create(recursive: true);
+  }
+  return dir;
+}
+
+/// Create a temporary photo directory for new items
+Future<String?> createTempPhotoDir() async {
+  if (photoDirectory == null) {
+    await initStoragePaths();
+  }
+  if (photoDirectory == null) return null;
+
+  // Generate unique temp folder name with timestamp
+  final timestamp = DateTime.now().millisecondsSinceEpoch;
+  final tempDirPath = '${photoDirectory!.path}/$tempPhotoFolderPrefix$timestamp';
+  final tempDir = Directory(tempDirPath);
+
+  if (!await tempDir.exists()) {
+    await tempDir.create(recursive: true);
+  }
+
+  myPrint('Created temp photo dir: $tempDirPath');
+  return tempDirPath;
+}
+
+/// Move photos from temp directory to item directory after save
+Future<List<String>> movePhotosFromTempToItem(String tempDirPath, int itemId) async {
+  final tempDir = Directory(tempDirPath);
+  if (!await tempDir.exists()) {
+    myPrint('Temp dir does not exist: $tempDirPath');
+    return [];
+  }
+
+  final itemDir = await getItemPhotoDir(itemId);
+  if (itemDir == null) {
+    myPrint('Failed to create item photo dir for item $itemId');
+    return [];
+  }
+
+  List<String> newPaths = [];
+  final files = await tempDir.list().toList();
+
+  for (var entity in files) {
+    if (entity is File) {
+      final fileName = entity.path.split('/').last;
+      final newPath = '${itemDir.path}/$fileName';
+      try {
+        await entity.copy(newPath);
+        await entity.delete();
+        newPaths.add(newPath);
+        myPrint('Moved photo: ${entity.path} -> $newPath');
+      } catch (e) {
+        myPrint('Error moving photo: $e');
+      }
+    }
+  }
+
+  // Delete empty temp directory
+  try {
+    await tempDir.delete();
+    myPrint('Deleted temp dir: $tempDirPath');
+  } catch (e) {
+    myPrint('Error deleting temp dir: $e');
+  }
+
+  return newPaths;
+}
+
+/// Delete a temporary photo directory (when user cancels)
+Future<void> deleteTempPhotoDir(String? tempDirPath) async {
+  if (tempDirPath == null || tempDirPath.isEmpty) return;
+
+  final tempDir = Directory(tempDirPath);
+  if (await tempDir.exists()) {
+    try {
+      await tempDir.delete(recursive: true);
+      myPrint('Deleted temp photo dir: $tempDirPath');
+    } catch (e) {
+      myPrint('Error deleting temp photo dir: $e');
+    }
+  }
+}
+
+/// Delete the photo directory for a specific item
+Future<void> deleteItemPhotoDir(int itemId) async {
+  final dirPath = getItemPhotoDirPath(itemId);
+  if (dirPath.isEmpty) return;
+
+  final dir = Directory(dirPath);
+  if (await dir.exists()) {
+    try {
+      await dir.delete(recursive: true);
+      myPrint('Deleted item photo dir: $dirPath');
+    } catch (e) {
+      myPrint('Error deleting item photo dir: $e');
+    }
+  }
+}
+
+/// Clean up orphaned temp directories (older than 1 day)
+Future<void> cleanupOrphanedTempDirs() async {
+  if (photoDirectory == null) return;
+
+  try {
+    final entities = await photoDirectory!.list().toList();
+    final oneDayAgo = DateTime.now().subtract(Duration(days: 1));
+
+    for (var entity in entities) {
+      if (entity is Directory) {
+        final dirName = entity.path.split('/').last;
+        if (dirName.startsWith(tempPhotoFolderPrefix)) {
+          // Check if directory is old
+          final stat = await entity.stat();
+          if (stat.modified.isBefore(oneDayAgo)) {
+            await entity.delete(recursive: true);
+            myPrint('Cleaned up orphaned temp dir: ${entity.path}');
+          }
+        }
+      }
+    }
+  } catch (e) {
+    myPrint('Error cleaning up orphaned temp dirs: $e');
+  }
+}
+
+/// Get list of photo files in an item's directory
+Future<List<String>> getItemPhotoPaths(int itemId) async {
+  final dirPath = getItemPhotoDirPath(itemId);
+  if (dirPath.isEmpty) return [];
+
+  final dir = Directory(dirPath);
+  if (!await dir.exists()) return [];
+
+  List<String> paths = [];
+  final files = await dir.list().toList();
+  for (var entity in files) {
+    if (entity is File && _isImageFile(entity.path)) {
+      paths.add(entity.path);
+    }
+  }
+
+  // Sort by filename for consistent ordering
+  paths.sort();
+  return paths;
+}
+
+/// Check if file is an image based on extension
+bool _isImageFile(String path) {
+  final lower = path.toLowerCase();
+  return lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.png') ||
+      lower.endsWith('.gif') ||
+      lower.endsWith('.webp');
 }
 
 Future<bool> deletePhotoFile(String photoPath) async {
