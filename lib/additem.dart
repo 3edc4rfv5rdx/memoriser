@@ -1142,19 +1142,23 @@ class _EditItemPageState extends State<EditItemPage> {
               style: TextStyle(color: clText, fontSize: fsMedium),
             ),
           ),
-          // Horizontal list of thumbnails
-          SizedBox(
-            height: photoThumbnailSize + 24, // Extra space for delete button
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _photoPaths.length + 1, // +1 for add button
-              itemBuilder: (context, index) {
-                if (index == _photoPaths.length) {
-                  // Add button at the end
-                  return _buildAddPhotoButton();
-                }
-                return _buildPhotoThumbnail(index);
-              },
+          // Horizontal list of thumbnails with space for delete button
+          Padding(
+            padding: EdgeInsets.only(top: 10), // Space for X button above
+            child: SizedBox(
+              height: photoThumbnailSize + 4,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.none, // Allow X button to overflow
+                itemCount: _photoPaths.length + 1, // +1 for add button
+                itemBuilder: (context, index) {
+                  if (index == _photoPaths.length) {
+                    // Add button at the end
+                    return _buildAddPhotoButton();
+                  }
+                  return _buildPhotoThumbnail(index);
+                },
+              ),
             ),
           ),
         ],

@@ -48,7 +48,7 @@ class FiltersScreen extends StatefulWidget {
   const FiltersScreen({super.key});
 
   @override
-  _FiltersScreenState createState() => _FiltersScreenState();
+  State<FiltersScreen> createState() => _FiltersScreenState();
 }
 
 class _FiltersScreenState extends State<FiltersScreen> {

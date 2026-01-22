@@ -224,7 +224,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
     // Return to main screen after notifications
     Future.delayed(Duration(seconds: 2), () {
-      Navigator.of(context).pop(true);
+      if (mounted) Navigator.of(context).pop(true);
     });
   }
 
@@ -253,7 +253,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           if (shouldSave == true) {
             await _saveChanges();
           } else {
-            Navigator.of(context).pop();
+            if (mounted) Navigator.of(context).pop();
           }
         }
       },

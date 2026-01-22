@@ -7,7 +7,7 @@ class TagsCloudScreen extends StatefulWidget {
   const TagsCloudScreen({super.key});
 
   @override
-  _TagsCloudScreenState createState() => _TagsCloudScreenState();
+  State<TagsCloudScreen> createState() => _TagsCloudScreenState();
 }
 
 class _TagsCloudScreenState extends State<TagsCloudScreen> {
