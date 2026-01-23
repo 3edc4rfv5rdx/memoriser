@@ -23,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 10, // Increased from 9 to 10 for daily reminders
+    version: 11, // Increased from 10 to 11 for sound field
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -43,7 +43,8 @@ Future<void> initDatabases() async {
           daily INTEGER DEFAULT 0,
           daily_times TEXT DEFAULT NULL,
           daily_days INTEGER DEFAULT 127,
-          daily_sound TEXT DEFAULT NULL
+          daily_sound TEXT DEFAULT NULL,
+          sound TEXT DEFAULT NULL
         )
       ''');
     },
@@ -126,6 +127,12 @@ Future<void> initDatabases() async {
         await db.execute('ALTER TABLE items ADD COLUMN daily_days INTEGER DEFAULT 127');
         await db.execute('ALTER TABLE items ADD COLUMN daily_sound TEXT DEFAULT NULL');
         myPrint("Database upgraded to version 10: Added daily reminder fields");
+      }
+
+      if (oldVersion < 11) {
+        // Migration for version 11 - add sound field for one-time reminders
+        await db.execute('ALTER TABLE items ADD COLUMN sound TEXT DEFAULT NULL');
+        myPrint("Database upgraded to version 11: Added sound field");
       }
     },
   );

@@ -349,4 +349,42 @@ class SimpleNotifications {
       myPrint('Error updating daily reminders: $e');
     }
   }
+
+  // Get list of system notification sounds
+  static Future<List<Map<String, String>>> getSystemSounds() async {
+    try {
+      final List<dynamic> result = await platform.invokeMethod('getSystemSounds');
+      return result.map((item) {
+        final map = item as Map<dynamic, dynamic>;
+        return {
+          'name': map['name']?.toString() ?? '',
+          'uri': map['uri']?.toString() ?? '',
+        };
+      }).toList();
+    } catch (e) {
+      myPrint('Error getting system sounds: $e');
+      return [];
+    }
+  }
+
+  // Play a sound (from system URI or file path)
+  static Future<void> playSound({String? soundUri, String? soundPath}) async {
+    try {
+      await platform.invokeMethod('playSound', {
+        'soundUri': soundUri,
+        'soundPath': soundPath,
+      });
+    } catch (e) {
+      myPrint('Error playing sound: $e');
+    }
+  }
+
+  // Stop currently playing sound
+  static Future<void> stopSound() async {
+    try {
+      await platform.invokeMethod('stopSound');
+    } catch (e) {
+      myPrint('Error stopping sound: $e');
+    }
+  }
 }

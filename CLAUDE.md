@@ -33,7 +33,7 @@ Documents/Memorizer/
 ```
 
 ## Database
-- Current version: 9
+- Current version: 11
 - Main DB: `mainDb` (items table)
 - Settings DB: `settDb`
 

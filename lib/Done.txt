@@ -1,17 +1,26 @@
-  + Виртуальная папка "Daily Reminders" (Ежедневные):
-    - Показывает записи с daily = 1 в отдельной папке
-    - Оранжевый цвет, иконка Icons.today
-    - ID: -4 (виртуальный элемент)
-    - Отображается в конце списка после Yearly и Notes (если есть записи)
-    - Навигация: вход/выход, back button, заголовок в AppBar
-    - Локализации: ru/ua
+  + Sound selection for reminders:
+    - System notification and alarm sounds available
+    - Sound picker dialog with preview (play button)
+    - Separate sound fields: 'sound' for one-time, 'daily_sound' for daily
+    - DB version 11 with 'sound' field
+    - Kotlin: getSystemSounds(), playSound(), stopSound()
+    - Flutter: SimpleNotifications methods for sounds
+    - Architecture supports future external file playback
 
-  + Мультифото (до 10 фото на запись):
-    - Фото хранятся в папках Photo/item_ID/
-    - Новая запись: temp_XXX папка → при сохранении перемещается в item_ID, при отмене удаляется
-    - Галерея просмотра с PageView и индикаторами
-    - Badge с количеством фото в списке
-    - Выбор: камера или галерея (мультивыбор)
-    - Бекап/Restore включает папку Photo
-    - Миграция v9: старые фото → item_ID
-    - Очистка осиротевших temp-папок при запуске (старше 1 дня)
+  + Daily Reminders virtual folder:
+    - Shows items with daily = 1 in separate folder
+    - Orange color, Icons.today icon
+    - ID: -4 (virtual item)
+    - Displayed at end of list after Yearly and Notes
+    - Navigation: enter/exit, back button, AppBar title
+    - Localizations: ru/ua
+
+  + Multi-photo support (up to 10 photos per item):
+    - Photos stored in Photo/item_ID/ folders
+    - New item: temp_XXX folder → moved to item_ID on save, deleted on cancel
+    - Gallery view with PageView and indicators
+    - Badge with photo count in list
+    - Source: camera or gallery (multi-select)
+    - Backup/Restore includes Photo folder
+    - Migration v9: old photos → item_ID
+    - Cleanup orphaned temp folders on startup (older than 1 day)

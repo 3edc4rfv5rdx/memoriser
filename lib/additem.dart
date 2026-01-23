@@ -52,6 +52,11 @@ class _EditItemPageState extends State<EditItemPage> {
   List<String> _dailyTimes = [];
   int _dailyDays = dayAllDays; // 127 = all days by default
 
+  // Sound fields
+  String? _sound; // For one-time reminders
+  String? _dailySound; // For daily reminders
+  List<Map<String, String>> _systemSounds = [];
+
   // List of tags for dropdown
   List<Map<String, dynamic>> _tagsWithCounts = [];
 
@@ -81,6 +86,17 @@ class _EditItemPageState extends State<EditItemPage> {
 
     // Load all tags on initialization
     _loadTagsData();
+
+    // Load system sounds
+    _loadSystemSounds();
+  }
+
+  // Load available system sounds
+  Future<void> _loadSystemSounds() async {
+    final sounds = await SimpleNotifications.getSystemSounds();
+    setState(() {
+      _systemSounds = sounds;
+    });
   }
 
   // Initialize temp photo directory for new items
@@ -162,6 +178,10 @@ class _EditItemPageState extends State<EditItemPage> {
         _daily = item['daily'] == 1;
         _dailyTimes = parseDailyTimes(item['daily_times']);
         _dailyDays = item['daily_days'] ?? dayAllDays;
+
+        // Load sound fields
+        _sound = item['sound'];
+        _dailySound = item['daily_sound'];
 
         // Set up photo directory for existing item
         _currentPhotoDir = getItemPhotoDirPath(itemId);
@@ -312,6 +332,8 @@ class _EditItemPageState extends State<EditItemPage> {
             'daily': dailyValue,
             'daily_times': dailyTimesValue,
             'daily_days': dailyDaysValue,
+            'sound': _sound,
+            'daily_sound': _dailySound,
             'photo': photoData,
           },
           where: 'id = ?',
@@ -352,6 +374,8 @@ class _EditItemPageState extends State<EditItemPage> {
           'daily': dailyValue,
           'daily_times': dailyTimesValue,
           'daily_days': dailyDaysValue,
+          'sound': _sound,
+          'daily_sound': _dailySound,
           'photo': null, // Will update after moving photos
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -804,6 +828,8 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildYearlySelector(),
                 SizedBox(height: 10),
                 _buildRemoveAfterReminderSelector(),
+                SizedBox(height: 10),
+                _buildSoundSelector(isDaily: false),
               ],
 
               // Daily reminder options
@@ -811,6 +837,8 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildDailyTimesSection(),
                 SizedBox(height: 12),
                 _buildDailyDaysSection(),
+                SizedBox(height: 12),
+                _buildSoundSelector(isDaily: true),
               ],
             ],
           ],
@@ -1182,6 +1210,166 @@ class _EditItemPageState extends State<EditItemPage> {
         ),
       ],
     );
+  }
+
+  // Build sound selector widget
+  Widget _buildSoundSelector({required bool isDaily}) {
+    final currentSound = isDaily ? _dailySound : _sound;
+    final soundName = _getSoundName(currentSound);
+
+    return Row(
+      children: [
+        Icon(Icons.volume_up, color: clText, size: 20),
+        SizedBox(width: 8),
+        Text(
+          lw('Sound:'),
+          style: TextStyle(color: clText, fontSize: fsNormal),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _showSoundPicker(isDaily: isDaily),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: clText.withValues(alpha: 0.3)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      soundName,
+                      style: TextStyle(color: clText, fontSize: fsNormal),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(Icons.arrow_drop_down, color: clText),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Play button
+        if (currentSound != null) ...[
+          SizedBox(width: 8),
+          IconButton(
+            icon: Icon(Icons.play_arrow, color: clText),
+            onPressed: () => SimpleNotifications.playSound(soundUri: currentSound),
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Get sound name from URI
+  String _getSoundName(String? soundUri) {
+    if (soundUri == null) return lw('Default');
+    for (var sound in _systemSounds) {
+      if (sound['uri'] == soundUri) {
+        return sound['name'] ?? lw('Unknown');
+      }
+    }
+    // If it's a file path, show just the filename
+    if (soundUri.startsWith('/')) {
+      return soundUri.split('/').last;
+    }
+    return lw('Default');
+  }
+
+  // Show sound picker dialog
+  void _showSoundPicker({required bool isDaily}) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: clBgrnd,
+          title: Text(
+            lw('Select Sound'),
+            style: TextStyle(color: clText),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: ListView.builder(
+              itemCount: _systemSounds.length + 1, // +1 for "Default" option
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  // Default option
+                  return ListTile(
+                    leading: Icon(Icons.notifications, color: clText),
+                    title: Text(lw('Default'), style: TextStyle(color: clText)),
+                    trailing: (isDaily ? _dailySound : _sound) == null
+                        ? Icon(Icons.check, color: Colors.green)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        if (isDaily) {
+                          _dailySound = null;
+                        } else {
+                          _sound = null;
+                        }
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                }
+
+                final sound = _systemSounds[index - 1];
+                final isSelected = (isDaily ? _dailySound : _sound) == sound['uri'];
+
+                return ListTile(
+                  leading: Icon(Icons.music_note, color: clText),
+                  title: Text(
+                    sound['name'] ?? '',
+                    style: TextStyle(color: clText),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.play_arrow, color: clText),
+                        onPressed: () {
+                          SimpleNotifications.playSound(soundUri: sound['uri']);
+                        },
+                      ),
+                      if (isSelected) Icon(Icons.check, color: Colors.green),
+                    ],
+                  ),
+                  onTap: () {
+                    SimpleNotifications.stopSound();
+                    setState(() {
+                      if (isDaily) {
+                        _dailySound = sound['uri'];
+                      } else {
+                        _sound = sound['uri'];
+                      }
+                    });
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                SimpleNotifications.stopSound();
+                Navigator.pop(context);
+              },
+              child: Text(lw('Cancel'), style: TextStyle(color: clText)),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      // Stop sound when dialog is closed
+      SimpleNotifications.stopSound();
+    });
   }
 
   // Validate reminder date is in the future

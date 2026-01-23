@@ -11,6 +11,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.sqlite.SQLiteDatabase
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.app.ActivityCompat
@@ -175,9 +177,114 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 cancelAllDailyReminders(itemId)
                 result.success(true)
             }
+            "getSystemSounds" -> {
+                val sounds = getSystemSounds()
+                result.success(sounds)
+            }
+            "playSound" -> {
+                val soundUri = call.argument<String>("soundUri")
+                val soundPath = call.argument<String>("soundPath")
+                playSound(soundUri, soundPath)
+                result.success(true)
+            }
+            "stopSound" -> {
+                stopSound()
+                result.success(true)
+            }
             else -> {
                 result.notImplemented()
             }
+        }
+    }
+
+    // Media player for sound playback
+    private var mediaPlayer: android.media.MediaPlayer? = null
+
+    // Get list of system notification sounds
+    private fun getSystemSounds(): List<Map<String, String>> {
+        val sounds = mutableListOf<Map<String, String>>()
+
+        // Add default notification sound
+        val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        sounds.add(mapOf(
+            "name" to "Default",
+            "uri" to defaultUri.toString()
+        ))
+
+        // Get all notification sounds
+        val manager = RingtoneManager(context)
+        manager.setType(RingtoneManager.TYPE_NOTIFICATION)
+        val cursor = manager.cursor
+
+        while (cursor.moveToNext()) {
+            val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
+            val uri = manager.getRingtoneUri(cursor.position).toString()
+            sounds.add(mapOf(
+                "name" to title,
+                "uri" to uri
+            ))
+        }
+
+        // Also add alarm sounds
+        val alarmManager = RingtoneManager(context)
+        alarmManager.setType(RingtoneManager.TYPE_ALARM)
+        val alarmCursor = alarmManager.cursor
+
+        while (alarmCursor.moveToNext()) {
+            val title = alarmCursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
+            val uri = alarmManager.getRingtoneUri(alarmCursor.position).toString()
+            sounds.add(mapOf(
+                "name" to "$title (Alarm)",
+                "uri" to uri
+            ))
+        }
+
+        return sounds
+    }
+
+    // Play sound from URI or file path
+    private fun playSound(soundUri: String?, soundPath: String?) {
+        try {
+            stopSound() // Stop any currently playing sound
+
+            mediaPlayer = android.media.MediaPlayer().apply {
+                when {
+                    soundUri != null -> {
+                        setDataSource(context, Uri.parse(soundUri))
+                    }
+                    soundPath != null -> {
+                        setDataSource(soundPath)
+                    }
+                    else -> {
+                        // Play default notification sound
+                        val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                        setDataSource(context, defaultUri)
+                    }
+                }
+                prepare()
+                start()
+                setOnCompletionListener {
+                    it.release()
+                    mediaPlayer = null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error playing sound: ${e.message}")
+        }
+    }
+
+    // Stop currently playing sound
+    private fun stopSound() {
+        try {
+            mediaPlayer?.let {
+                if (it.isPlaying) {
+                    it.stop()
+                }
+                it.release()
+            }
+            mediaPlayer = null
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error stopping sound: ${e.message}")
         }
     }
 
