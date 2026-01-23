@@ -82,8 +82,8 @@ class SimpleNotifications {
       }
 
       // Determine notification time
-      int hour = 8; // Default to 8:00 AM
-      int minute = 0;
+      int hour = 9; // Default to 9:30 AM
+      int minute = 30;
 
       if (time != null) {
         // Use specific time from item

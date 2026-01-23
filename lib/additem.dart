@@ -35,9 +35,9 @@ class _EditItemPageState extends State<EditItemPage> {
   int? _selectedTimeOption; // 0 - morning, 1 - day, 2 - evening, null - none selected
 
   // Time option constants
-  static const int TIME_MORNING = 800;  // 08:00
+  static const int TIME_MORNING = 930;  // 09:30
   static const int TIME_DAY = 1230;     // 12:30
-  static const int TIME_EVENING = 1700; // 17:00
+  static const int TIME_EVENING = 1830; // 18:30
 
   DateTime? _date;
   int _priority = 0; // Default priority value
@@ -761,7 +761,7 @@ class _EditItemPageState extends State<EditItemPage> {
                         // Set default time
                         _selectedTimeOption = 0;
                         _time = TIME_MORNING;
-                        timeController.text = '08:00';
+                        timeController.text = '09:30';
                       } else {
                         // Disable all reminders
                         _remind = false;
@@ -832,7 +832,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _daily = false;
                 _selectedTimeOption = 0;
                 _time = TIME_MORNING;
-                timeController.text = '08:00';
+                timeController.text = '09:30';
               });
             },
             child: Container(
@@ -1393,8 +1393,8 @@ class _EditItemPageState extends State<EditItemPage> {
                 onChanged: _remind ? (int? value) {
                   setState(() {
                     _selectedTimeOption = value;
-                    _time = TIME_MORNING; // 08:00
-                    timeController.text = '08:00';
+                    _time = TIME_MORNING; // 09:30
+                    timeController.text = '09:30';
                   });
                 } : null,
               ),
@@ -1437,8 +1437,8 @@ class _EditItemPageState extends State<EditItemPage> {
                 onChanged: _remind ? (int? value) {
                   setState(() {
                     _selectedTimeOption = value;
-                    _time = TIME_EVENING; // 17:00
-                    timeController.text = '17:00';
+                    _time = TIME_EVENING; // 18:30
+                    timeController.text = '18:30';
                   });
                 } : null,
               ),

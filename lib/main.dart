@@ -621,6 +621,7 @@ class _HomePageState extends State<HomePage> {
   Timer? _tapTimer;
   bool _isInYearlyFolder = false;
   bool _isInNotesFolder = false;
+  bool _isInDailyFolder = false;
 
   @override
   void initState() {
@@ -639,6 +640,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _isInNotesFolder = true;
       _isInYearlyFolder = false; // Убеждаемся что другие папки закрыты
+      _isInDailyFolder = false;
       xvFilter = 'notes:true'; // Устанавливаем фильтр на заметки
     });
     _refreshItems();
@@ -657,6 +659,8 @@ class _HomePageState extends State<HomePage> {
   void _enterYearlyFolder() {
     setState(() {
       _isInYearlyFolder = true;
+      _isInNotesFolder = false;
+      _isInDailyFolder = false;
       xvFilter = 'yearly:true'; // Устанавливаем фильтр на ежегодные
     });
     _refreshItems();
@@ -667,6 +671,26 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _isInYearlyFolder = false;
       xvFilter = ''; // Очищаем фильтр
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  void _enterDailyFolder() {
+    setState(() {
+      _isInDailyFolder = true;
+      _isInYearlyFolder = false;
+      _isInNotesFolder = false;
+      xvFilter = 'daily:true';
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  void _exitDailyFolder() {
+    setState(() {
+      _isInDailyFolder = false;
+      xvFilter = '';
     });
     _refreshItems();
     _updateFilterStatus();
@@ -708,6 +732,24 @@ class _HomePageState extends State<HomePage> {
     };
   }
 
+  Map<String, dynamic> _createDailyFolderItem() {
+    return {
+      'id': -4, // Специальный ID для виртуального элемента
+      'isVirtual': true,
+      'type': 'daily_folder',
+      'title': lw('Daily Reminders'),
+      'content': '',
+      'tags': '',
+      'priority': 0,
+      'date': null,
+      'time': null,
+      'remind': 0,
+      'yearly': 0,
+      'hidden': 0,
+      'photo': null,
+    };
+  }
+
   Future<int> _getYearlyItemsCount() async {
     try {
       // Подсчитываем количество ежегодных записей
@@ -724,14 +766,28 @@ class _HomePageState extends State<HomePage> {
 
   Future<int> _getNotesItemsCount() async {
     try {
-      // Подсчитываем количество записей без времени и не ежегодных
+      // Подсчитываем количество записей без времени, не ежегодных и не daily
       final count = await mainDb.rawQuery(
-        'SELECT COUNT(*) as count FROM items WHERE time IS NULL AND yearly != 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
+        'SELECT COUNT(*) as count FROM items WHERE time IS NULL AND yearly != 1 AND (daily != 1 OR daily IS NULL) AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
       );
 
       return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
     } catch (e) {
       myPrint('Error counting notes items: $e');
+      return 0;
+    }
+  }
+
+  Future<int> _getDailyItemsCount() async {
+    try {
+      // Подсчитываем количество записей с ежедневными напоминаниями
+      final count = await mainDb.rawQuery(
+        'SELECT COUNT(*) as count FROM items WHERE daily = 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
+      );
+
+      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
+    } catch (e) {
+      myPrint('Error counting daily items: $e');
       return 0;
     }
   }
@@ -1103,6 +1159,7 @@ class _HomePageState extends State<HomePage> {
       xvFilter = '';
       _isInYearlyFolder = false;
       _isInNotesFolder = false;
+      _isInDailyFolder = false;
     });
     _refreshItems();
     okInfoBarBlue(lw('All filters cleared'));
@@ -1202,6 +1259,48 @@ class _HomePageState extends State<HomePage> {
           },
         ),
       );
+    } else if (type == 'daily_folder') {
+      return GestureDetector(
+        onLongPress: () => showHelp(133),
+        child: ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.orange,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.today, color: clText, size: 20),
+          ),
+          title: Text(
+            lw('Daily Reminders'),
+            style: TextStyle(
+              fontWeight: fwBold,
+              color: clText,
+              fontSize: fsMedium,
+            ),
+          ),
+          subtitle: FutureBuilder<int>(
+            future: _getDailyItemsCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return Text(
+                '$count ${lw('items')}',
+                style: TextStyle(color: clText, fontStyle: FontStyle.italic),
+              );
+            },
+          ),
+          trailing: Icon(Icons.folder_open, color: Colors.orange),
+          tileColor: clFill,
+          onTap: () {
+            _enterDailyFolder();
+
+            if (xvHiddenMode) {
+              resetHiddenModeTimer();
+            }
+          },
+        ),
+      );
     }
 
     return SizedBox.shrink();
@@ -1224,15 +1323,20 @@ class _HomePageState extends State<HomePage> {
         finalItems.addAll(yearlyItems);
 
       } else if (_isInNotesFolder) {
-        // В папке Notes - только записи без времени и не ежегодные
+        // В папке Notes - только записи без времени, не ежегодные и не daily
         final notesItems = items.where((item) =>
-        item['time'] == null && item['yearly'] != 1).toList();
+        item['time'] == null && item['yearly'] != 1 && item['daily'] != 1).toList();
         finalItems.addAll(notesItems);
 
+      } else if (_isInDailyFolder) {
+        // В папке Daily - только записи с ежедневными напоминаниями
+        final dailyItems = items.where((item) => item['daily'] == 1).toList();
+        finalItems.addAll(dailyItems);
+
       } else {
-        // На главном уровне - сначала обычные записи
+        // На главном уровне - сначала обычные записи (исключаем yearly и daily)
         final normalItems = items.where((item) =>
-        item['yearly'] != 1 && item['time'] != null).toList();
+        item['yearly'] != 1 && item['daily'] != 1 && item['time'] != null).toList();
         finalItems.addAll(normalItems);
 
         // Виртуальные папки в КОНЦЕ списка
@@ -1244,6 +1348,11 @@ class _HomePageState extends State<HomePage> {
         final notesCount = await _getNotesItemsCount();
         if (notesCount > 0) {
           finalItems.add(_createNotesFolderItem());
+        }
+
+        final dailyCount = await _getDailyItemsCount();
+        if (dailyCount > 0) {
+          finalItems.add(_createDailyFolderItem());
         }
       }
 
@@ -1376,6 +1485,7 @@ class _HomePageState extends State<HomePage> {
               Text(
                 _isInYearlyFolder ? lw('Yearly') :
                 _isInNotesFolder ? lw('Notes') :
+                _isInDailyFolder ? lw('Daily') :
                 lw('Memorizer'),
                 style: TextStyle(fontSize: fsLarge, fontWeight: fwBold),
               ),
@@ -1390,12 +1500,14 @@ class _HomePageState extends State<HomePage> {
         leading: GestureDetector(
           onLongPress: () => showHelp(21),
           child: IconButton(
-            icon: Icon((_isInYearlyFolder || _isInNotesFolder) ? Icons.arrow_back : Icons.close),
+            icon: Icon((_isInYearlyFolder || _isInNotesFolder || _isInDailyFolder) ? Icons.arrow_back : Icons.close),
             onPressed: () async {
               if (_isInYearlyFolder) {
                 _exitYearlyFolder();
               } else if (_isInNotesFolder) {
                 _exitNotesFolder();
+              } else if (_isInDailyFolder) {
+                _exitDailyFolder();
               } else {
                 await vacuumDatabases();
                 Navigator.of(context).canPop()
@@ -1555,6 +1667,8 @@ class _HomePageState extends State<HomePage> {
               ? lw('No yearly events yet.')
               : _isInNotesFolder
               ? lw('No notes yet.')
+              : _isInDailyFolder
+              ? lw('No daily reminders yet.')
               : xvHiddenMode
               ? lw('No private items yet. Press + to add.')
               : lw('No items yet. Press + to add.'),

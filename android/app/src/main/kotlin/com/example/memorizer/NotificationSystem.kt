@@ -987,8 +987,8 @@ class BootReceiver : BroadcastReceiver() {
                     val day = date % 100
 
                     // Parse time or use default
-                    val hour = time?.let { it / 100 } ?: 8
-                    val minute = time?.let { it % 100 } ?: 0
+                    val hour = time?.let { it / 100 } ?: 9
+                    val minute = time?.let { it % 100 } ?: 30
 
                     // Schedule the reminder
                     scheduleSpecificReminder(

@@ -36,3 +36,7 @@ Documents/Memorizer/
 - Current version: 9
 - Main DB: `mainDb` (items table)
 - Settings DB: `settDb`
+
+## Code Style
+- All code comments must be in English. Translate any non-English comments to English.
+- ToDo.txt and Done.txt entries should also be in English.
