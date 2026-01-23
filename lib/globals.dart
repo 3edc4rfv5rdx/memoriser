@@ -117,6 +117,7 @@ Map<String, dynamic> defSettings = {
   "Newest first": "true",
   "Last items": "0",
   "Enable reminders": "true",
+  "Enable daily reminders": "true",
   "Debug logs": "false",
 };
 
@@ -1260,6 +1261,133 @@ bool isValidTimeFormat(String? timeString) {
 
   return true;
 }
+
+// ============ Daily Reminder Utilities ============
+
+// Days of week constants (bitmask: bit 0 = Monday, bit 6 = Sunday)
+const int dayMonday = 1;      // 0b0000001
+const int dayTuesday = 2;     // 0b0000010
+const int dayWednesday = 4;   // 0b0000100
+const int dayThursday = 8;    // 0b0001000
+const int dayFriday = 16;     // 0b0010000
+const int daySaturday = 32;   // 0b0100000
+const int daySunday = 64;     // 0b1000000
+const int dayAllDays = 127;   // 0b1111111 (all days)
+const int dayWeekdays = 31;   // 0b0011111 (Mon-Fri)
+const int dayWeekend = 96;    // 0b1100000 (Sat-Sun)
+
+// Day names for UI (ordered: Mon-Sun)
+const List<String> dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const List<String> dayNamesRu = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/// Get localized day name for index (0=Monday, 6=Sunday)
+String getDayName(int dayIndex) {
+  if (dayIndex < 0 || dayIndex > 6) return '';
+  final names = currentLocale == 'ru' ? dayNamesRu : dayNames;
+  return names[dayIndex];
+}
+
+/// Check if a specific day is set in the bitmask
+bool isDayEnabled(int dayMask, int dayIndex) {
+  if (dayIndex < 0 || dayIndex > 6) return false;
+  return (dayMask & (1 << dayIndex)) != 0;
+}
+
+/// Set or clear a specific day in the bitmask
+int setDayEnabled(int dayMask, int dayIndex, bool enabled) {
+  if (dayIndex < 0 || dayIndex > 6) return dayMask;
+  if (enabled) {
+    return dayMask | (1 << dayIndex);
+  } else {
+    return dayMask & ~(1 << dayIndex);
+  }
+}
+
+/// Check if today is an active day in the bitmask
+bool isTodayEnabled(int dayMask) {
+  // DateTime.weekday: 1=Monday, 7=Sunday
+  // Our bitmask: bit 0=Monday, bit 6=Sunday
+  final todayIndex = DateTime.now().weekday - 1; // Convert to 0-6
+  return isDayEnabled(dayMask, todayIndex);
+}
+
+/// Get list of enabled day indices from bitmask
+List<int> getEnabledDays(int dayMask) {
+  List<int> days = [];
+  for (int i = 0; i < 7; i++) {
+    if (isDayEnabled(dayMask, i)) {
+      days.add(i);
+    }
+  }
+  return days;
+}
+
+/// Get human-readable string of enabled days
+String getDaysString(int dayMask) {
+  if (dayMask == dayAllDays) return lw('Every day');
+  if (dayMask == dayWeekdays) return lw('Weekdays');
+  if (dayMask == dayWeekend) return lw('Weekend');
+  if (dayMask == 0) return lw('No days');
+
+  final enabledDays = getEnabledDays(dayMask);
+  return enabledDays.map((i) => getDayName(i)).join(', ');
+}
+
+// ============ Daily Times JSON Utilities ============
+
+/// Parse daily times from JSON string (["08:00", "14:00", "20:00"])
+List<String> parseDailyTimes(dynamic timesValue) {
+  if (timesValue == null) return [];
+
+  String value = timesValue.toString().trim();
+  if (value.isEmpty) return [];
+
+  try {
+    final List<dynamic> parsed = json.decode(value);
+    return parsed
+        .map((e) => e.toString().trim())
+        .where((e) => isValidTimeFormat(e))
+        .toList();
+  } catch (e) {
+    myPrint('Error parsing daily times JSON: $e');
+    return [];
+  }
+}
+
+/// Encode daily times to JSON string
+String? encodeDailyTimes(List<String> times) {
+  if (times.isEmpty) return null;
+  // Filter only valid times and sort
+  final validTimes = times.where((t) => isValidTimeFormat(t)).toList();
+  validTimes.sort();
+  if (validTimes.isEmpty) return null;
+  return json.encode(validTimes);
+}
+
+/// Add a time to the list (sorted, no duplicates)
+List<String> addDailyTime(List<String> times, String newTime) {
+  if (!isValidTimeFormat(newTime)) return times;
+  if (times.contains(newTime)) return times;
+
+  final newList = List<String>.from(times);
+  newList.add(newTime);
+  newList.sort();
+  return newList;
+}
+
+/// Remove a time from the list
+List<String> removeDailyTime(List<String> times, String timeToRemove) {
+  return times.where((t) => t != timeToRemove).toList();
+}
+
+/// Get formatted string of daily times for display
+String getDailyTimesString(List<String> times) {
+  if (times.isEmpty) return lw('No times set');
+  return times.join(', ');
+}
+
+/// Default daily reminder sound name
+const String defaultDailySound = 'default_daily';
 
 Future<void> initLogging() async {
   final debugLogsEnabled = await getSetting("Debug logs") ?? "false";

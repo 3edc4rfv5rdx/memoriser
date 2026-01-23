@@ -47,6 +47,11 @@ class _EditItemPageState extends State<EditItemPage> {
   bool _removeAfterReminder = false; // Default value for auto-remove
   bool _yearly = false; // NEW: Default value for yearly repeat
 
+  // Daily reminder fields
+  bool _daily = false;
+  List<String> _dailyTimes = [];
+  int _dailyDays = dayAllDays; // 127 = all days by default
+
   // List of tags for dropdown
   List<Map<String, dynamic>> _tagsWithCounts = [];
 
@@ -153,6 +158,11 @@ class _EditItemPageState extends State<EditItemPage> {
         _removeAfterReminder = item['remove'] == 1;
         _yearly = item['yearly'] == 1; // NEW: Load yearly field
 
+        // Load daily reminder fields
+        _daily = item['daily'] == 1;
+        _dailyTimes = parseDailyTimes(item['daily_times']);
+        _dailyDays = item['daily_days'] ?? dayAllDays;
+
         // Set up photo directory for existing item
         _currentPhotoDir = getItemPhotoDirPath(itemId);
         // Load photos from item directory (filesystem is the source of truth)
@@ -209,6 +219,7 @@ class _EditItemPageState extends State<EditItemPage> {
       return;
     }
 
+    // Validation for one-time reminder
     if (_remind) {
       // Check if date is set
       if (_date == null) {
@@ -235,12 +246,35 @@ class _EditItemPageState extends State<EditItemPage> {
       }
     }
 
+    // Validation for daily reminder
+    if (_daily) {
+      if (_dailyTimes.isEmpty) {
+        okInfoBarRed(
+          lw('Add at least one time'),
+          duration: Duration(seconds: 4),
+        );
+        return;
+      }
+      if (_dailyDays == 0) {
+        okInfoBarRed(
+          lw('Select at least one day'),
+          duration: Duration(seconds: 4),
+        );
+        return;
+      }
+    }
+
     // Convert date to YYYYMMDD format for storage
     final dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
     final remindValue = _remind ? 1 : 0;
     final hiddenValue = _hidden ? 1 : 0;
     final removeValue = _removeAfterReminder ? 1 : 0;
     final yearlyValue = _yearly ? 1 : 0; // NEW: Yearly field
+
+    // Daily reminder fields
+    final dailyValue = _daily ? 1 : 0;
+    final dailyTimesValue = encodeDailyTimes(_dailyTimes);
+    final dailyDaysValue = _dailyDays;
 
     // Get time value (may be null)
     final timeValue = _time;
@@ -275,6 +309,9 @@ class _EditItemPageState extends State<EditItemPage> {
             'hidden': hiddenValue,
             'remove': removeValue,
             'yearly': yearlyValue,
+            'daily': dailyValue,
+            'daily_times': dailyTimesValue,
+            'daily_days': dailyDaysValue,
             'photo': photoData,
           },
           where: 'id = ?',
@@ -290,6 +327,15 @@ class _EditItemPageState extends State<EditItemPage> {
           _time,
         );
 
+        // Update daily reminders for this item
+        await SimpleNotifications.updateDailyReminders(
+          widget.itemId!,
+          _daily,
+          _dailyTimes,
+          _dailyDays,
+          titleText,
+        );
+
       } else {
         // Insert new item first to get the ID
         final insertedId = await mainDb.insert('items', {
@@ -303,6 +349,9 @@ class _EditItemPageState extends State<EditItemPage> {
           'hidden': hiddenValue,
           'remove': removeValue,
           'yearly': yearlyValue,
+          'daily': dailyValue,
+          'daily_times': dailyTimesValue,
+          'daily_days': dailyDaysValue,
           'photo': null, // Will update after moving photos
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -331,6 +380,16 @@ class _EditItemPageState extends State<EditItemPage> {
             insertedId,
             _date!,
             _time,
+          );
+        }
+
+        // Schedule daily reminders for new item if needed
+        if (_daily && _dailyTimes.isNotEmpty) {
+          await SimpleNotifications.scheduleAllDailyReminders(
+            insertedId,
+            _dailyTimes,
+            _dailyDays,
+            titleText,
           );
         }
       }
@@ -583,8 +642,6 @@ class _EditItemPageState extends State<EditItemPage> {
       setState(() {
         _date = picked;
         dateController.text = DateFormat(ymdDateFormat).format(picked);
-        // Автоматическая валидация напоминания
-        if (_remind) _validateReminderDate();
       });
     }
   }
@@ -671,48 +728,181 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-// UPDATED: Reminder selector with automatic morning selection
-  Widget _buildReminderSelector() {
+// Complete reminder section with header, checkbox, and type selector
+  Widget _buildReminderSection() {
+    // Check if any reminder is enabled
+    final bool reminderEnabled = _remind || _daily;
+
     return GestureDetector(
-      onLongPress: () => showHelp(35), // ID 35 for reminder checkbox
-      child: Row(
-        children: [
-          Checkbox(
-            value: _remind,
-            activeColor: clUpBar,
-            checkColor: clText,
-            onChanged: (value) {
+      onLongPress: () => showHelp(35),
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: clFill,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: reminderEnabled ? clUpBar : clText.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with checkbox
+            Row(
+              children: [
+                Checkbox(
+                  value: reminderEnabled,
+                  activeColor: clUpBar,
+                  checkColor: clText,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        // Enable one-time reminder by default
+                        _remind = true;
+                        _daily = false;
+                        // Set default time
+                        _selectedTimeOption = 0;
+                        _time = TIME_MORNING;
+                        timeController.text = '08:00';
+                      } else {
+                        // Disable all reminders
+                        _remind = false;
+                        _daily = false;
+                        timeController.clear();
+                        _time = null;
+                        _selectedTimeOption = null;
+                        _yearly = false;
+                        _removeAfterReminder = false;
+                      }
+                    });
+                  },
+                ),
+                Text(
+                  lw('Reminder'),
+                  style: TextStyle(
+                    color: clText,
+                    fontSize: fsMedium,
+                    fontWeight: fwBold,
+                  ),
+                ),
+              ],
+            ),
+
+            // Show options only when reminder is enabled
+            if (reminderEnabled) ...[
+              SizedBox(height: 12),
+
+              // One-time / Daily toggle
+              _buildReminderTypeToggle(),
+
+              SizedBox(height: 12),
+
+              // One-time reminder options
+              if (_remind) ...[
+                _buildTimeField(),
+                SizedBox(height: 10),
+                _buildTimeOptions(),
+                SizedBox(height: 10),
+                _buildYearlySelector(),
+                SizedBox(height: 10),
+                _buildRemoveAfterReminderSelector(),
+              ],
+
+              // Daily reminder options
+              if (_daily) ...[
+                _buildDailyTimesSection(),
+                SizedBox(height: 12),
+                _buildDailyDaysSection(),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // One-time / Daily toggle buttons
+  Widget _buildReminderTypeToggle() {
+    return Row(
+      children: [
+        // One-time toggle
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
               setState(() {
-                _remind = value ?? false;
-
-                // If enabling reminder, validate date and set morning time
-                if (_remind) {
-                  _validateReminderDate();
-
-                  // If reminder is still enabled after validation, set morning time
-                  if (_remind) {
-                    // Automatically select morning time
-                    _selectedTimeOption = 0;
-                    _time = TIME_MORNING; // 08:00
-                    timeController.text = '08:00';
-                  }
-                } else {
-                  // If disabling reminder, reset time field, radio buttons, yearly and remove
-                  timeController.clear();
-                  _time = null;
-                  _selectedTimeOption = null;
-                  _yearly = false; // Reset yearly when reminder is disabled
-                  _removeAfterReminder = false;
+                _remind = true;
+                _daily = false;
+                _selectedTimeOption = 0;
+                _time = TIME_MORNING;
+                timeController.text = '08:00';
+              });
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              decoration: BoxDecoration(
+                color: _remind ? clUpBar : Colors.transparent,
+                borderRadius: BorderRadius.horizontal(left: Radius.circular(6)),
+                border: Border.all(color: _remind ? clUpBar : clText.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.event, color: clText, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    lw('One-time'),
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsNormal,
+                      fontWeight: _remind ? fwBold : fwNormal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Daily toggle
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _daily = true;
+                _remind = false;
+                timeController.clear();
+                _time = null;
+                _selectedTimeOption = null;
+                _yearly = false;
+                _removeAfterReminder = false;
+                if (_dailyTimes.isEmpty) {
+                  _dailyTimes = ['09:00'];
                 }
               });
             },
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              decoration: BoxDecoration(
+                color: _daily ? clUpBar : Colors.transparent,
+                borderRadius: BorderRadius.horizontal(right: Radius.circular(6)),
+                border: Border.all(color: _daily ? clUpBar : clText.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.repeat, color: clText, size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    lw('Daily'),
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsNormal,
+                      fontWeight: _daily ? fwBold : fwNormal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          Text(
-            lw('Set reminder'),
-            style: TextStyle(color: clText, fontSize: fsMedium),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -782,6 +972,215 @@ class _EditItemPageState extends State<EditItemPage> {
           ),
         ],
       ),
+    );
+  }
+
+  // Build the times list section
+  Widget _buildDailyTimesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.access_time, color: clText, size: 16),
+            SizedBox(width: 8),
+            Text(
+              lw('Times'),
+              style: TextStyle(color: clText, fontSize: fsNormal, fontWeight: fwBold),
+            ),
+            Spacer(),
+            // Add time button
+            IconButton(
+              icon: Icon(Icons.add_circle, color: clUpBar, size: 24),
+              onPressed: () => _showAddTimeDialog(),
+              tooltip: lw('Add time'),
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(),
+            ),
+          ],
+        ),
+        SizedBox(height: 8),
+
+        // List of times
+        if (_dailyTimes.isEmpty)
+          Text(
+            lw('No times set'),
+            style: TextStyle(color: clText.withValues(alpha: 0.5), fontSize: fsSmall),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: _dailyTimes.map((time) {
+              return Chip(
+                label: Text(time, style: TextStyle(color: clText)),
+                backgroundColor: clUpBar,
+                deleteIcon: Icon(Icons.close, size: 16, color: clRed),
+                onDeleted: () {
+                  setState(() {
+                    _dailyTimes = removeDailyTime(_dailyTimes, time);
+                  });
+                },
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  // Show dialog to add a new time
+  Future<void> _showAddTimeDialog() async {
+    TimeOfDay? selectedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: 9, minute: 0),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: clUpBar,
+              onPrimary: clText,
+              surface: clBgrnd,
+              onSurface: clText,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedTime != null) {
+      final timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+      setState(() {
+        _dailyTimes = addDailyTime(_dailyTimes, timeStr);
+      });
+    }
+  }
+
+  // Build the days of week section
+  Widget _buildDailyDaysSection() {
+    // Check if all days or weekdays are currently selected
+    final bool allDaysOn = _dailyDays == dayAllDays;
+    final bool weekdaysOn = (_dailyDays & dayWeekdays) == dayWeekdays;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header with toggle buttons
+        Row(
+          children: [
+            Icon(Icons.calendar_today, color: clText, size: 16),
+            SizedBox(width: 8),
+            Text(
+              lw('Days'),
+              style: TextStyle(color: clText, fontSize: fsNormal, fontWeight: fwBold),
+            ),
+            Spacer(),
+            // Independent toggle buttons
+            // "All" toggle - on/off
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (allDaysOn) {
+                    _dailyDays = 0; // Turn off all
+                  } else {
+                    _dailyDays = dayAllDays; // Turn on all
+                  }
+                });
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                margin: EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: allDaysOn ? clUpBar : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: allDaysOn ? clUpBar : clText.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  lw('All'),
+                  style: TextStyle(
+                    fontSize: fsSmall,
+                    color: clText,
+                    fontWeight: allDaysOn ? fwBold : fwNormal,
+                  ),
+                ),
+              ),
+            ),
+            // "Weekdays" toggle - on/off
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (weekdaysOn) {
+                    // Turn off weekdays (Mon-Fri), keep weekend as is
+                    _dailyDays = _dailyDays & dayWeekend;
+                  } else {
+                    // Turn on weekdays, keep weekend as is
+                    _dailyDays = _dailyDays | dayWeekdays;
+                  }
+                });
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: weekdaysOn ? clUpBar : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: weekdaysOn ? clUpBar : clText.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  lw('Weekdays'),
+                  style: TextStyle(
+                    fontSize: fsSmall,
+                    color: clText,
+                    fontWeight: weekdaysOn ? fwBold : fwNormal,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+
+        // Day checkboxes
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(7, (index) {
+            final isEnabled = isDayEnabled(_dailyDays, index);
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _dailyDays = setDayEnabled(_dailyDays, index, !isEnabled);
+                });
+              },
+              child: Column(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isEnabled ? clUpBar : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isEnabled ? clUpBar : clText.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: isEnabled
+                        ? Icon(Icons.check, color: clText, size: 18)
+                        : null,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    getDayName(index),
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsSmall,
+                      fontWeight: isEnabled ? fwBold : fwNormal,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
+      ],
     );
   }
 
@@ -1487,29 +1886,12 @@ class _EditItemPageState extends State<EditItemPage> {
             _buildPrioritySelector(),
             SizedBox(height: 10),
 
-            // Date field
+            // Date field (always visible)
             _buildDateField(),
             SizedBox(height: 10),
 
-            // Reminder checkbox
-            _buildReminderSelector(),
-            SizedBox(height: 10),
-
-            // Time field
-            _buildTimeField(),
-            SizedBox(height: 10),
-
-            // Time options (radio buttons)
-            _buildTimeOptions(),
-            SizedBox(height: 10),
-
-            // NEW: Yearly repeat checkbox
-            _buildYearlySelector(),
-            SizedBox(height: 10),
-
-            // Remove checkbox (updated)
-            _buildRemoveAfterReminderSelector(),
-            SizedBox(height: 10),
+            // Reminder section with header and checkbox
+            _buildReminderSection(),
 
             // Hidden checkbox (only in hidden mode)
             _buildHiddenSelector(),

@@ -23,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 9, // Increased from 8 to 9 for item photo folders
+    version: 10, // Increased from 9 to 10 for daily reminders
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -39,7 +39,11 @@ Future<void> initDatabases() async {
           remove INTEGER DEFAULT 0,
           hidden INTEGER DEFAULT 0,
           photo TEXT DEFAULT NULL,
-          yearly INTEGER DEFAULT 0
+          yearly INTEGER DEFAULT 0,
+          daily INTEGER DEFAULT 0,
+          daily_times TEXT DEFAULT NULL,
+          daily_days INTEGER DEFAULT 127,
+          daily_sound TEXT DEFAULT NULL
         )
       ''');
     },
@@ -113,6 +117,15 @@ Future<void> initDatabases() async {
         // Migration for version 9 - move photos to item folders
         myPrint("Starting migration to version 9: Moving photos to item folders");
         await _migratePhotosToItemFolders(db);
+      }
+
+      if (oldVersion < 10) {
+        // Migration for version 10 - add daily reminder fields
+        await db.execute('ALTER TABLE items ADD COLUMN daily INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE items ADD COLUMN daily_times TEXT DEFAULT NULL');
+        await db.execute('ALTER TABLE items ADD COLUMN daily_days INTEGER DEFAULT 127');
+        await db.execute('ALTER TABLE items ADD COLUMN daily_sound TEXT DEFAULT NULL');
+        myPrint("Database upgraded to version 10: Added daily reminder fields");
       }
     },
   );

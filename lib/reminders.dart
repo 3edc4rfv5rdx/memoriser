@@ -233,4 +233,120 @@ class SimpleNotifications {
       okInfoBarRed('${lw('Error')}: $e');
     }
   }
+
+  // Schedule a daily reminder
+  static Future<void> scheduleDailyReminder(
+    int itemId,
+    String time,
+    int daysMask,
+    String title,
+    String body,
+  ) async {
+    try {
+      myPrint('=== SCHEDULING DAILY REMINDER ===');
+      myPrint('Item ID: $itemId');
+      myPrint('Time: $time');
+      myPrint('Days mask: $daysMask');
+
+      // Check if daily reminders are enabled
+      final enableDailyReminders = await getSetting("Enable daily reminders") ?? defSettings["Enable daily reminders"];
+      if (enableDailyReminders != "true") {
+        myPrint('Daily reminders are disabled, not scheduling');
+        return;
+      }
+
+      // Parse time string (HH:MM)
+      final parts = time.split(':');
+      if (parts.length != 2) {
+        myPrint('Invalid time format: $time');
+        return;
+      }
+
+      final hour = int.tryParse(parts[0]) ?? 0;
+      final minute = int.tryParse(parts[1]) ?? 0;
+
+      await platform.invokeMethod('scheduleDailyReminder', {
+        'itemId': itemId,
+        'hour': hour,
+        'minute': minute,
+        'daysMask': daysMask,
+        'title': title,
+        'body': body,
+      });
+
+      myPrint('Daily reminder scheduled for item $itemId at $hour:$minute');
+    } catch (e) {
+      myPrint('Failed to schedule daily reminder: $e');
+    }
+  }
+
+  // Cancel a specific daily reminder
+  static Future<void> cancelDailyReminder(int itemId, String time) async {
+    try {
+      final parts = time.split(':');
+      if (parts.length != 2) return;
+
+      final hour = int.tryParse(parts[0]) ?? 0;
+      final minute = int.tryParse(parts[1]) ?? 0;
+
+      await platform.invokeMethod('cancelDailyReminder', {
+        'itemId': itemId,
+        'hour': hour,
+        'minute': minute,
+      });
+      myPrint('Daily reminder cancelled for item $itemId at $time');
+    } catch (e) {
+      myPrint('Failed to cancel daily reminder: $e');
+    }
+  }
+
+  // Cancel all daily reminders for an item
+  static Future<void> cancelAllDailyReminders(int itemId) async {
+    try {
+      await platform.invokeMethod('cancelAllDailyReminders', {
+        'itemId': itemId,
+      });
+      myPrint('All daily reminders cancelled for item $itemId');
+    } catch (e) {
+      myPrint('Failed to cancel all daily reminders: $e');
+    }
+  }
+
+  // Schedule all daily reminders for an item
+  static Future<void> scheduleAllDailyReminders(
+    int itemId,
+    List<String> times,
+    int daysMask,
+    String title,
+  ) async {
+    try {
+      for (var time in times) {
+        await scheduleDailyReminder(itemId, time, daysMask, title, '');
+      }
+      myPrint('Scheduled ${times.length} daily reminders for item $itemId');
+    } catch (e) {
+      myPrint('Error scheduling all daily reminders: $e');
+    }
+  }
+
+  // Update daily reminders for an item (cancel old, schedule new)
+  static Future<void> updateDailyReminders(
+    int itemId,
+    bool enabled,
+    List<String> times,
+    int daysMask,
+    String title,
+  ) async {
+    try {
+      // First cancel all existing daily reminders for this item
+      await cancelAllDailyReminders(itemId);
+
+      // If enabled, schedule new ones
+      if (enabled && times.isNotEmpty && daysMask > 0) {
+        await scheduleAllDailyReminders(itemId, times, daysMask, title);
+      }
+    } catch (e) {
+      myPrint('Error updating daily reminders: $e');
+    }
+  }
 }

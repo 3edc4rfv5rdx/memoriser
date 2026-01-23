@@ -118,6 +118,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
         when (call.method) {
             "initializeNotifications" -> {
                 createNotificationChannel()
+                createDailyNotificationChannel()
                 result.success(null)
             }
             "showNotification" -> {
@@ -151,9 +152,155 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 cancelAllNotifications()
                 result.success(true)
             }
+            "scheduleDailyReminder" -> {
+                val itemId = call.argument<Int>("itemId") ?: 0
+                val hour = call.argument<Int>("hour") ?: 0
+                val minute = call.argument<Int>("minute") ?: 0
+                val daysMask = call.argument<Int>("daysMask") ?: 127 // All days by default
+                val title = call.argument<String>("title") ?: ""
+                val body = call.argument<String>("body") ?: ""
+
+                scheduleDailyReminder(itemId, hour, minute, daysMask, title, body)
+                result.success(true)
+            }
+            "cancelDailyReminder" -> {
+                val itemId = call.argument<Int>("itemId") ?: 0
+                val hour = call.argument<Int>("hour") ?: 0
+                val minute = call.argument<Int>("minute") ?: 0
+                cancelDailyReminder(itemId, hour, minute)
+                result.success(true)
+            }
+            "cancelAllDailyReminders" -> {
+                val itemId = call.argument<Int>("itemId") ?: 0
+                cancelAllDailyReminders(itemId)
+                result.success(true)
+            }
             else -> {
                 result.notImplemented()
             }
+        }
+    }
+
+    // Create notification channel for daily reminders
+    private fun createDailyNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "memorizer_daily",
+                "Daily Reminders",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Daily reminders for Memorizer app"
+                enableLights(true)
+                enableVibration(true)
+            }
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    // Schedule a daily reminder for specific item
+    private fun scheduleDailyReminder(itemId: Int, hour: Int, minute: Int, daysMask: Int, title: String, body: String) {
+        try {
+            Log.d("MemorizerApp", "Scheduling daily reminder for item $itemId at $hour:$minute, daysMask=$daysMask")
+
+            // Create intent for daily reminder
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.DAILY_REMINDER"
+                putExtra("itemId", itemId)
+                putExtra("hour", hour)
+                putExtra("minute", minute)
+                putExtra("daysMask", daysMask)
+                putExtra("title", title)
+                putExtra("body", body)
+            }
+
+            // Use unique requestCode based on itemId, hour and minute
+            val requestCode = itemId * 10000 + hour * 100 + minute
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Set time for next reminder (today or tomorrow)
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+
+                // If time already passed today, schedule for tomorrow
+                if (timeInMillis <= System.currentTimeMillis()) {
+                    add(Calendar.DAY_OF_YEAR, 1)
+                }
+            }
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            // Schedule repeating alarm
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+
+            Log.d("MemorizerApp", "Daily reminder scheduled for item $itemId at ${calendar.time}")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error scheduling daily reminder: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    // Cancel a specific daily reminder
+    private fun cancelDailyReminder(itemId: Int, hour: Int, minute: Int) {
+        try {
+            Log.d("MemorizerApp", "Cancelling daily reminder for item $itemId at $hour:$minute")
+
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.DAILY_REMINDER"
+            }
+
+            val requestCode = itemId * 10000 + hour * 100 + minute
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarmManager.cancel(pendingIntent)
+
+            Log.d("MemorizerApp", "Daily reminder cancelled for item $itemId at $hour:$minute")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error cancelling daily reminder: ${e.message}")
+        }
+    }
+
+    // Cancel all daily reminders for an item
+    private fun cancelAllDailyReminders(itemId: Int) {
+        try {
+            Log.d("MemorizerApp", "Cancelling all daily reminders for item $itemId")
+            // Cancel all possible time combinations (this is a simplification)
+            // In a production app, you might want to track scheduled times
+            for (hour in 0..23) {
+                for (minute in listOf(0, 15, 30, 45)) {
+                    cancelDailyReminder(itemId, hour, minute)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error cancelling all daily reminders: ${e.message}")
         }
     }
 
@@ -321,10 +468,256 @@ class NotificationReceiver : BroadcastReceiver() {
                     handleSpecificReminder(context, intent)
                     return
                 }
+                "com.example.memorizer.DAILY_REMINDER" -> {
+                    // Handle daily reminder
+                    handleDailyReminder(context, intent)
+                    return
+                }
             }
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error in NotificationReceiver.onReceive: ${e.message}")
             e.printStackTrace()
+        }
+    }
+
+    // Handle daily reminder
+    private fun handleDailyReminder(context: Context, intent: Intent) {
+        try {
+            val itemId = intent.getIntExtra("itemId", 0)
+            val hour = intent.getIntExtra("hour", 0)
+            val minute = intent.getIntExtra("minute", 0)
+            val daysMask = intent.getIntExtra("daysMask", 127)
+            val title = intent.getStringExtra("title") ?: "Daily Reminder"
+            val body = intent.getStringExtra("body") ?: ""
+
+            Log.d("MemorizerApp", "Handling daily reminder for item $itemId at $hour:$minute")
+
+            // Check if daily reminders are enabled globally
+            if (!isDailyRemindersEnabled(context)) {
+                Log.d("MemorizerApp", "Daily reminders are disabled, skipping")
+                rescheduleNextDailyReminder(context, itemId, hour, minute, daysMask, title, body)
+                return
+            }
+
+            // Check if today is an enabled day (bit 0 = Monday, bit 6 = Sunday)
+            val calendar = Calendar.getInstance()
+            // Calendar.DAY_OF_WEEK: Sunday=1, Monday=2, ..., Saturday=7
+            // Our bitmask: bit 0=Monday, bit 6=Sunday
+            val calendarDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+            val dayIndex = if (calendarDayOfWeek == Calendar.SUNDAY) 6 else calendarDayOfWeek - 2
+
+            if ((daysMask and (1 shl dayIndex)) == 0) {
+                Log.d("MemorizerApp", "Today (day index $dayIndex) is not in daysMask $daysMask, skipping")
+                rescheduleNextDailyReminder(context, itemId, hour, minute, daysMask, title, body)
+                return
+            }
+
+            // Check if item still has daily reminders enabled
+            if (!isItemDailyActive(context, itemId)) {
+                Log.d("MemorizerApp", "Item $itemId daily reminder is disabled, not rescheduling")
+                return
+            }
+
+            // Get item data from database
+            val itemData = getItemData(context, itemId)
+            val itemTitle = if (itemData.first.isNotEmpty()) itemData.first else title
+            val itemContent = itemData.second.ifEmpty { body }
+
+            // Create notification channel for daily reminders
+            createDailyNotificationChannel(context)
+
+            // Show notification (later can be replaced with dialog activity)
+            showDailyNotification(context, itemId, hour, minute, itemTitle, itemContent)
+
+            // Reschedule for next occurrence
+            rescheduleNextDailyReminder(context, itemId, hour, minute, daysMask, title, body)
+
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error handling daily reminder: ${e.message}")
+        }
+    }
+
+    // Reschedule daily reminder for next day
+    private fun rescheduleNextDailyReminder(context: Context, itemId: Int, hour: Int, minute: Int, daysMask: Int, title: String, body: String) {
+        try {
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.DAILY_REMINDER"
+                putExtra("itemId", itemId)
+                putExtra("hour", hour)
+                putExtra("minute", minute)
+                putExtra("daysMask", daysMask)
+                putExtra("title", title)
+                putExtra("body", body)
+            }
+
+            val requestCode = itemId * 10000 + hour * 100 + minute
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Schedule for tomorrow at the same time
+            val calendar = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+
+            Log.d("MemorizerApp", "Daily reminder rescheduled for item $itemId at ${calendar.time}")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error rescheduling daily reminder: ${e.message}")
+        }
+    }
+
+    // Check if daily reminders are enabled in settings
+    private fun isDailyRemindersEnabled(context: Context): Boolean {
+        try {
+            val dbPath = context.getDatabasePath("settings.db")
+            if (!dbPath.exists()) {
+                return true // Default enabled
+            }
+
+            val db = SQLiteDatabase.openDatabase(
+                dbPath.absolutePath,
+                null,
+                SQLiteDatabase.OPEN_READONLY
+            )
+
+            val cursor = db.rawQuery(
+                "SELECT value FROM settings WHERE key = ?",
+                arrayOf("Enable daily reminders")
+            )
+
+            val result = if (cursor.moveToFirst()) {
+                cursor.getString(0) == "true"
+            } else {
+                true // Default enabled
+            }
+
+            cursor.close()
+            db.close()
+            return result
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error checking if daily reminders enabled: ${e.message}")
+            return true
+        }
+    }
+
+    // Check if item has daily reminders active
+    private fun isItemDailyActive(context: Context, itemId: Int): Boolean {
+        return try {
+            val dbPath = context.getDatabasePath("memorizer.db")
+            if (!dbPath.exists()) return false
+
+            val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+
+            val cursor = db.rawQuery(
+                "SELECT daily FROM items WHERE id = ?",
+                arrayOf(itemId.toString())
+            )
+
+            val isActive = if (cursor.moveToFirst()) {
+                cursor.getInt(0) == 1
+            } else {
+                false
+            }
+
+            cursor.close()
+            db.close()
+            isActive
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error checking if item daily is active: ${e.message}")
+            false
+        }
+    }
+
+    // Create notification channel for daily reminders
+    private fun createDailyNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "memorizer_daily",
+                "Daily Reminders",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Daily reminders for Memorizer app"
+                enableLights(true)
+                enableVibration(true)
+                setShowBadge(true)
+            }
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    // Show daily notification
+    private fun showDailyNotification(context: Context, itemId: Int, hour: Int, minute: Int, title: String, content: String) {
+        try {
+            val notificationIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("notification_payload", itemId.toString())
+            }
+
+            // Use unique notification ID based on itemId, hour and minute
+            val notificationId = itemId * 10000 + hour * 100 + minute
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId,
+                notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Blue color for daily reminders
+            val blueColor = 0xFF2196F3.toInt()
+
+            val bigTextStyle = NotificationCompat.BigTextStyle()
+                .bigText(content)
+                .setBigContentTitle(title)
+
+            val builder = NotificationCompat.Builder(context, "memorizer_daily")
+                .setSmallIcon(R.drawable.notification_icon)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setStyle(bigTextStyle)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setColor(blueColor)
+                .setColorized(true)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+
+            try {
+                val notificationManager = NotificationManagerCompat.from(context)
+                notificationManager.notify(notificationId, builder.build())
+                Log.d("MemorizerApp", "Daily notification shown with ID: $notificationId")
+            } catch (se: SecurityException) {
+                Log.e("MemorizerApp", "Security exception showing daily notification: ${se.message}")
+            }
+
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error showing daily notification: ${e.message}")
         }
     }
 

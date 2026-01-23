@@ -24,6 +24,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   bool _newestFirst = true;
   int _lastItems = 0;
   bool _enableReminders = true;
+  bool _enableDailyReminders = true;
   bool _debugLogs = false;
   bool _isLoading = true;
 
@@ -33,6 +34,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   bool? _newNewestFirst;
   int? _newLastItems;
   bool? _newEnableReminders;
+  bool? _newEnableDailyReminders;
   bool? _newDebugLogs;
   bool _hasChanges = false;
 
@@ -75,6 +77,11 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
     final enableReminders = enableRemindersValue == "true";
 
+    // Load enable daily reminders setting
+    final enableDailyRemindersValue =
+        await getSetting("Enable daily reminders") ?? defSettings["Enable daily reminders"];
+    final enableDailyReminders = enableDailyRemindersValue == "true";
+
     // Load debug logs setting
     final debugLogsValue =
         await getSetting("Debug logs") ?? defSettings["Debug logs"];
@@ -89,6 +96,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newestFirst = isNewestFirst;
         _lastItems = lastItems;
         _enableReminders = enableReminders;
+        _enableDailyReminders = enableDailyReminders;
         _debugLogs = debugLogs;
 
         // Initialize temporary values
@@ -97,6 +105,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newNewestFirst = isNewestFirst;
         _newLastItems = lastItems;
         _newEnableReminders = enableReminders;
+        _newEnableDailyReminders = enableDailyReminders;
         _newDebugLogs = debugLogs;
 
         _isLoading = false;
@@ -114,6 +123,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _newNewestFirst != _newestFirst ||
               _newLastItems != _lastItems ||
               _newEnableReminders != _enableReminders ||
+              _newEnableDailyReminders != _enableDailyReminders ||
               _newDebugLogs != _debugLogs;
     });
   }
@@ -162,6 +172,14 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       reminderSettingsChanged = true;
     }
 
+    // Save enable daily reminders setting if changed
+    if (_newEnableDailyReminders != _enableDailyReminders &&
+        _newEnableDailyReminders != null) {
+      await saveSetting("Enable daily reminders", _newEnableDailyReminders.toString());
+      savedSettings.add('enable daily reminders');
+      // TODO: Handle daily reminders rescheduling when Kotlin part is implemented
+    }
+
     // Save debug logs setting if changed
     if (_newDebugLogs != _debugLogs && _newDebugLogs != null) {
       await saveSetting("Debug logs", _newDebugLogs.toString());
@@ -175,6 +193,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _newestFirst = _newNewestFirst ?? _newestFirst;
       _lastItems = _newLastItems ?? _lastItems;
       _enableReminders = _newEnableReminders ?? _enableReminders;
+      _enableDailyReminders = _newEnableDailyReminders ?? _enableDailyReminders;
       _debugLogs = _newDebugLogs ?? _debugLogs;
       _hasChanges = false;
     });
@@ -411,6 +430,15 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
               SizedBox(height: 10),
 
+              // Enable daily reminders checkbox row
+              _buildSettingsRow(
+                label: lw('Enable daily reminders'),
+                child: _buildEnableDailyRemindersCheckbox(),
+                helpId: 107,
+              ),
+
+              SizedBox(height: 10),
+
               // Debug logs checkbox row
               _buildSettingsRow(
                 label: lw('Debug logs'),
@@ -576,6 +604,26 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           if (value != null && value != _newEnableReminders) {
             setState(() {
               _newEnableReminders = value;
+            });
+            _checkForChanges();
+          }
+        },
+      ),
+    );
+  }
+
+  // Function for enable daily reminders checkbox
+  Widget _buildEnableDailyRemindersCheckbox() {
+    return Container(
+      alignment: Alignment.centerLeft,
+      child: Checkbox(
+        value: _newEnableDailyReminders,
+        activeColor: clUpBar,
+        checkColor: clText,
+        onChanged: (bool? value) {
+          if (value != null && value != _newEnableDailyReminders) {
+            setState(() {
+              _newEnableDailyReminders = value;
             });
             _checkForChanges();
           }
