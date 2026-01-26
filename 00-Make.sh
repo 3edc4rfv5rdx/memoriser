@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="xxx"
+COMMENT="test - daily reminders and sounds"
 #
 GLOBVERS='0.9'
 VER=''
