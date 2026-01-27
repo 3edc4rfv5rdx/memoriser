@@ -1,3 +1,10 @@
+  + Custom sound files for daily reminders:
+    - File picker for mp3, wav, ogg, m4a, aac
+    - Files copied to Documents/Memorizer/Sounds/
+    - Sound picker shows: Default, Custom sounds, Choose file, System sounds
+    - Kotlin: getSoundUri() converts file paths to file:// URIs
+    - Localizations: ru/ua
+
   + Default sound settings in Settings screen:
     - Default sound for one-time reminders
     - Default sound for daily reminders

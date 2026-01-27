@@ -32,6 +32,7 @@ late BuildContext globalContext;
 late Directory? documentsDirectory;
 late Directory? memorizerDirectory;
 late Directory? photoDirectory;
+late Directory? soundsDirectory;
 late Directory? backupDirectory;
 
 bool xvDebug = true;
@@ -810,6 +811,12 @@ Future<void> initStoragePaths() async {
         await photoDirectory!.create(recursive: true);
       }
 
+      // Create sounds directory
+      soundsDirectory = Directory('${memorizerDirectory!.path}/Sounds');
+      if (!await soundsDirectory!.exists()) {
+        await soundsDirectory!.create(recursive: true);
+      }
+
       myPrint('Storage paths initialized: ${documentsDirectory!.path}');
     } else {
       myPrint('Failed to get documents directory');
@@ -1178,6 +1185,84 @@ bool _isImageFile(String path) {
       lower.endsWith('.png') ||
       lower.endsWith('.gif') ||
       lower.endsWith('.webp');
+}
+
+/// Check if file is an audio file based on extension
+bool isAudioFile(String path) {
+  final lower = path.toLowerCase();
+  return lower.endsWith('.mp3') ||
+      lower.endsWith('.wav') ||
+      lower.endsWith('.ogg') ||
+      lower.endsWith('.m4a') ||
+      lower.endsWith('.aac');
+}
+
+/// Copy sound file to Sounds directory and return new path
+Future<String?> copySoundFile(String sourcePath) async {
+  if (soundsDirectory == null) {
+    await initStoragePaths();
+  }
+  if (soundsDirectory == null) return null;
+
+  try {
+    final sourceFile = File(sourcePath);
+    if (!await sourceFile.exists()) {
+      myPrint('Source sound file does not exist: $sourcePath');
+      return null;
+    }
+
+    // Get filename from source path
+    final fileName = sourcePath.split('/').last;
+    final destPath = '${soundsDirectory!.path}/$fileName';
+
+    // Check if file already exists with same name
+    final destFile = File(destPath);
+    if (await destFile.exists()) {
+      // File already exists, use it
+      myPrint('Sound file already exists: $destPath');
+      return destPath;
+    }
+
+    // Copy file
+    await sourceFile.copy(destPath);
+    myPrint('Sound file copied to: $destPath');
+    return destPath;
+  } catch (e) {
+    myPrint('Error copying sound file: $e');
+    return null;
+  }
+}
+
+/// Get list of sound files in Sounds directory
+Future<List<Map<String, String>>> getCustomSounds() async {
+  if (soundsDirectory == null) {
+    await initStoragePaths();
+  }
+  if (soundsDirectory == null) return [];
+
+  try {
+    final files = await soundsDirectory!.list().toList();
+    List<Map<String, String>> sounds = [];
+
+    for (var entity in files) {
+      if (entity is File && isAudioFile(entity.path)) {
+        final fileName = entity.path.split('/').last;
+        // Remove extension for display name
+        final displayName = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
+        sounds.add({
+          'name': displayName,
+          'path': entity.path,
+        });
+      }
+    }
+
+    // Sort by name
+    sounds.sort((a, b) => a['name']!.compareTo(b['name']!));
+    return sounds;
+  } catch (e) {
+    myPrint('Error getting custom sounds: $e');
+    return [];
+  }
 }
 
 Future<bool> deletePhotoFile(String photoPath) async {

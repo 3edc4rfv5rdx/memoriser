@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:sqflite/sqflite.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 
 import 'globals.dart';
 import 'reminders.dart';
@@ -1275,26 +1276,37 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  // Get sound name from URI
-  String _getSoundName(String? soundUri) {
-    if (soundUri == null) return lw('Default');
+  // Get sound name from URI or path
+  String _getSoundName(String? soundValue) {
+    if (soundValue == null) return lw('Default');
+
+    // Check system sounds
     for (var sound in _systemSounds) {
-      if (sound['uri'] == soundUri) {
+      if (sound['uri'] == soundValue) {
         return sound['name'] ?? lw('Unknown');
       }
     }
-    // If it's a file path, show just the filename
-    if (soundUri.startsWith('/')) {
-      return soundUri.split('/').last;
+
+    // If it's a file path, show filename without extension
+    if (soundValue.startsWith('/')) {
+      final fileName = soundValue.split('/').last;
+      // Remove extension
+      return fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
     }
+
     return lw('Default');
   }
 
   // Show sound picker dialog
-  void _showSoundPicker({required bool isDaily}) {
+  void _showSoundPicker({required bool isDaily}) async {
+    // Load custom sounds from Sounds folder
+    final customSounds = await getCustomSounds();
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: clBgrnd,
           title: Text(
@@ -1304,72 +1316,134 @@ class _EditItemPageState extends State<EditItemPage> {
           content: SizedBox(
             width: double.maxFinite,
             height: 400,
-            child: ListView.builder(
-              itemCount: _systemSounds.length + 1, // +1 for "Default" option
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  // Default option
-                  return ListTile(
-                    leading: Icon(Icons.notifications, color: clText),
-                    title: Text(lw('Default'), style: TextStyle(color: clText)),
-                    trailing: (isDaily ? _dailySound : _sound) == null
-                        ? Icon(Icons.check, color: Colors.green)
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        if (isDaily) {
-                          _dailySound = null;
-                        } else {
-                          _sound = null;
-                        }
-                      });
-                      Navigator.pop(context);
-                    },
-                  );
-                }
-
-                final sound = _systemSounds[index - 1];
-                final isSelected = (isDaily ? _dailySound : _sound) == sound['uri'];
-
-                return ListTile(
-                  leading: Icon(Icons.music_note, color: clText),
-                  title: Text(
-                    sound['name'] ?? '',
-                    style: TextStyle(color: clText),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.play_arrow, color: clText),
-                        onPressed: () {
-                          SimpleNotifications.playSound(soundUri: sound['uri']);
-                        },
-                      ),
-                      if (isSelected) Icon(Icons.check, color: Colors.green),
-                    ],
-                  ),
+            child: ListView(
+              children: [
+                // Default option
+                ListTile(
+                  leading: Icon(Icons.notifications, color: clText),
+                  title: Text(lw('Default'), style: TextStyle(color: clText)),
+                  trailing: (isDaily ? _dailySound : _sound) == null
+                      ? Icon(Icons.check, color: Colors.green)
+                      : null,
                   onTap: () {
-                    SimpleNotifications.stopSound();
                     setState(() {
                       if (isDaily) {
-                        _dailySound = sound['uri'];
+                        _dailySound = null;
                       } else {
-                        _sound = sound['uri'];
+                        _sound = null;
                       }
                     });
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                   },
-                );
-              },
+                ),
+
+                // Custom sounds section (if any)
+                if (customSounds.isNotEmpty) ...[
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                      lw('Custom sounds'),
+                      style: TextStyle(color: clText.withValues(alpha: 0.7), fontSize: fsSmall),
+                    ),
+                  ),
+                  ...customSounds.map((sound) {
+                    final currentSound = isDaily ? _dailySound : _sound;
+                    final isSelected = currentSound == sound['path'];
+                    return ListTile(
+                      leading: Icon(Icons.audiotrack, color: Colors.orange),
+                      title: Text(
+                        sound['name'] ?? '',
+                        style: TextStyle(color: clText),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.play_arrow, color: clText),
+                            onPressed: () {
+                              SimpleNotifications.playSound(soundPath: sound['path']);
+                            },
+                          ),
+                          if (isSelected) Icon(Icons.check, color: Colors.green),
+                        ],
+                      ),
+                      onTap: () {
+                        SimpleNotifications.stopSound();
+                        setState(() {
+                          if (isDaily) {
+                            _dailySound = sound['path'];
+                          } else {
+                            _sound = sound['path'];
+                          }
+                        });
+                        Navigator.pop(dialogContext);
+                      },
+                    );
+                  }),
+                ],
+
+                // Choose file option
+                ListTile(
+                  leading: Icon(Icons.folder_open, color: Colors.blue),
+                  title: Text(lw('Choose file'), style: TextStyle(color: Colors.blue)),
+                  onTap: () async {
+                    Navigator.pop(dialogContext);
+                    await _pickSoundFile(isDaily: isDaily);
+                  },
+                ),
+
+                // System sounds section
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    lw('System sounds'),
+                    style: TextStyle(color: clText.withValues(alpha: 0.7), fontSize: fsSmall),
+                  ),
+                ),
+                ..._systemSounds.map((sound) {
+                  final currentSound = isDaily ? _dailySound : _sound;
+                  final isSelected = currentSound == sound['uri'];
+                  return ListTile(
+                    leading: Icon(Icons.music_note, color: clText),
+                    title: Text(
+                      sound['name'] ?? '',
+                      style: TextStyle(color: clText),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.play_arrow, color: clText),
+                          onPressed: () {
+                            SimpleNotifications.playSound(soundUri: sound['uri']);
+                          },
+                        ),
+                        if (isSelected) Icon(Icons.check, color: Colors.green),
+                      ],
+                    ),
+                    onTap: () {
+                      SimpleNotifications.stopSound();
+                      setState(() {
+                        if (isDaily) {
+                          _dailySound = sound['uri'];
+                        } else {
+                          _sound = sound['uri'];
+                        }
+                      });
+                      Navigator.pop(dialogContext);
+                    },
+                  );
+                }),
+              ],
             ),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 SimpleNotifications.stopSound();
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
               child: Text(lw('Cancel'), style: TextStyle(color: clText)),
             ),
@@ -1380,6 +1454,39 @@ class _EditItemPageState extends State<EditItemPage> {
       // Stop sound when dialog is closed
       SimpleNotifications.stopSound();
     });
+  }
+
+  // Pick sound file from device
+  Future<void> _pickSoundFile({required bool isDaily}) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final sourcePath = result.files.single.path!;
+
+        // Copy file to Sounds directory
+        final newPath = await copySoundFile(sourcePath);
+
+        if (newPath != null) {
+          setState(() {
+            if (isDaily) {
+              _dailySound = newPath;
+            } else {
+              _sound = newPath;
+            }
+          });
+          okInfoBarGreen(lw('Sound added'));
+        } else {
+          okInfoBarRed(lw('Error adding sound'));
+        }
+      }
+    } catch (e) {
+      myPrint('Error picking sound file: $e');
+      okInfoBarRed(lw('Error picking file'));
+    }
   }
 
   // Validate reminder date is in the future

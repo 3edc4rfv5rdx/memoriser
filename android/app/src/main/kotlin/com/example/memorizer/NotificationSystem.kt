@@ -964,13 +964,26 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
+    // Convert sound path/uri to proper Uri for notification channel
+    private fun getSoundUri(soundValue: String?): Uri? {
+        if (soundValue == null) return null
+
+        return if (soundValue.startsWith("/")) {
+            // File path - convert to file:// URI
+            Uri.fromFile(java.io.File(soundValue))
+        } else {
+            // Already a URI (content://, etc.)
+            Uri.parse(soundValue)
+        }
+    }
+
     // Create notification channel for one-time reminders with sound from Settings
-    private fun createReminderNotificationChannel(context: Context, soundUri: String?): String {
+    private fun createReminderNotificationChannel(context: Context, soundValue: String?): String {
         // Always use hash-based channel ID (0 for null/system default)
-        val channelId = "memorizer_reminder_${soundUri?.hashCode() ?: 0}"
+        val channelId = "memorizer_reminder_${soundValue?.hashCode() ?: 0}"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelName = if (soundUri != null) "Reminders (Custom)" else "Reminders (System)"
+            val channelName = if (soundValue != null) "Reminders (Custom)" else "Reminders (System)"
             val channel = NotificationChannel(
                 channelId,
                 channelName,
@@ -981,14 +994,15 @@ class NotificationReceiver : BroadcastReceiver() {
                 enableVibration(true)
                 setShowBadge(true)
                 // Set custom sound for channel (null = system default)
+                val soundUri = getSoundUri(soundValue)
                 if (soundUri != null) {
                     val audioAttributes = android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
-                    setSound(Uri.parse(soundUri), audioAttributes)
+                    setSound(soundUri, audioAttributes)
                 }
-                Log.d("MemorizerApp", "Created reminder channel $channelId with sound: $soundUri")
+                Log.d("MemorizerApp", "Created reminder channel $channelId with sound: $soundValue")
             }
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
@@ -997,16 +1011,16 @@ class NotificationReceiver : BroadcastReceiver() {
     }
 
     // Create notification channel for daily reminders with optional custom sound
-    private fun createDailyNotificationChannel(context: Context, soundUri: String?): String {
-        val channelId = if (soundUri != null) {
-            // Create unique channel ID based on sound URI hash
-            "memorizer_daily_${soundUri.hashCode()}"
+    private fun createDailyNotificationChannel(context: Context, soundValue: String?): String {
+        val channelId = if (soundValue != null) {
+            // Create unique channel ID based on sound value hash
+            "memorizer_daily_${soundValue.hashCode()}"
         } else {
             "memorizer_daily"
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelName = if (soundUri != null) "Daily Reminders (Custom)" else "Daily Reminders"
+            val channelName = if (soundValue != null) "Daily Reminders (Custom)" else "Daily Reminders"
             val channel = NotificationChannel(
                 channelId,
                 channelName,
@@ -1017,13 +1031,14 @@ class NotificationReceiver : BroadcastReceiver() {
                 enableVibration(true)
                 setShowBadge(true)
                 // Set custom sound for channel
+                val soundUri = getSoundUri(soundValue)
                 if (soundUri != null) {
                     val audioAttributes = android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
-                    setSound(Uri.parse(soundUri), audioAttributes)
-                    Log.d("MemorizerApp", "Created channel $channelId with sound: $soundUri")
+                    setSound(soundUri, audioAttributes)
+                    Log.d("MemorizerApp", "Created channel $channelId with sound: $soundValue")
                 }
             }
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
