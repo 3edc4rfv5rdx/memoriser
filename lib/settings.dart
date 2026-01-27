@@ -28,6 +28,11 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   bool _debugLogs = false;
   bool _isLoading = true;
 
+  // Sound settings
+  String? _defaultSound;
+  String? _defaultDailySound;
+  List<Map<String, String>> _systemSounds = [];
+
   // Temporary values to track changes
   String? _newTheme;
   String? _newLanguage;
@@ -36,6 +41,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   bool? _newEnableReminders;
   bool? _newEnableDailyReminders;
   bool? _newDebugLogs;
+  String? _newDefaultSound;
+  String? _newDefaultDailySound;
   bool _hasChanges = false;
 
   // Controller for Last items input field
@@ -87,6 +94,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         await getSetting("Debug logs") ?? defSettings["Debug logs"];
     final debugLogs = debugLogsValue == "true";
 
+    // Load default sound settings
+    final defaultSoundValue = await getSetting("Default sound");
+    final defaultDailySoundValue = await getSetting("Default daily sound");
+
+    // Load system sounds
+    final systemSounds = await SimpleNotifications.getSystemSounds();
+
     _lastItemsController = TextEditingController(text: lastItems.toString());
 
     if (mounted) {
@@ -98,6 +112,9 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _enableReminders = enableReminders;
         _enableDailyReminders = enableDailyReminders;
         _debugLogs = debugLogs;
+        _defaultSound = defaultSoundValue;
+        _defaultDailySound = defaultDailySoundValue;
+        _systemSounds = systemSounds;
 
         // Initialize temporary values
         _newTheme = themeValue;
@@ -107,6 +124,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newEnableReminders = enableReminders;
         _newEnableDailyReminders = enableDailyReminders;
         _newDebugLogs = debugLogs;
+        _newDefaultSound = defaultSoundValue;
+        _newDefaultDailySound = defaultDailySoundValue;
 
         _isLoading = false;
         _hasChanges = false;
@@ -124,7 +143,9 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _newLastItems != _lastItems ||
               _newEnableReminders != _enableReminders ||
               _newEnableDailyReminders != _enableDailyReminders ||
-              _newDebugLogs != _debugLogs;
+              _newDebugLogs != _debugLogs ||
+              _newDefaultSound != _defaultSound ||
+              _newDefaultDailySound != _defaultDailySound;
     });
   }
 
@@ -186,6 +207,25 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       savedSettings.add('debug logs');
     }
 
+    // Save default sound settings if changed
+    if (_newDefaultSound != _defaultSound) {
+      if (_newDefaultSound != null) {
+        await saveSetting("Default sound", _newDefaultSound!);
+      } else {
+        await saveSetting("Default sound", "");
+      }
+      savedSettings.add('default sound');
+    }
+
+    if (_newDefaultDailySound != _defaultDailySound) {
+      if (_newDefaultDailySound != null) {
+        await saveSetting("Default daily sound", _newDefaultDailySound!);
+      } else {
+        await saveSetting("Default daily sound", "");
+      }
+      savedSettings.add('default daily sound');
+    }
+
     // Update current values
     setState(() {
       _currentTheme = _newTheme;
@@ -195,6 +235,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _enableReminders = _newEnableReminders ?? _enableReminders;
       _enableDailyReminders = _newEnableDailyReminders ?? _enableDailyReminders;
       _debugLogs = _newDebugLogs ?? _debugLogs;
+      _defaultSound = _newDefaultSound;
+      _defaultDailySound = _newDefaultDailySound;
       _hasChanges = false;
     });
 
@@ -439,6 +481,24 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
               SizedBox(height: 10),
 
+              // Default sound for one-time reminders
+              _buildSettingsRow(
+                label: lw('Default sound'),
+                child: _buildSoundSelector(isDaily: false),
+                helpId: 108,
+              ),
+
+              SizedBox(height: 10),
+
+              // Default sound for daily reminders
+              _buildSettingsRow(
+                label: lw('Default daily sound'),
+                child: _buildSoundSelector(isDaily: true),
+                helpId: 109,
+              ),
+
+              SizedBox(height: 10),
+
               // Debug logs checkbox row
               _buildSettingsRow(
                 label: lw('Debug logs'),
@@ -649,6 +709,159 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           }
         },
       ),
+    );
+  }
+
+  // Function to build sound selector
+  Widget _buildSoundSelector({required bool isDaily}) {
+    final currentSound = isDaily ? _newDefaultDailySound : _newDefaultSound;
+    final soundName = _getSoundName(currentSound);
+
+    return GestureDetector(
+      onTap: () => _showSoundPicker(isDaily: isDaily),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: clFill,
+          border: Border.all(color: clUpBar),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                soundName,
+                style: TextStyle(color: clText, fontSize: fsMedium),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (currentSound != null)
+                  GestureDetector(
+                    onTap: () => SimpleNotifications.playSound(soundUri: currentSound),
+                    child: Icon(Icons.play_arrow, color: clText, size: 20),
+                  ),
+                SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down, color: clText),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Get sound name from URI
+  String _getSoundName(String? soundUri) {
+    if (soundUri == null || soundUri.isEmpty) return lw('Default');
+    for (var sound in _systemSounds) {
+      if (sound['uri'] == soundUri) {
+        return sound['name'] ?? lw('Unknown');
+      }
+    }
+    // If it's a file path, show just the filename
+    if (soundUri.startsWith('/')) {
+      return soundUri.split('/').last;
+    }
+    return lw('Default');
+  }
+
+  // Show sound picker dialog
+  void _showSoundPicker({required bool isDaily}) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: clBgrnd,
+          title: Text(
+            lw('Select Sound'),
+            style: TextStyle(color: clText),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: ListView.builder(
+              itemCount: _systemSounds.length + 1, // +1 for "Default" option
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  // Default option
+                  final isSelected = isDaily
+                      ? (_newDefaultDailySound == null || _newDefaultDailySound!.isEmpty)
+                      : (_newDefaultSound == null || _newDefaultSound!.isEmpty);
+                  return ListTile(
+                    leading: Icon(Icons.notifications, color: clText),
+                    title: Text(lw('Default'), style: TextStyle(color: clText)),
+                    trailing: isSelected
+                        ? Icon(Icons.check, color: Colors.green)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        if (isDaily) {
+                          _newDefaultDailySound = null;
+                        } else {
+                          _newDefaultSound = null;
+                        }
+                      });
+                      _checkForChanges();
+                      Navigator.pop(context);
+                    },
+                  );
+                }
+
+                final sound = _systemSounds[index - 1];
+                final isSelected = isDaily
+                    ? _newDefaultDailySound == sound['uri']
+                    : _newDefaultSound == sound['uri'];
+
+                return ListTile(
+                  leading: Icon(Icons.music_note, color: clText),
+                  title: Text(
+                    sound['name'] ?? '',
+                    style: TextStyle(color: clText),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.play_arrow, color: clText),
+                        onPressed: () {
+                          SimpleNotifications.playSound(soundUri: sound['uri']);
+                        },
+                      ),
+                      if (isSelected) Icon(Icons.check, color: Colors.green),
+                    ],
+                  ),
+                  onTap: () {
+                    SimpleNotifications.stopSound();
+                    setState(() {
+                      if (isDaily) {
+                        _newDefaultDailySound = sound['uri'];
+                      } else {
+                        _newDefaultSound = sound['uri'];
+                      }
+                    });
+                    _checkForChanges();
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                SimpleNotifications.stopSound();
+                Navigator.pop(context);
+              },
+              child: Text(lw('Cancel'), style: TextStyle(color: clText)),
+            ),
+          ],
+        );
+      },
     );
   }
 }

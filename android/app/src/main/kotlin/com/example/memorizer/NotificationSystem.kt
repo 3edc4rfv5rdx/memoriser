@@ -761,6 +761,43 @@ class NotificationReceiver : BroadcastReceiver() {
     }
 
     // Create notification channel for daily reminders with custom sound
+    // Create notification channel for one-time reminders with optional custom sound
+    private fun createReminderNotificationChannel(context: Context, soundUri: String?): String {
+        val channelId = if (soundUri != null) {
+            // Create unique channel ID based on sound URI hash
+            "memorizer_reminder_${soundUri.hashCode()}"
+        } else {
+            "memorizer_reminders"
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channelName = if (soundUri != null) "Reminders (Custom)" else "Memorizer Reminders"
+            val channel = NotificationChannel(
+                channelId,
+                channelName,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "One-time reminders for Memorizer app"
+                enableLights(true)
+                enableVibration(true)
+                setShowBadge(true)
+                // Set custom sound for channel
+                if (soundUri != null) {
+                    val audioAttributes = android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                    setSound(Uri.parse(soundUri), audioAttributes)
+                    Log.d("MemorizerApp", "Created reminder channel $channelId with sound: $soundUri")
+                }
+            }
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+        return channelId
+    }
+
+    // Create notification channel for daily reminders with optional custom sound
     private fun createDailyNotificationChannel(context: Context, soundUri: String?): String {
         val channelId = if (soundUri != null) {
             // Create unique channel ID based on sound URI hash
@@ -874,18 +911,19 @@ class NotificationReceiver : BroadcastReceiver() {
 
             // Check if this item is still active in the database
             if (isItemStillActive(context, itemId)) {
-                // Create notification channel
-                createNotificationChannel(context)
-
-                // Get item data from database
+                // Get item data from database (includes sound)
                 val itemData = getItemData(context, itemId)
                 val itemTitle = if (itemData.title.isNotEmpty()) "Reminder: ${itemData.title}" else title
                 val itemContent = itemData.content.ifEmpty { body }
+                val itemSound = itemData.sound
 
-                // Show notification
-                showEventNotification(context, itemId, itemTitle, itemContent, itemId)
+                // Create notification channel with custom sound
+                val channelId = createReminderNotificationChannel(context, itemSound)
 
-                Log.d("MemorizerApp", "Specific reminder shown for item $itemId")
+                // Show notification with the channel
+                showEventNotification(context, itemId, itemTitle, itemContent, itemId, channelId)
+
+                Log.d("MemorizerApp", "Specific reminder shown for item $itemId with channel $channelId")
             } else {
                 Log.d("MemorizerApp", "Item $itemId no longer exists or reminder disabled, skipping notification")
             }
@@ -896,28 +934,29 @@ class NotificationReceiver : BroadcastReceiver() {
     }
 
     // Data class for item data with sound
-    data class ItemData(val title: String, val content: String, val dailySound: String?)
+    data class ItemData(val title: String, val content: String, val sound: String?, val dailySound: String?)
 
-    // Get item data from database including daily_sound
+    // Get item data from database including sound and daily_sound
     private fun getItemData(context: Context, itemId: Int): ItemData {
         return try {
             val dbPath = context.getDatabasePath("memorizer.db")
-            if (!dbPath.exists()) return ItemData("", "", null)
+            if (!dbPath.exists()) return ItemData("", "", null, null)
 
             val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
 
             val cursor = db.rawQuery(
-                "SELECT title, content, daily_sound FROM items WHERE id = ?",
+                "SELECT title, content, sound, daily_sound FROM items WHERE id = ?",
                 arrayOf(itemId.toString())
             )
 
             val result = if (cursor.moveToFirst()) {
                 val title = cursor.getString(0) ?: ""
                 val content = cursor.getString(1) ?: ""
-                val dailySound = cursor.getString(2)
-                ItemData(title, content, dailySound)
+                val sound = cursor.getString(2)
+                val dailySound = cursor.getString(3)
+                ItemData(title, content, sound, dailySound)
             } else {
-                ItemData("", "", null)
+                ItemData("", "", null, null)
             }
 
             cursor.close()
@@ -925,7 +964,7 @@ class NotificationReceiver : BroadcastReceiver() {
             result
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error getting item data: ${e.message}")
-            ItemData("", "", null)
+            ItemData("", "", null, null)
         }
     }
 
@@ -974,7 +1013,7 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showEventNotification(context: Context, itemId: Int, title: String, content: String, notificationId: Int) {
+    private fun showEventNotification(context: Context, itemId: Int, title: String, content: String, notificationId: Int, channelId: String = "memorizer_reminders") {
         try {
             // Create notification intent that opens the app
             val notificationIntent = Intent(context, MainActivity::class.java).apply {
@@ -997,8 +1036,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 .bigText(content)
                 .setBigContentTitle(title)
 
-            // Create notification
-            val builder = NotificationCompat.Builder(context, "memorizer_reminders") // ← ИСПРАВЛЕНО
+            // Create notification with specified channel
+            val builder = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.notification_icon)
                 .setContentTitle(title)
                 .setContentText(content)
@@ -1009,7 +1048,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 .setAutoCancel(true)
                 .setColor(orangeColor)
                 .setColorized(true)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
 
             // Show notification with permission check
             try {

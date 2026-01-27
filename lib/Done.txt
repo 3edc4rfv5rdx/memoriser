@@ -1,3 +1,11 @@
+  + Default sound settings in Settings screen:
+    - Default sound for one-time reminders
+    - Default sound for daily reminders
+    - Sound picker dialog with preview (play button)
+    - Settings: "Default sound", "Default daily sound"
+    - Saved to settingsDb
+    - Localizations: ru/ua
+
   + Sound selection for reminders:
     - System notification and alarm sounds available
     - Sound picker dialog with preview (play button)
