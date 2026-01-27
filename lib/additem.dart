@@ -828,8 +828,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildYearlySelector(),
                 SizedBox(height: 10),
                 _buildRemoveAfterReminderSelector(),
-                SizedBox(height: 10),
-                _buildSoundSelector(isDaily: false),
+                // Sound for one-time reminders is taken from app Settings
               ],
 
               // Daily reminder options
