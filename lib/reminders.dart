@@ -367,6 +367,17 @@ class SimpleNotifications {
     }
   }
 
+  // Get default daily sound from settings (or system default if not set)
+  static Future<String?> getDefaultDailySound() async {
+    try {
+      final result = await platform.invokeMethod('getDefaultDailySound');
+      return result as String?;
+    } catch (e) {
+      myPrint('Error getting default daily sound: $e');
+      return null;
+    }
+  }
+
   // Play a sound (from system URI or file path)
   static Future<void> playSound({String? soundUri, String? soundPath}) async {
     try {

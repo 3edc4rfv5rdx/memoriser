@@ -165,6 +165,10 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 val sounds = getSystemSounds()
                 result.success(sounds)
             }
+            "getDefaultDailySound" -> {
+                val sound = getDefaultDailySound(context)
+                result.success(sound)
+            }
             "playSound" -> {
                 val soundUri = call.argument<String>("soundUri")
                 val soundPath = call.argument<String>("soundPath")
@@ -269,6 +273,76 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             mediaPlayer = null
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error stopping sound: ${e.message}")
+        }
+    }
+
+    // Get default daily sound from settings (or system default if not set)
+    private fun getDefaultDailySound(context: Context): String? {
+        try {
+            val dbPath = context.getDatabasePath("settings.db")
+
+            // Try to read from settings
+            if (dbPath.exists()) {
+                val db = SQLiteDatabase.openDatabase(
+                    dbPath.absolutePath,
+                    null,
+                    SQLiteDatabase.OPEN_READONLY
+                )
+
+                val cursor = db.rawQuery(
+                    "SELECT value FROM settings WHERE key = ?",
+                    arrayOf("Default daily sound")
+                )
+
+                val result = if (cursor.moveToFirst()) {
+                    val value = cursor.getString(0)
+                    if (value.isNullOrEmpty()) null else value
+                } else {
+                    null
+                }
+
+                cursor.close()
+                db.close()
+
+                if (result != null) {
+                    return result
+                }
+            }
+
+            // No setting found - get system default notification sound
+            val systemDefaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val systemDefaultString = systemDefaultUri?.toString()
+
+            if (systemDefaultString != null) {
+                // Save to settings for future use
+                saveDefaultDailySound(context, systemDefaultString)
+                Log.d("MemorizerApp", "Set system default daily sound: $systemDefaultString")
+            }
+
+            return systemDefaultString
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error getting default daily sound: ${e.message}")
+            return null
+        }
+    }
+
+    // Save default daily sound to settings
+    private fun saveDefaultDailySound(context: Context, soundUri: String) {
+        try {
+            val dbPath = context.getDatabasePath("settings.db")
+            val db = SQLiteDatabase.openOrCreateDatabase(dbPath.absolutePath, null)
+
+            db.execSQL("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+
+            db.execSQL(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                arrayOf("Default daily sound", soundUri)
+            )
+
+            db.close()
+            Log.d("MemorizerApp", "Saved default daily sound to settings: $soundUri")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error saving default daily sound: ${e.message}")
         }
     }
 
@@ -754,6 +828,77 @@ class NotificationReceiver : BroadcastReceiver() {
             Log.d("MemorizerApp", "Saved default sound to settings: $soundUri")
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error saving default sound: ${e.message}")
+        }
+    }
+
+    // Get default sound for daily reminders from settings
+    // If not set, gets system default and saves it to settings
+    private fun getDefaultDailySound(context: Context): String? {
+        try {
+            val dbPath = context.getDatabasePath("settings.db")
+
+            // Try to read from settings
+            if (dbPath.exists()) {
+                val db = SQLiteDatabase.openDatabase(
+                    dbPath.absolutePath,
+                    null,
+                    SQLiteDatabase.OPEN_READONLY
+                )
+
+                val cursor = db.rawQuery(
+                    "SELECT value FROM settings WHERE key = ?",
+                    arrayOf("Default daily sound")
+                )
+
+                val result = if (cursor.moveToFirst()) {
+                    val value = cursor.getString(0)
+                    if (value.isNullOrEmpty()) null else value
+                } else {
+                    null
+                }
+
+                cursor.close()
+                db.close()
+
+                if (result != null) {
+                    return result
+                }
+            }
+
+            // No setting found - get system default notification sound
+            val systemDefaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val systemDefaultString = systemDefaultUri?.toString()
+
+            if (systemDefaultString != null) {
+                // Save to settings for future use
+                saveDefaultDailySound(context, systemDefaultString)
+                Log.d("MemorizerApp", "Set system default daily sound: $systemDefaultString")
+            }
+
+            return systemDefaultString
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error getting default daily sound: ${e.message}")
+            return null
+        }
+    }
+
+    // Save default daily sound to settings
+    private fun saveDefaultDailySound(context: Context, soundUri: String) {
+        try {
+            val dbPath = context.getDatabasePath("settings.db")
+            val db = SQLiteDatabase.openOrCreateDatabase(dbPath.absolutePath, null)
+
+            db.execSQL("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+
+            db.execSQL(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                arrayOf("Default daily sound", soundUri)
+            )
+
+            db.close()
+            Log.d("MemorizerApp", "Saved default daily sound to settings: $soundUri")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error saving default daily sound: ${e.message}")
         }
     }
 

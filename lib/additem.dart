@@ -183,6 +183,11 @@ class _EditItemPageState extends State<EditItemPage> {
         _sound = item['sound'];
         _dailySound = item['daily_sound'];
 
+        // If daily sound is empty and daily is enabled, get default from settings
+        if (_dailySound == null && _daily) {
+          _dailySound = await SimpleNotifications.getDefaultDailySound();
+        }
+
         // Set up photo directory for existing item
         _currentPhotoDir = getItemPhotoDirPath(itemId);
         // Load photos from item directory (filesystem is the source of truth)
@@ -890,7 +895,12 @@ class _EditItemPageState extends State<EditItemPage> {
         // Daily toggle
         Expanded(
           child: GestureDetector(
-            onTap: () {
+            onTap: () async {
+              // Load default daily sound if not set
+              String? defaultSound = _dailySound;
+              if (defaultSound == null) {
+                defaultSound = await SimpleNotifications.getDefaultDailySound();
+              }
               setState(() {
                 _daily = true;
                 _remind = false;
@@ -899,6 +909,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _selectedTimeOption = null;
                 _yearly = false;
                 _removeAfterReminder = false;
+                _dailySound = defaultSound;
                 if (_dailyTimes.isEmpty) {
                   _dailyTimes = ['09:00'];
                 }
