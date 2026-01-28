@@ -23,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 12, // Increased from 10 to 11 for sound field
+    version: 12, // Increased from 11 to 12 for monthly field
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -40,6 +40,7 @@ Future<void> initDatabases() async {
           hidden INTEGER DEFAULT 0,
           photo TEXT DEFAULT NULL,
           yearly INTEGER DEFAULT 0,
+          monthly INTEGER DEFAULT 0,
           daily INTEGER DEFAULT 0,
           daily_times TEXT DEFAULT NULL,
           daily_days INTEGER DEFAULT 127,

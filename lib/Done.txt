@@ -1,3 +1,18 @@
+  + Monthly repeating reminders:
+    - Auto-reschedule to next month after date passes (like yearly events)
+    - DB version 12: 'monthly' column (INTEGER DEFAULT 0)
+    - updateMonthlyEvents() function handles month-end edge cases
+    - Day 31 → last day of month (Feb 28/29, Apr 30, etc.)
+    - Year rollover support (Dec → Jan next year)
+    - Leap year detection for February dates
+    - UI: Monthly checkbox (purple, Icons.calendar_month) above Yearly
+    - Mutually exclusive with Yearly and "Remove after reminder"
+    - Virtual folder: "Monthly Events" (ID: -5, purple color)
+    - Display: 📅 emoji prefix for monthly items
+    - Filter logic excludes monthly from main list
+    - Navigation: enter/exit folder, back button, AppBar title
+    - Localizations: "Monthly repeat", "Monthly Events", "Monthly" (ru/ua)
+
   + Custom sound files for daily reminders:
     - File picker for mp3, wav, ogg, m4a, aac
     - Files copied to app-private storage (no permissions needed)
