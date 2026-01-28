@@ -1,3 +1,10 @@
+  + Fixed: Decode hidden items in notifications:
+    - Added deobfuscateText() function in Kotlin (NotificationSystem.kt)
+    - getItemData() now reads 'hidden' column from database
+    - Hidden items (hidden = 1) are automatically decoded for notifications
+    - Base64 decoding works for both one-time and daily reminders
+    - Users now see readable text in notifications instead of base64 strings
+
   + Monthly repeating reminders:
     - Auto-reschedule to next month after date passes (like yearly events)
     - DB version 12: 'monthly' column (INTEGER DEFAULT 0)

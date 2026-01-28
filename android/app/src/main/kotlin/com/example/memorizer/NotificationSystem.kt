@@ -1188,6 +1188,24 @@ class NotificationReceiver : BroadcastReceiver() {
     // Data class for item data with sound
     data class ItemData(val title: String, val content: String, val sound: String?, val dailySound: String?)
 
+    // Decode Base64 obfuscated text (same logic as Flutter's deobfuscateText)
+    private fun deobfuscateText(encodedText: String): String {
+        if (encodedText.isEmpty()) return encodedText
+        return try {
+            // Check if string is valid Base64
+            if (encodedText.matches(Regex("^[A-Za-z0-9+/=]+$"))) {
+                val decodedBytes = android.util.Base64.decode(encodedText, android.util.Base64.DEFAULT)
+                String(decodedBytes, Charsets.UTF_8)
+            } else {
+                // If not Base64, return as is
+                encodedText
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error decoding text: ${e.message}")
+            encodedText
+        }
+    }
+
     // Get item data from database including sound and daily_sound
     private fun getItemData(context: Context, itemId: Int): ItemData {
         return try {
@@ -1197,15 +1215,23 @@ class NotificationReceiver : BroadcastReceiver() {
             val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
 
             val cursor = db.rawQuery(
-                "SELECT title, content, sound, daily_sound FROM items WHERE id = ?",
+                "SELECT title, content, sound, daily_sound, hidden FROM items WHERE id = ?",
                 arrayOf(itemId.toString())
             )
 
             val result = if (cursor.moveToFirst()) {
-                val title = cursor.getString(0) ?: ""
-                val content = cursor.getString(1) ?: ""
+                var title = cursor.getString(0) ?: ""
+                var content = cursor.getString(1) ?: ""
                 val sound = cursor.getString(2)
                 val dailySound = cursor.getString(3)
+                val hidden = cursor.getInt(4)
+
+                // Decode hidden items for notifications (always show readable text in notifications)
+                if (hidden == 1) {
+                    title = deobfuscateText(title)
+                    content = deobfuscateText(content)
+                }
+
                 ItemData(title, content, sound, dailySound)
             } else {
                 ItemData("", "", null, null)
