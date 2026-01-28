@@ -811,11 +811,13 @@ Future<void> initStoragePaths() async {
         await photoDirectory!.create(recursive: true);
       }
 
-      // Create sounds directory
-      soundsDirectory = Directory('${memorizerDirectory!.path}/Sounds');
+      // Create sounds directory in app-private storage (no permissions needed)
+      final appDir = await getApplicationDocumentsDirectory();
+      soundsDirectory = Directory('${appDir.path}/Sounds');
       if (!await soundsDirectory!.exists()) {
         await soundsDirectory!.create(recursive: true);
       }
+      myPrint('Sounds directory: ${soundsDirectory!.path}');
 
       myPrint('Storage paths initialized: ${documentsDirectory!.path}');
     } else {

@@ -78,6 +78,9 @@ Future<String> createBackup() async {
     // Backup Photo folder
     await _backupPhotoFolder(backupDirPath);
 
+    // Backup Sounds folder
+    await _backupSoundsFolder(backupDirPath);
+
     // Список всех файлов в директории бэкапа
     await listBackupFiles();
 
@@ -199,6 +202,85 @@ Future<void> _restorePhotoFolder(String backupDirPath) async {
     myPrint('Restored $restoredFolders photo folders with $restoredFiles files');
   } catch (e) {
     myPrint('Error restoring Photo folder: $e');
+  }
+}
+
+// Backup Sounds folder to backup directory
+Future<void> _backupSoundsFolder(String backupDirPath) async {
+  try {
+    if (soundsDirectory == null) {
+      await initStoragePaths();
+    }
+    if (soundsDirectory == null || !await soundsDirectory!.exists()) {
+      myPrint('No Sounds folder to backup');
+      return;
+    }
+
+    final backupSoundsDir = Directory('$backupDirPath/Sounds');
+    if (!await backupSoundsDir.exists()) {
+      await backupSoundsDir.create(recursive: true);
+    }
+
+    // Copy all sound files
+    final entities = await soundsDirectory!.list().toList();
+    int copiedFiles = 0;
+
+    for (var entity in entities) {
+      if (entity is File && isAudioFile(entity.path)) {
+        final fileName = entity.path.split('/').last;
+        await entity.copy('${backupSoundsDir.path}/$fileName');
+        copiedFiles++;
+      }
+    }
+
+    myPrint('Backed up $copiedFiles sound files');
+  } catch (e) {
+    myPrint('Error backing up Sounds folder: $e');
+  }
+}
+
+// Restore Sounds folder from backup directory
+Future<void> _restoreSoundsFolder(String backupDirPath) async {
+  try {
+    final backupSoundsDir = Directory('$backupDirPath/Sounds');
+    if (!await backupSoundsDir.exists()) {
+      myPrint('No Sounds folder in backup to restore');
+      return;
+    }
+
+    if (soundsDirectory == null) {
+      await initStoragePaths();
+    }
+    if (soundsDirectory == null) {
+      myPrint('Cannot restore sounds: soundsDirectory is null');
+      return;
+    }
+
+    // Ensure target Sounds directory exists
+    if (!await soundsDirectory!.exists()) {
+      await soundsDirectory!.create(recursive: true);
+    }
+
+    // Copy all sound files from backup
+    final entities = await backupSoundsDir.list().toList();
+    int restoredFiles = 0;
+
+    for (var entity in entities) {
+      if (entity is File) {
+        final fileName = entity.path.split('/').last;
+        final targetPath = '${soundsDirectory!.path}/$fileName';
+
+        // Skip if file already exists
+        if (!await File(targetPath).exists()) {
+          await entity.copy(targetPath);
+          restoredFiles++;
+        }
+      }
+    }
+
+    myPrint('Restored $restoredFiles sound files');
+  } catch (e) {
+    myPrint('Error restoring Sounds folder: $e');
   }
 }
 
@@ -386,6 +468,9 @@ Future<String> restoreBackup() async {
     // Restore Photo folder if exists in backup
     final backupDir = Directory(filePath).parent;
     await _restorePhotoFolder(backupDir.path);
+
+    // Restore Sounds folder if exists in backup
+    await _restoreSoundsFolder(backupDir.path);
 
     // НОВОЕ: Перепланируем все напоминания после успешного восстановления
     myPrint('Rescheduling reminders after restore...');

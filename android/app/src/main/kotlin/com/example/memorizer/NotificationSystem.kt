@@ -241,7 +241,9 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                         setDataSource(context, Uri.parse(soundUri))
                     }
                     soundPath != null -> {
-                        setDataSource(soundPath)
+                        // Use Uri.fromFile for file paths to handle permissions properly
+                        val fileUri = Uri.fromFile(java.io.File(soundPath))
+                        setDataSource(context, fileUri)
                     }
                     else -> {
                         // Play default notification sound
@@ -1020,6 +1022,8 @@ class NotificationReceiver : BroadcastReceiver() {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // For file paths, sound is played manually (not via channel)
+            val isFilePath = soundValue?.startsWith("/") == true
             val channelName = if (soundValue != null) "Daily Reminders (Custom)" else "Daily Reminders"
             val channel = NotificationChannel(
                 channelId,
@@ -1030,15 +1034,21 @@ class NotificationReceiver : BroadcastReceiver() {
                 enableLights(true)
                 enableVibration(true)
                 setShowBadge(true)
-                // Set custom sound for channel
-                val soundUri = getSoundUri(soundValue)
-                if (soundUri != null) {
-                    val audioAttributes = android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                    setSound(soundUri, audioAttributes)
-                    Log.d("MemorizerApp", "Created channel $channelId with sound: $soundValue")
+                // Only set channel sound for content:// URIs (not file paths)
+                if (!isFilePath) {
+                    val soundUri = getSoundUri(soundValue)
+                    if (soundUri != null) {
+                        val audioAttributes = android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                        setSound(soundUri, audioAttributes)
+                        Log.d("MemorizerApp", "Created channel $channelId with sound URI: $soundValue")
+                    }
+                } else {
+                    // Disable default sound for file paths (will be played manually)
+                    setSound(null, null)
+                    Log.d("MemorizerApp", "Created channel $channelId for file sound: $soundValue (played manually)")
                 }
             }
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -1099,12 +1109,38 @@ class NotificationReceiver : BroadcastReceiver() {
                 val notificationManager = NotificationManagerCompat.from(context)
                 notificationManager.notify(notificationId, builder.build())
                 Log.d("MemorizerApp", "Daily notification shown with ID: $notificationId, channel: $channelId")
+
+                // For file paths, play sound manually (channel sounds don't work with file:// URIs)
+                if (soundUri != null && soundUri.startsWith("/")) {
+                    playSoundFile(context, soundUri)
+                }
             } catch (se: SecurityException) {
                 Log.e("MemorizerApp", "Security exception showing daily notification: ${se.message}")
             }
 
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error showing daily notification: ${e.message}")
+        }
+    }
+
+    // Play sound file manually for notifications (workaround for file:// URI restrictions)
+    private fun playSoundFile(context: Context, filePath: String) {
+        try {
+            val mediaPlayer = android.media.MediaPlayer().apply {
+                setDataSource(filePath)
+                setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                prepare()
+                start()
+                setOnCompletionListener { it.release() }
+            }
+            Log.d("MemorizerApp", "Playing sound file: $filePath")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error playing sound file: ${e.message}")
         }
     }
 
