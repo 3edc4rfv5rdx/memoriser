@@ -1525,11 +1525,7 @@ class _HomePageState extends State<HomePage> {
         finalItems.addAll(normalItems);
 
         // Виртуальные папки в КОНЦЕ списка
-        final yearlyCount = await _getYearlyItemsCount();
-        if (yearlyCount > 0) {
-          finalItems.add(_createYearlyFolderItem());
-        }
-
+        // Order: Notes → Daily → Monthly → Yearly
         final notesCount = await _getNotesItemsCount();
         if (notesCount > 0) {
           finalItems.add(_createNotesFolderItem());
@@ -1543,6 +1539,11 @@ class _HomePageState extends State<HomePage> {
         final monthlyCount = await _getMonthlyItemsCount();
         if (monthlyCount > 0) {
           finalItems.add(_createMonthlyFolderItem());
+        }
+
+        final yearlyCount = await _getYearlyItemsCount();
+        if (yearlyCount > 0) {
+          finalItems.add(_createYearlyFolderItem());
         }
       }
 
