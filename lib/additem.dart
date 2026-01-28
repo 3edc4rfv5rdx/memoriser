@@ -48,6 +48,7 @@ class _EditItemPageState extends State<EditItemPage> {
   bool _removeAfterReminder = false; // Default value for auto-remove
   bool _yearly = false; // NEW: Default value for yearly repeat
   bool _monthly = false; // NEW: Default value for monthly repeat
+  bool _showPhotoSection = false; // Show/hide photo section
 
   // Daily reminder fields
   bool _daily = false;
@@ -195,6 +196,8 @@ class _EditItemPageState extends State<EditItemPage> {
         _currentPhotoDir = getItemPhotoDirPath(itemId);
         // Load photos from item directory (filesystem is the source of truth)
         _photoPaths = await getItemPhotoPaths(itemId);
+        // Show photo section if there are photos
+        _showPhotoSection = _photoPaths.isNotEmpty;
 
         // Load time if set
         _time = item['time'] as int?;
@@ -482,6 +485,7 @@ class _EditItemPageState extends State<EditItemPage> {
         // Add to photo list
         setState(() {
           _photoPaths.add(newImage.path);
+          _showPhotoSection = true; // Show photo section when photo is added
         });
 
         okInfoBarGreen(lw('Photo saved'));
@@ -548,7 +552,9 @@ class _EditItemPageState extends State<EditItemPage> {
       }
 
       if (addedCount > 0) {
-        setState(() {});
+        setState(() {
+          _showPhotoSection = true; // Show photo section when photos are added
+        });
         okInfoBarGreen('$addedCount ${lw('photos added')}');
       }
     } catch (e) {
@@ -1897,6 +1903,36 @@ class _EditItemPageState extends State<EditItemPage> {
 
   // Build multi-photo section with horizontal thumbnail list
   Widget _buildPhotoSection() {
+    // If photo section is hidden and no photos, show only [+] button
+    if (!_showPhotoSection && _photoPaths.isEmpty) {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            _showPhotoSection = true;
+          });
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: clUpBar.withValues(alpha: 0.5)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add, color: clUpBar, size: 20),
+              SizedBox(width: 4),
+              Text(
+                lw('Photo'),
+                style: TextStyle(color: clText, fontSize: fsMedium),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show full photo section
     return GestureDetector(
       onLongPress: () => showHelp(38),
       child: Column(

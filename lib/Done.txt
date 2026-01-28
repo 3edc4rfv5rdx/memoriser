@@ -1,3 +1,11 @@
+  + Hide photo frame by default (show on [+] button):
+    - Photo section hidden by default for new items
+    - Shows compact [+] button to activate photo section
+    - Auto-shows when editing item with existing photos
+    - Auto-shows after adding photos (camera or gallery)
+    - State variable _showPhotoSection controls visibility
+    - Cleaner UI for items without photos
+
   + Fixed: Decode hidden items in notifications:
     - Added deobfuscateText() function in Kotlin (NotificationSystem.kt)
     - getItemData() now reads 'hidden' column from database
