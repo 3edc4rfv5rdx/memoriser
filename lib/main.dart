@@ -23,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 11, // Increased from 10 to 11 for sound field
+    version: 12, // Increased from 10 to 11 for sound field
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -133,6 +133,12 @@ Future<void> initDatabases() async {
         // Migration for version 11 - add sound field for one-time reminders
         await db.execute('ALTER TABLE items ADD COLUMN sound TEXT DEFAULT NULL');
         myPrint("Database upgraded to version 11: Added sound field");
+      }
+
+      if (oldVersion < 12) {
+        // Migration for version 12 - add monthly field for monthly repeating reminders
+        await db.execute('ALTER TABLE items ADD COLUMN monthly INTEGER DEFAULT 0');
+        myPrint("Database upgraded to version 12: Added 'monthly' field");
       }
     },
   );
@@ -447,10 +453,13 @@ Future<void> removeExpiredItems() async {
     // FIRST update yearly events
     await updateYearlyEvents(todayInt!);
 
-    // THEN get expired records (NOT yearly) with remove flag to delete their photos first
+    // THEN update monthly events
+    await updateMonthlyEvents(todayInt);
+
+    // THEN get expired records (NOT yearly, NOT monthly) with remove flag to delete their photos first
     final expiredItems = await mainDb.query(
       'items',
-      where: 'date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0',
+      where: 'date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0 AND monthly = 0',
       whereArgs: [todayInt],
     );
 
@@ -470,7 +479,7 @@ Future<void> removeExpiredItems() async {
 
     // Now delete the expired records from database
     final count = await mainDb.rawDelete(
-        'DELETE FROM items WHERE date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0',
+        'DELETE FROM items WHERE date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0 AND monthly = 0',
         [todayInt]
     );
 
@@ -532,6 +541,70 @@ Future<void> updateYearlyEvents(int today) async {
     }
   } catch (e) {
     myPrint('Error updating yearly events: $e');
+  }
+}
+
+// Function to update monthly events
+Future<void> updateMonthlyEvents(int today) async {
+  try {
+    // Find all monthly events with past dates
+    final monthlyEvents = await mainDb.query(
+      'items',
+      where: 'monthly = 1 AND date < ?',
+      whereArgs: [today],
+    );
+
+    myPrint('Found ${monthlyEvents.length} monthly events to update');
+
+    for (var event in monthlyEvents) {
+      try {
+        final eventId = event['id'] as int;
+        final oldDateInt = event['date'] as int;
+        final oldDate = yyyymmddToDateTime(oldDateInt);
+
+        if (oldDate == null) {
+          myPrint('Invalid date for monthly event $eventId: $oldDateInt');
+          continue;
+        }
+
+        // Calculate next month
+        int targetDay = oldDate.day;
+        int newYear = oldDate.year;
+        int newMonth = oldDate.month + 1;
+
+        // Handle year rollover
+        if (newMonth > 12) {
+          newMonth = 1;
+          newYear++;
+        }
+
+        // Handle month-end edge cases (e.g., Jan 31 -> Feb 28/29)
+        int daysInNewMonth = DateTime(newYear, newMonth + 1, 0).day;
+        int actualDay = targetDay > daysInNewMonth ? daysInNewMonth : targetDay;
+
+        final newDate = DateTime(newYear, newMonth, actualDay);
+        final newDateInt = dateTimeToYYYYMMDD(newDate);
+
+        if (newDateInt != null) {
+          await mainDb.update(
+            'items',
+            {'date': newDateInt},
+            where: 'id = ?',
+            whereArgs: [eventId],
+          );
+
+          myPrint('Updated monthly event $eventId: ${oldDate.toString().substring(0, 10)} -> ${newDate.toString().substring(0, 10)}');
+        }
+      } catch (e) {
+        myPrint('Error updating monthly event ${event['id']}: $e');
+      }
+    }
+
+    if (monthlyEvents.isNotEmpty) {
+      myPrint('Updated ${monthlyEvents.length} monthly events to next month');
+    }
+  } catch (e) {
+    myPrint('Error updating monthly events: $e');
   }
 }
 
@@ -629,6 +702,7 @@ class _HomePageState extends State<HomePage> {
   bool _isInYearlyFolder = false;
   bool _isInNotesFolder = false;
   bool _isInDailyFolder = false;
+  bool _isInMonthlyFolder = false;
 
   @override
   void initState() {
@@ -703,6 +777,27 @@ class _HomePageState extends State<HomePage> {
     _updateFilterStatus();
   }
 
+  void _enterMonthlyFolder() {
+    setState(() {
+      _isInMonthlyFolder = true;
+      _isInYearlyFolder = false;
+      _isInNotesFolder = false;
+      _isInDailyFolder = false;
+      xvFilter = 'monthly:true';
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  void _exitMonthlyFolder() {
+    setState(() {
+      _isInMonthlyFolder = false;
+      xvFilter = '';
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
   Map<String, dynamic> _createYearlyFolderItem() {
     return {
       'id': -2, // Специальный ID для виртуального элемента
@@ -757,6 +852,25 @@ class _HomePageState extends State<HomePage> {
     };
   }
 
+  Map<String, dynamic> _createMonthlyFolderItem() {
+    return {
+      'id': -5, // Special ID for virtual element (next after daily=-4)
+      'isVirtual': true,
+      'type': 'monthly_folder',
+      'title': lw('Monthly Events'),
+      'content': '',
+      'tags': '',
+      'priority': 0,
+      'date': null,
+      'time': null,
+      'remind': 0,
+      'yearly': 0,
+      'monthly': 0,
+      'hidden': 0,
+      'photo': null,
+    };
+  }
+
   Future<int> _getYearlyItemsCount() async {
     try {
       // Подсчитываем количество ежегодных записей
@@ -795,6 +909,20 @@ class _HomePageState extends State<HomePage> {
       return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
     } catch (e) {
       myPrint('Error counting daily items: $e');
+      return 0;
+    }
+  }
+
+  Future<int> _getMonthlyItemsCount() async {
+    try {
+      // Count monthly reminder records
+      final count = await mainDb.rawQuery(
+        'SELECT COUNT(*) as count FROM items WHERE monthly = 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
+      );
+
+      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
+    } catch (e) {
+      myPrint('Error counting monthly items: $e');
       return 0;
     }
   }
@@ -888,9 +1016,10 @@ class _HomePageState extends State<HomePage> {
         // Skip hidden records if not in hidden mode
         if (item['hidden'] == 1 && !xvHiddenMode) continue;
 
-        // Add formatting for reminders and yearly events
+        // Add formatting for reminders and yearly/monthly events
         bool isReminder = item['remind'] == 1;
         bool isYearly = item['yearly'] == 1;
+        bool isMonthly = item['monthly'] == 1;
         String priorityStars = '';
 
         // Add stars for priority
@@ -909,12 +1038,12 @@ class _HomePageState extends State<HomePage> {
           }
         }
 
-        // Format entry with yearly indicator
+        // Format entry with yearly/monthly indicator
         if (isReminder) {
-          String prefix = isYearly ? '• 🔄 🔔 ' : '• 🔔 ';
+          String prefix = isYearly ? '• 🔄 🔔 ' : isMonthly ? '• 📅 🔔 ' : '• 🔔 ';
           message.write('$prefix$title$timeStr$priorityStars\n');
         } else {
-          String prefix = isYearly ? '• 🔄 ' : '• ';
+          String prefix = isYearly ? '• 🔄 ' : isMonthly ? '• 📅 ' : '• ';
           message.write('$prefix$title$timeStr$priorityStars\n');
         }
       }
@@ -1167,6 +1296,7 @@ class _HomePageState extends State<HomePage> {
       _isInYearlyFolder = false;
       _isInNotesFolder = false;
       _isInDailyFolder = false;
+      _isInMonthlyFolder = false;
     });
     _refreshItems();
     okInfoBarBlue(lw('All filters cleared'));
@@ -1308,6 +1438,48 @@ class _HomePageState extends State<HomePage> {
           },
         ),
       );
+    } else if (type == 'monthly_folder') {
+      return GestureDetector(
+        onLongPress: () => showHelp(134), // New help ID
+        child: ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.purple,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.calendar_month, color: clText, size: 20),
+          ),
+          title: Text(
+            lw('Monthly Events'),
+            style: TextStyle(
+              fontWeight: fwBold,
+              color: clText,
+              fontSize: fsMedium,
+            ),
+          ),
+          subtitle: FutureBuilder<int>(
+            future: _getMonthlyItemsCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return Text(
+                '$count ${lw('items')}',
+                style: TextStyle(color: clText, fontStyle: FontStyle.italic),
+              );
+            },
+          ),
+          trailing: Icon(Icons.folder_open, color: Colors.purple),
+          tileColor: clFill,
+          onTap: () {
+            _enterMonthlyFolder();
+
+            if (xvHiddenMode) {
+              resetHiddenModeTimer();
+            }
+          },
+        ),
+      );
     }
 
     return SizedBox.shrink();
@@ -1340,10 +1512,15 @@ class _HomePageState extends State<HomePage> {
         final dailyItems = items.where((item) => item['daily'] == 1).toList();
         finalItems.addAll(dailyItems);
 
+      } else if (_isInMonthlyFolder) {
+        // In Monthly folder - only monthly reminder records
+        final monthlyItems = items.where((item) => item['monthly'] == 1).toList();
+        finalItems.addAll(monthlyItems);
+
       } else {
-        // На главном уровне - сначала обычные записи (исключаем yearly и daily)
+        // На главном уровне - сначала обычные записи (исключаем yearly, daily и monthly)
         final normalItems = items.where((item) =>
-        item['yearly'] != 1 && item['daily'] != 1 && item['time'] != null).toList();
+        item['yearly'] != 1 && item['daily'] != 1 && item['monthly'] != 1 && item['time'] != null).toList();
         finalItems.addAll(normalItems);
 
         // Виртуальные папки в КОНЦЕ списка
@@ -1360,6 +1537,11 @@ class _HomePageState extends State<HomePage> {
         final dailyCount = await _getDailyItemsCount();
         if (dailyCount > 0) {
           finalItems.add(_createDailyFolderItem());
+        }
+
+        final monthlyCount = await _getMonthlyItemsCount();
+        if (monthlyCount > 0) {
+          finalItems.add(_createMonthlyFolderItem());
         }
       }
 
@@ -1493,6 +1675,7 @@ class _HomePageState extends State<HomePage> {
                 _isInYearlyFolder ? lw('Yearly') :
                 _isInNotesFolder ? lw('Notes') :
                 _isInDailyFolder ? lw('Daily') :
+                _isInMonthlyFolder ? lw('Monthly') :
                 lw('Memorizer'),
                 style: TextStyle(fontSize: fsLarge, fontWeight: fwBold),
               ),
@@ -1507,7 +1690,7 @@ class _HomePageState extends State<HomePage> {
         leading: GestureDetector(
           onLongPress: () => showHelp(21),
           child: IconButton(
-            icon: Icon((_isInYearlyFolder || _isInNotesFolder || _isInDailyFolder) ? Icons.arrow_back : Icons.close),
+            icon: Icon((_isInYearlyFolder || _isInNotesFolder || _isInDailyFolder || _isInMonthlyFolder) ? Icons.arrow_back : Icons.close),
             onPressed: () async {
               if (_isInYearlyFolder) {
                 _exitYearlyFolder();
@@ -1515,6 +1698,8 @@ class _HomePageState extends State<HomePage> {
                 _exitNotesFolder();
               } else if (_isInDailyFolder) {
                 _exitDailyFolder();
+              } else if (_isInMonthlyFolder) {
+                _exitMonthlyFolder();
               } else {
                 await vacuumDatabases();
                 Navigator.of(context).canPop()
@@ -1698,6 +1883,7 @@ class _HomePageState extends State<HomePage> {
           final hasTime = item['time'] != null;
           final isReminder = item['remind'] == 1;
           final isYearly = item['yearly'] == 1;
+          final isMonthly = item['monthly'] == 1;
           final photoPaths = parsePhotoPaths(item['photo']);
           final hasPhoto = photoPaths.isNotEmpty;
           final photoCount = photoPaths.length;
@@ -1913,6 +2099,14 @@ class _HomePageState extends State<HomePage> {
                     Icon(
                       Icons.refresh,
                       color: isToday ? clRed : clText,
+                      size: 16,
+                    ),
+                  ],
+                  if (isMonthly && hasDate) ...[
+                    SizedBox(height: 2),
+                    Icon(
+                      Icons.calendar_month,
+                      color: isToday ? clRed : Colors.purple,
                       size: 16,
                     ),
                   ],

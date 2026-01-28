@@ -47,6 +47,7 @@ class _EditItemPageState extends State<EditItemPage> {
   bool _isLoading = false; // Loading indicator
   bool _removeAfterReminder = false; // Default value for auto-remove
   bool _yearly = false; // NEW: Default value for yearly repeat
+  bool _monthly = false; // NEW: Default value for monthly repeat
 
   // Daily reminder fields
   bool _daily = false;
@@ -174,6 +175,7 @@ class _EditItemPageState extends State<EditItemPage> {
         _hidden = item['hidden'] == 1;
         _removeAfterReminder = item['remove'] == 1;
         _yearly = item['yearly'] == 1; // NEW: Load yearly field
+        _monthly = item['monthly'] == 1; // NEW: Load monthly field
 
         // Load daily reminder fields
         _daily = item['daily'] == 1;
@@ -296,6 +298,7 @@ class _EditItemPageState extends State<EditItemPage> {
     final hiddenValue = _hidden ? 1 : 0;
     final removeValue = _removeAfterReminder ? 1 : 0;
     final yearlyValue = _yearly ? 1 : 0; // NEW: Yearly field
+    final monthlyValue = _monthly ? 1 : 0; // NEW: Monthly field
 
     // Daily reminder fields
     final dailyValue = _daily ? 1 : 0;
@@ -335,6 +338,7 @@ class _EditItemPageState extends State<EditItemPage> {
             'hidden': hiddenValue,
             'remove': removeValue,
             'yearly': yearlyValue,
+            'monthly': monthlyValue,
             'daily': dailyValue,
             'daily_times': dailyTimesValue,
             'daily_days': dailyDaysValue,
@@ -377,6 +381,7 @@ class _EditItemPageState extends State<EditItemPage> {
           'hidden': hiddenValue,
           'remove': removeValue,
           'yearly': yearlyValue,
+          'monthly': monthlyValue,
           'daily': dailyValue,
           'daily_times': dailyTimesValue,
           'daily_days': dailyDaysValue,
@@ -800,6 +805,7 @@ class _EditItemPageState extends State<EditItemPage> {
                         _time = null;
                         _selectedTimeOption = null;
                         _yearly = false;
+                        _monthly = false;
                         _removeAfterReminder = false;
                       }
                     });
@@ -831,7 +837,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 SizedBox(height: 10),
                 _buildTimeOptions(),
                 SizedBox(height: 10),
-                _buildYearlySelector(),
+                _buildRepeatSelector(),
                 SizedBox(height: 10),
                 _buildRemoveAfterReminderSelector(),
                 // Sound for one-time reminders is taken from app Settings
@@ -909,6 +915,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _time = null;
                 _selectedTimeOption = null;
                 _yearly = false;
+                _monthly = false;
                 _removeAfterReminder = false;
                 _dailySound = defaultSound;
                 if (_dailyTimes.isEmpty) {
@@ -955,8 +962,8 @@ class _EditItemPageState extends State<EditItemPage> {
             value: _removeAfterReminder,
             activeColor: clRed,
             checkColor: clText,
-            // Disable if yearly is enabled OR reminder is disabled
-            onChanged: (_yearly || !_remind) ? null : (value) {
+            // Disable if yearly OR monthly is enabled OR reminder is disabled
+            onChanged: (_yearly || _monthly || !_remind) ? null : (value) {
               setState(() {
                 _removeAfterReminder = value ?? false;
               });
@@ -965,7 +972,7 @@ class _EditItemPageState extends State<EditItemPage> {
           Text(
             lw('Remove after reminder'),
             style: TextStyle(
-              color: (_yearly || !_remind) ? clText.withValues(alpha: 0.5) : clText,
+              color: (_yearly || _monthly || !_remind) ? clText.withValues(alpha: 0.5) : clText,
               fontSize: fsMedium,
             ),
           ),
@@ -975,39 +982,82 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   // NEW: Widget for yearly repeat selector
-  Widget _buildYearlySelector() {
+  Widget _buildRepeatSelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(43), // ID 43 for yearly checkbox
-      child: Row(
+      onLongPress: () => showHelp(43), // ID 43 for repeat checkboxes
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Checkbox(
-            value: _yearly,
-            activeColor: Colors.green,
-            checkColor: clText,
-            // Enable only if reminder is set
-            onChanged: _remind ? (value) {
-              setState(() {
-                _yearly = value ?? false;
+          // Monthly checkbox (first)
+          Row(
+            children: [
+              Checkbox(
+                value: _monthly,
+                activeColor: Colors.purple,
+                checkColor: clText,
+                // Enable only if reminder is set
+                onChanged: _remind ? (value) {
+                  setState(() {
+                    _monthly = value ?? false;
 
-                // If yearly is enabled, automatically disable "remove after reminder"
-                if (_yearly) {
-                  _removeAfterReminder = false;
-                }
-              });
-            } : null,
+                    // If monthly is enabled, disable yearly and remove-after
+                    if (_monthly) {
+                      _yearly = false;
+                      _removeAfterReminder = false;
+                    }
+                  });
+                } : null,
+              ),
+              Text(
+                lw('Monthly repeat'),
+                style: TextStyle(
+                  color: _remind ? clText : clText.withValues(alpha: 0.5),
+                  fontSize: fsMedium,
+                ),
+              ),
+              SizedBox(width: 4),
+              Icon(
+                Icons.calendar_month,
+                color: _remind ? Colors.purple : Colors.purple.withValues(alpha: 0.5),
+                size: 16,
+              ),
+            ],
           ),
-          Text(
-            lw('Yearly repeat'),
-            style: TextStyle(
-              color: _remind ? clText : clText.withValues(alpha: 0.5),
-              fontSize: fsMedium,
-            ),
-          ),
-          SizedBox(width: 4),
-          Icon(
-            Icons.autorenew,
-            color: _remind ? Colors.green : Colors.green.withValues(alpha: 0.5),
-            size: 16,
+
+          // Yearly checkbox (second)
+          Row(
+            children: [
+              Checkbox(
+                value: _yearly,
+                activeColor: Colors.green,
+                checkColor: clText,
+                // Enable only if reminder is set
+                onChanged: _remind ? (value) {
+                  setState(() {
+                    _yearly = value ?? false;
+
+                    // If yearly is enabled, disable monthly and remove-after
+                    if (_yearly) {
+                      _monthly = false;
+                      _removeAfterReminder = false;
+                    }
+                  });
+                } : null,
+              ),
+              Text(
+                lw('Yearly repeat'),
+                style: TextStyle(
+                  color: _remind ? clText : clText.withValues(alpha: 0.5),
+                  fontSize: fsMedium,
+                ),
+              ),
+              SizedBox(width: 4),
+              Icon(
+                Icons.autorenew,
+                color: _remind ? Colors.green : Colors.green.withValues(alpha: 0.5),
+                size: 16,
+              ),
+            ],
           ),
         ],
       ),
