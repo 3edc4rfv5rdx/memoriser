@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="test4 - custom sounds for daily reminders"
+COMMENT="sounds and custom sounds for daily reminders"
 #
 GLOBVERS='0.9'
 VER=''
