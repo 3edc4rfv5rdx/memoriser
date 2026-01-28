@@ -1561,6 +1561,80 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // Copy item function
+  Future<void> _copyItem(int itemId) async {
+    try {
+      // Get item data from database
+      final items = await mainDb.query(
+        'items',
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+
+      if (items.isEmpty) {
+        okInfoBarRed(lw('Item not found'));
+        return;
+      }
+
+      final originalItem = items.first;
+
+      // Prepare new item data with "copy-" prefix
+      String originalTitle = originalItem['title'] as String? ?? '';
+      String newTitle = 'copy-$originalTitle';
+
+      // Insert new item with all fields copied (without photos)
+      final newItemId = await mainDb.insert('items', {
+        'title': newTitle,
+        'content': originalItem['content'],
+        'tags': originalItem['tags'],
+        'priority': originalItem['priority'],
+        'date': originalItem['date'],
+        'time': originalItem['time'],
+        'remind': originalItem['remind'], // Copy reminder flag
+        'created': dateTimeToYYYYMMDD(DateTime.now()),
+        'remove': originalItem['remove'],
+        'hidden': originalItem['hidden'],
+        'yearly': originalItem['yearly'],
+        'monthly': originalItem['monthly'],
+        'daily': originalItem['daily'], // Copy daily flag
+        'daily_times': originalItem['daily_times'],
+        'daily_days': originalItem['daily_days'],
+        'daily_sound': originalItem['daily_sound'],
+        'sound': originalItem['sound'],
+        'photo': null, // Don't copy photos
+      });
+
+      // Schedule reminders for copied item
+      if (originalItem['remind'] == 1 && originalItem['date'] != null) {
+        final date = yyyymmddToDateTime(originalItem['date'] as int);
+        if (date != null) {
+          await SimpleNotifications.scheduleSpecificReminder(
+            newItemId,
+            date,
+            originalItem['time'] as int?,
+          );
+        }
+      }
+
+      if (originalItem['daily'] == 1) {
+        final dailyTimes = parseDailyTimes(originalItem['daily_times']);
+        await SimpleNotifications.updateDailyReminders(
+          newItemId,
+          true,
+          dailyTimes,
+          originalItem['daily_days'] as int? ?? 127,
+          newTitle,
+        );
+      }
+
+      _refreshItems();
+      okInfoBarGreen(lw('Item copied'));
+    } catch (e) {
+      myPrint('Error copying item: $e');
+      okInfoBarRed(lw('Failed to copy item'));
+    }
+  }
+
   void _showContextMenu(BuildContext context, Map<String, dynamic> item) {
     List<PopupMenuEntry> menuItems = [
       // В методе _showContextMenu
@@ -1584,6 +1658,16 @@ class _HomePageState extends State<HomePage> {
                 _refreshItems();
               }
             });
+          },
+        ),
+      ),
+      PopupMenuItem(
+        child: ListTile(
+          leading: Icon(Icons.copy, color: clText),
+          title: Text(lw('Copy'), style: TextStyle(color: clText)),
+          onTap: () {
+            Navigator.pop(context); // Close the menu
+            _copyItem(item['id']);
           },
         ),
       ),

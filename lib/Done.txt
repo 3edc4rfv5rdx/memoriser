@@ -1,3 +1,11 @@
+  + Copy item feature:
+    - "Copy" option in context menu (long press item)
+    - Creates duplicate with "copy-" prefix (e.g., "aaa" → "copy-aaa")
+    - Copies all fields: content, tags, priority, date, time, remind settings
+    - Copies and reschedules: one-time reminders, yearly, monthly, daily
+    - Photos NOT copied (user can add manually)
+    - Localizations: ru/ua for "Copy", "Item copied", "Failed to copy item"
+
   + Hide photo frame by default (show on [+] button):
     - Photo section hidden by default for new items
     - Shows compact [+] button to activate photo section
