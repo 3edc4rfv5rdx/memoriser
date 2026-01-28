@@ -1081,6 +1081,17 @@ class _EditItemPageState extends State<EditItemPage> {
               surface: clBgrnd,
               onSurface: clText,
             ),
+            // Style OK/Cancel buttons with background
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
           ),
           child: child!,
         );
@@ -1232,11 +1243,14 @@ class _EditItemPageState extends State<EditItemPage> {
       children: [
         Icon(Icons.volume_up, color: clText, size: 20),
         SizedBox(width: 8),
-        Text(
-          lw('Sound:'),
-          style: TextStyle(color: clText, fontSize: fsNormal),
-        ),
-        SizedBox(width: 8),
+        // Hide "Sound:" label for daily reminders to save space
+        if (!isDaily) ...[
+          Text(
+            lw('Sound:'),
+            style: TextStyle(color: clText, fontSize: fsNormal),
+          ),
+          SizedBox(width: 8),
+        ],
         Expanded(
           child: GestureDetector(
             onTap: () => _showSoundPicker(isDaily: isDaily),

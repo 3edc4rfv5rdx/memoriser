@@ -1,8 +1,9 @@
   + Custom sound files for daily reminders:
     - File picker for mp3, wav, ogg, m4a, aac
-    - Files copied to Documents/Memorizer/Sounds/
+    - Files copied to app-private storage (no permissions needed)
     - Sound picker shows: Default, Custom sounds, Choose file, System sounds
-    - Kotlin: getSoundUri() converts file paths to file:// URIs
+    - Kotlin: playSoundFile() via MediaPlayer (channel sounds don't work with file:// URIs)
+    - Backup/Restore includes Sounds folder
     - Localizations: ru/ua
 
   + Default sound settings in Settings screen:
