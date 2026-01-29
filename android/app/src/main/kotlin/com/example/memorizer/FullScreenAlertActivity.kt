@@ -57,6 +57,11 @@ class FullScreenAlertActivity : Activity() {
             Log.e("MemorizerApp", "Error cancelling notification: ${e.message}")
         }
 
+        // Set current time
+        val currentTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        findViewById<TextView>(R.id.alert_time).text = currentTime
+
         // Set text in views
         findViewById<TextView>(R.id.alert_title).text = title
         findViewById<TextView>(R.id.alert_content).apply {

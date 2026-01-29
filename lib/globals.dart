@@ -832,16 +832,27 @@ Future<void> initStoragePaths() async {
 Future<Directory?> getDocumentsDirectory() async {
   try {
     if (Platform.isAndroid) {
-      // На Android используем внешнее хранилище
+      // Try external storage first
       final directory = await getExternalStorageDirectory();
       if (directory != null) {
         final androidPath = directory.path.split('/Android')[0];
         final documentsDir = Directory('$androidPath/Documents');
-        // Создаем директорию, если она не существует
-        if (!await documentsDir.exists()) {
-          await documentsDir.create(recursive: true);
+
+        try {
+          // Try to create/access external Documents directory
+          if (!await documentsDir.exists()) {
+            await documentsDir.create(recursive: true);
+          }
+          // Test write access
+          final testFile = File('${documentsDir.path}/.memorizer_test');
+          await testFile.writeAsString('test');
+          await testFile.delete();
+          return documentsDir;
+        } catch (e) {
+          myPrint('Cannot access external Documents, using app-specific storage: $e');
+          // Fallback to app-specific directory
+          return await getApplicationDocumentsDirectory();
         }
-        return documentsDir;
       }
       return await getApplicationDocumentsDirectory();
     } else if (Platform.isLinux) {

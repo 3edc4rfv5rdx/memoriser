@@ -2164,11 +2164,9 @@ class _HomePageState extends State<HomePage> {
               return false;
             },
             child: ListTile(
-              title: Row(
-                children: [
-                  // Checkbox for quick reminder activation/deactivation
-                  if (hasAnyReminder)
-                    SizedBox(
+              // Leading: checkbox on title level (for reminders only)
+              leading: hasAnyReminder
+                  ? SizedBox(
                       width: 32,
                       height: 32,
                       child: Checkbox(
@@ -2181,8 +2179,10 @@ class _HomePageState extends State<HomePage> {
                           await _toggleReminderActive(item['id'], value ?? false);
                         },
                       ),
-                    ),
-                  if (hasAnyReminder) SizedBox(width: 4),
+                    )
+                  : null,
+              title: Row(
+                children: [
                   Expanded(
                     child: Text(
                       item['title'],
@@ -2192,6 +2192,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
+                  // Priority stars on the right
                   if (priorityValue > 0)
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -2205,7 +2206,27 @@ class _HomePageState extends State<HomePage> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(content, style: TextStyle(color: isToday ? clRed : clText)),
+                  // Content with inline icons
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (xvHiddenMode) ...[
+                        Icon(Icons.lock, color: clText, size: 14),
+                        SizedBox(width: 4),
+                      ],
+                      if (isYearly) ...[
+                        Icon(Icons.refresh, color: Colors.green, size: 14),
+                        SizedBox(width: 4),
+                      ],
+                      if (isMonthly) ...[
+                        Icon(Icons.calendar_month, color: Colors.purple, size: 14),
+                        SizedBox(width: 4),
+                      ],
+                      Expanded(
+                        child: Text(content, style: TextStyle(color: isToday ? clRed : clText)),
+                      ),
+                    ],
+                  ),
                   if (tags.isNotEmpty)
                     Text(
                       'Tags: $tags',
@@ -2250,50 +2271,6 @@ class _HomePageState extends State<HomePage> {
                   : isToday
                   ? Color(0x22FF0000)
                   : clFill,
-              leading: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (xvHiddenMode)
-                    Icon(Icons.lock, color: clText, size: 16),
-                  if (priorityValue > 0) ...[
-                    if (xvHiddenMode) SizedBox(height: 2),
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: clUpBar,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        priorityValue.toString(),
-                        style: TextStyle(
-                          color: clText,
-                          fontWeight: fwBold,
-                          fontSize: fsSmall,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (isYearly && hasDate) ...[
-                    SizedBox(height: 2),
-                    Icon(
-                      Icons.refresh,
-                      color: isToday ? clRed : clText,
-                      size: 16,
-                    ),
-                  ],
-                  if (isMonthly && hasDate) ...[
-                    SizedBox(height: 2),
-                    Icon(
-                      Icons.calendar_month,
-                      color: isToday ? clRed : Colors.purple,
-                      size: 16,
-                    ),
-                  ],
-                ],
-              ),
               trailing: hasPhoto
                   ? Stack(
                       clipBehavior: Clip.none,

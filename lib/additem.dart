@@ -460,18 +460,23 @@ class _EditItemPageState extends State<EditItemPage> {
     }
 
     try {
+      myPrint('Starting camera...');
       // Get the image from the camera
       final XFile? image = await _picker.pickImage(source: ImageSource.camera);
 
       if (image != null) {
+        myPrint('Image captured: ${image.path}');
+
         // Ensure we have a photo directory
         if (_currentPhotoDir == null) {
+          myPrint('Creating photo directory...');
           if (_isNewItem) {
             await _initTempPhotoDir();
           } else {
             _currentPhotoDir = getItemPhotoDirPath(widget.itemId!);
             await getItemPhotoDir(widget.itemId!); // Create if needed
           }
+          myPrint('Photo dir: $_currentPhotoDir');
         }
 
         if (_currentPhotoDir == null) {
@@ -481,6 +486,7 @@ class _EditItemPageState extends State<EditItemPage> {
         // Ensure directory exists
         final dir = Directory(_currentPhotoDir!);
         if (!await dir.exists()) {
+          myPrint('Creating directory: ${dir.path}');
           await dir.create(recursive: true);
         }
 
@@ -491,6 +497,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
         // Copy the image to the photo directory
         final File newImage = File('$_currentPhotoDir/$fileName');
+        myPrint('Copying image to: ${newImage.path}');
         await File(image.path).copy(newImage.path);
 
         // Add to photo list
@@ -499,10 +506,14 @@ class _EditItemPageState extends State<EditItemPage> {
           _showPhotoSection = true; // Show photo section when photo is added
         });
 
+        myPrint('Photo saved successfully');
         okInfoBarGreen(lw('Photo saved'));
+      } else {
+        myPrint('Camera was cancelled by user');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       myPrint('Error taking picture: $e');
+      myPrint('Stack trace: $stackTrace');
       okInfoBarRed(lw('Failed to take picture'));
     }
   }

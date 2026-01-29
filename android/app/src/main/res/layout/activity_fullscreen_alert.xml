@@ -9,42 +9,85 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:gravity="center"
         android:padding="32dp">
 
-        <!-- Title -->
-        <TextView
-            android:id="@+id/alert_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Reminder"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:gravity="center"
-            android:layout_marginBottom="20dp"/>
+        <!-- Top section - 4/5 of screen -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="4"
+            android:orientation="vertical"
+            android:gravity="center">
 
-        <!-- Content -->
-        <TextView
-            android:id="@+id/alert_content"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""
-            android:textSize="20sp"
-            android:textColor="#FFFFFF"
-            android:gravity="center"
-            android:layout_marginBottom="40dp"/>
+            <!-- App name "Memorizer" at top -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Memorizer"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="#000000"
+                android:gravity="center"
+                android:layout_marginBottom="16dp"/>
 
-        <!-- OK Button -->
-        <Button
-            android:id="@+id/alert_ok_button"
-            android:layout_width="200dp"
-            android:layout_height="60dp"
-            android:text="OK"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:backgroundTint="#023047"
-            android:textColor="#FFFFFF"/>
+            <!-- Current time -->
+            <TextView
+                android:id="@+id/alert_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12:00"
+                android:textSize="48sp"
+                android:textStyle="bold"
+                android:textColor="#000000"
+                android:gravity="center"
+                android:layout_marginBottom="32dp"/>
+
+            <!-- Reminder title -->
+            <TextView
+                android:id="@+id/alert_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Reminder: Title"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#000000"
+                android:gravity="center"
+                android:layout_marginBottom="16dp"
+                android:paddingHorizontal="16dp"/>
+
+            <!-- Content -->
+            <TextView
+                android:id="@+id/alert_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="18sp"
+                android:textColor="#000000"
+                android:gravity="center"
+                android:paddingHorizontal="16dp"/>
+
+        </LinearLayout>
+
+        <!-- Bottom section - 1/5 of screen -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <!-- OK Button with rounded corners -->
+            <Button
+                android:id="@+id/alert_ok_button"
+                android:layout_width="200dp"
+                android:layout_height="60dp"
+                android:text="OK"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:background="@drawable/rounded_button"
+                android:textColor="#FFFFFF"/>
+
+        </LinearLayout>
 
     </LinearLayout>
 
@@ -56,15 +99,33 @@
         android:background="#AA000000"
         android:clickable="true">
 
-        <!-- Hint text -->
-        <TextView
+        <!-- Lock icon and arrow centered -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="⬇ Swipe down to access button"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:layout_gravity="center_horizontal|top"
-            android:layout_marginTop="100dp"/>
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <!-- Lock icon -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔒"
+                android:textSize="80sp"
+                android:gravity="center"
+                android:layout_marginBottom="24dp"/>
+
+            <!-- Down arrow -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⬇"
+                android:textSize="60sp"
+                android:textColor="#FFFFFF"
+                android:gravity="center"/>
+
+        </LinearLayout>
 
     </FrameLayout>
 
