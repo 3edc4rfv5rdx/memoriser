@@ -23,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 13, // Increased from 12 to 13 for fullscreen field
+    version: 14, // Increased from 13 to 14 for active field
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -46,7 +46,8 @@ Future<void> initDatabases() async {
           daily_days INTEGER DEFAULT 127,
           daily_sound TEXT DEFAULT NULL,
           sound TEXT DEFAULT NULL,
-          fullscreen INTEGER DEFAULT 0
+          fullscreen INTEGER DEFAULT 0,
+          active INTEGER DEFAULT 1
         )
       ''');
     },
@@ -147,6 +148,12 @@ Future<void> initDatabases() async {
         // Migration for version 13 - add fullscreen field for fullscreen alert windows
         await db.execute('ALTER TABLE items ADD COLUMN fullscreen INTEGER DEFAULT 0');
         myPrint("Database upgraded to version 13: Added 'fullscreen' field");
+      }
+
+      if (oldVersion < 14) {
+        // Migration for version 14 - add active field for quick reminder activation/deactivation
+        await db.execute('ALTER TABLE items ADD COLUMN active INTEGER DEFAULT 1');
+        myPrint("Database upgraded to version 14: Added 'active' field");
       }
     },
   );
@@ -1568,6 +1575,68 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // Toggle reminder active/inactive
+  Future<void> _toggleReminderActive(int itemId, bool newActiveState) async {
+    try {
+      // Update active field in database
+      await mainDb.update(
+        'items',
+        {'active': newActiveState ? 1 : 0},
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+
+      // Get item data to check reminder types
+      final items = await mainDb.query(
+        'items',
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+
+      if (items.isEmpty) return;
+      final item = items.first;
+
+      final hasRemind = item['remind'] == 1;
+      final hasDaily = item['daily'] == 1;
+      final dateInt = item['date'] as int?;
+      final date = dateInt != null ? yyyymmddToDateTime(dateInt) : null;
+      final time = item['time'] as int?;
+      final dailyTimes = parseDailyTimes(item['daily_times']);
+      final dailyDays = (item['daily_days'] as int?) ?? dayAllDays;
+      final title = (item['title'] as String?) ?? '';
+
+      if (newActiveState) {
+        // Activate: reschedule reminders
+        if (hasRemind && date != null && time != null) {
+          await SimpleNotifications.updateSpecificReminder(itemId, true, date, time);
+          myPrint('Reminder reactivated for item $itemId');
+        }
+        if (hasDaily && dailyTimes.isNotEmpty) {
+          await SimpleNotifications.updateDailyReminders(itemId, true, dailyTimes, dailyDays, title);
+          myPrint('Daily reminders reactivated for item $itemId');
+        }
+        okInfoBarGreen(lw('Reminder activated'));
+      } else {
+        // Deactivate: cancel all reminders
+        if (hasRemind) {
+          await SimpleNotifications.updateSpecificReminder(itemId, false, null, null);
+          myPrint('Reminder cancelled for item $itemId');
+        }
+        if (hasDaily) {
+          await SimpleNotifications.updateDailyReminders(itemId, false, [], dayAllDays, title);
+          myPrint('Daily reminders cancelled for item $itemId');
+        }
+        okInfoBarGreen(lw('Reminder deactivated'));
+      }
+
+      // Refresh UI
+      _refreshItems();
+    } catch (e) {
+      myPrint('Error toggling reminder active state: $e');
+      okInfoBarRed(lw('Error'));
+    }
+  }
+
   // Copy item function
   Future<void> _copyItem(int itemId) async {
     try {
@@ -1977,6 +2046,9 @@ class _HomePageState extends State<HomePage> {
           final isReminder = item['remind'] == 1;
           final isYearly = item['yearly'] == 1;
           final isMonthly = item['monthly'] == 1;
+          final isDaily = item['daily'] == 1;
+          final isActive = item['active'] == 1;
+          final hasAnyReminder = isReminder || isDaily;
           final photoPaths = parsePhotoPaths(item['photo']);
           final hasPhoto = photoPaths.isNotEmpty;
           final photoCount = photoPaths.length;
@@ -2094,6 +2166,23 @@ class _HomePageState extends State<HomePage> {
             child: ListTile(
               title: Row(
                 children: [
+                  // Checkbox for quick reminder activation/deactivation
+                  if (hasAnyReminder)
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Checkbox(
+                        value: isActive,
+                        activeColor: Colors.green,
+                        checkColor: clText,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        onChanged: (value) async {
+                          await _toggleReminderActive(item['id'], value ?? false);
+                        },
+                      ),
+                    ),
+                  if (hasAnyReminder) SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       item['title'],

@@ -689,11 +689,19 @@ class NotificationReceiver : BroadcastReceiver() {
 
             // Get item data from database
             val itemData = getItemData(context, itemId)
+
+            // Check if reminder is active
+            if (itemData.active == 0) {
+                Log.d("MemorizerApp", "Daily reminder for item $itemId is INACTIVE, skipping notification")
+                rescheduleNextDailyReminder(context, itemId, hour, minute, daysMask, title, body)
+                return
+            }
+
             val itemTitle = if (itemData.title.isNotEmpty()) itemData.title else title
             val itemContent = itemData.content.ifEmpty { body }
             val itemSound = itemData.dailySound
 
-            Log.d("MemorizerApp", "Daily reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}")
+            Log.d("MemorizerApp", "Daily reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}, active: ${itemData.active}")
 
             // Check if fullscreen alert is enabled
             if (itemData.fullscreen == 1) {
@@ -1172,13 +1180,20 @@ class NotificationReceiver : BroadcastReceiver() {
             if (isItemStillActive(context, itemId)) {
                 // Get item data from database
                 val itemData = getItemData(context, itemId)
+
+                // Check if reminder is active
+                if (itemData.active == 0) {
+                    Log.d("MemorizerApp", "Specific reminder for item $itemId is INACTIVE, skipping notification")
+                    return
+                }
+
                 val itemTitle = if (itemData.title.isNotEmpty()) "Reminder: ${itemData.title}" else title
                 val itemContent = itemData.content.ifEmpty { body }
 
                 // Get default sound from app settings (not from item)
                 val defaultSound = getDefaultSound(context)
 
-                Log.d("MemorizerApp", "Specific reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}")
+                Log.d("MemorizerApp", "Specific reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}, active: ${itemData.active}")
 
                 // Check if fullscreen alert is enabled
                 if (itemData.fullscreen == 1) {
@@ -1203,14 +1218,15 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Data class for item data with sound and fullscreen
+    // Data class for item data with sound, fullscreen, and active
     data class ItemData(
         val title: String,
         val content: String,
         val sound: String?,
         val dailySound: String?,
         val hidden: Int,
-        val fullscreen: Int
+        val fullscreen: Int,
+        val active: Int
     )
 
     // Decode Base64 obfuscated text (same logic as Flutter's deobfuscateText)
@@ -1231,16 +1247,16 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Get item data from database including sound, daily_sound, hidden, and fullscreen
+    // Get item data from database including sound, daily_sound, hidden, fullscreen, and active
     private fun getItemData(context: Context, itemId: Int): ItemData {
         return try {
             val dbPath = context.getDatabasePath("memorizer.db")
-            if (!dbPath.exists()) return ItemData("", "", null, null, 0, 0)
+            if (!dbPath.exists()) return ItemData("", "", null, null, 0, 0, 1)
 
             val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
 
             val cursor = db.rawQuery(
-                "SELECT title, content, sound, daily_sound, hidden, fullscreen FROM items WHERE id = ?",
+                "SELECT title, content, sound, daily_sound, hidden, fullscreen, active FROM items WHERE id = ?",
                 arrayOf(itemId.toString())
             )
 
@@ -1251,8 +1267,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 val dailySound = cursor.getString(3)
                 val hidden = cursor.getInt(4)
                 val fullscreen = cursor.getInt(5)
+                val active = cursor.getInt(6)
 
-                Log.d("MemorizerApp", "getItemData($itemId): fullscreen=$fullscreen, title=$title")
+                Log.d("MemorizerApp", "getItemData($itemId): fullscreen=$fullscreen, active=$active, title=$title")
 
                 // Decode hidden items for notifications (always show readable text in notifications)
                 if (hidden == 1) {
@@ -1260,10 +1277,10 @@ class NotificationReceiver : BroadcastReceiver() {
                     content = deobfuscateText(content)
                 }
 
-                ItemData(title, content, sound, dailySound, hidden, fullscreen)
+                ItemData(title, content, sound, dailySound, hidden, fullscreen, active)
             } else {
                 Log.d("MemorizerApp", "getItemData($itemId): Item not found in database")
-                ItemData("", "", null, null, 0, 0)
+                ItemData("", "", null, null, 0, 0, 1)
             }
 
             cursor.close()
@@ -1271,7 +1288,7 @@ class NotificationReceiver : BroadcastReceiver() {
             result
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error getting item data: ${e.message}")
-            ItemData("", "", null, null, 0, 0)
+            ItemData("", "", null, null, 0, 0, 1)
         }
     }
 

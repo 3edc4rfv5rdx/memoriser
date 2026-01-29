@@ -1073,12 +1073,6 @@ class _EditItemPageState extends State<EditItemPage> {
                   fontSize: fsMedium,
                 ),
               ),
-              SizedBox(width: 4),
-              Icon(
-                Icons.calendar_month,
-                color: _remind ? Colors.purple : Colors.purple.withValues(alpha: 0.5),
-                size: 16,
-              ),
             ],
           ),
 
@@ -1108,12 +1102,6 @@ class _EditItemPageState extends State<EditItemPage> {
                   color: _remind ? clText : clText.withValues(alpha: 0.5),
                   fontSize: fsMedium,
                 ),
-              ),
-              SizedBox(width: 4),
-              Icon(
-                Icons.autorenew,
-                color: _remind ? Colors.green : Colors.green.withValues(alpha: 0.5),
-                size: 16,
               ),
             ],
           ),

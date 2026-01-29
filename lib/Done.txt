@@ -1,3 +1,26 @@
+  + Fullscreen alert windows for reminders:
+    - Per-item checkbox "Fullscreen alert" in reminder section
+    - DB version 13: 'fullscreen' column (INTEGER DEFAULT 0)
+    - Launches fullscreen activity instead of notification when enabled
+    - Works with all reminder types: one-time, daily, monthly, yearly
+    - Orange fullscreen window (#FB8500) with title + content
+    - Sound plays ONCE in Activity via MediaPlayer (USAGE_ALARM)
+    - Swipe-down barrier overlay prevents accidental dismissal
+    - Semi-transparent black overlay (#AA000000) with hint text
+    - Gesture detector: swipe down (500+ pixels/sec) dismisses barrier
+    - [OK] button accessible only after barrier dismissed
+    - Back button disabled (user must swipe + tap OK)
+    - Displays over lock screen (FLAG_SHOW_WHEN_LOCKED, FLAG_TURN_SCREEN_ON)
+    - FullScreenAlertActivity.kt: Core activity with barrier + sound
+    - activity_fullscreen_alert.xml: Layout with barrier overlay
+    - NotificationSystem: Uses full-screen intent via notification
+    - Permission: USE_FULL_SCREEN_INTENT (Android 10+)
+    - targetSdkVersion 28: Avoids Android 10+ BAL restrictions
+    - Auto-opens on lock screen without user permission
+    - Notification auto-cancelled when fullscreen opens
+    - Localization: ru/ua for "Fullscreen alert"
+    - Testing: Works on emulator when screen is locked (keyevent 26)
+
   + Copy item feature:
     - "Copy" option in context menu (long press item)
     - Creates duplicate with "copy-" prefix (e.g., "aaa" → "copy-aaa")
