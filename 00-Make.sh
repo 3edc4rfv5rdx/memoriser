@@ -34,37 +34,37 @@ OLD_DEBUG_VALUE=""
 auto_increment_version() {
     echo "===== AUTO INCREMENT VERSION ====="
 
-    # Установка глобальной версии, если не задана
+    # Set global version if not specified
     if [ -z "$VER" ]; then
-        # Получаем текущую дату в формате YYMMDD
+        # Get current date in YYMMDD format
         DATE_SHORT=$(date +"%y%m%d")
         VER="${GLOBVERS}.${DATE_SHORT}"
         echo "✓ Version set to $VER based on current date"
     fi
 
-    # Автоинкремент кода версии, если не задан
+    # Auto-increment version code if not specified
     if [ -z "$VER_CODE" ]; then
-        # Извлекаем текущий код версии из pubspec.yaml
+        # Extract current version code from pubspec.yaml
         CURRENT_VERSION=$(grep -o "version: [0-9]\+\.[0-9]\+\.[0-9]\+\+[0-9]\+" "$PUB_FILE" | grep -o "\+[0-9]\+")
 
         if [ -z "$CURRENT_VERSION" ]; then
-            # Если не нашли версию с +, пробуем другой формат
+            # If version with + not found, try another format
             CURRENT_VERSION=$(grep -o "version: [0-9]\+\.[0-9]\+\.[0-9]\+.*" "$PUB_FILE" | grep -o "\+[0-9]\+")
         fi
 
         if [ -n "$CURRENT_VERSION" ]; then
-            # Извлекаем число после + и инкрементируем
+            # Extract number after + and increment
             CURRENT_CODE=${CURRENT_VERSION#+}
             VER_CODE=$((CURRENT_CODE + 1))
             echo "✓ Version code incremented from $CURRENT_CODE to $VER_CODE"
         else
-            # Если не нашли код версии, устанавливаем в 1
+            # If version code not found, set to 1
             VER_CODE=1
             echo "✓ Version code set to $VER_CODE (no previous version found)"
         fi
     fi
 
-    # Обновляем FULL_VER с новыми значениями
+    # Update FULL_VER with new values
     FULL_VER="$VER+$VER_CODE"
     echo "✓ Full version: $FULL_VER"
 }
@@ -260,7 +260,7 @@ clean_output() {
 copy_final_apk() {
     echo "===== COPYING FINAL APK ====="
 
-    # Найти конкретный файл для текущей версии вместо всех файлов
+    # Find specific file for current version instead of all files
     SRC=$(ls $APK_PATH/app-arm64-v8a-release-$VER-$VER_CODE.apk 2>/dev/null)
 
     if [ -z "$SRC" ]; then

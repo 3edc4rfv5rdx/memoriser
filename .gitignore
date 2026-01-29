@@ -184,3 +184,4 @@ app.*.symbols
 /android/memorizer_android.iml
 /android/app/src/main/res/drawable/notification_icon.xml
 /lib/ToDo.txt
+/xxx/

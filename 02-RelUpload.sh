@@ -6,6 +6,12 @@ APK_DIR="/home/e/AndroidStudioProjects/memorizer/build/app/outputs/flutter-apk"
 TODO_FILE="lib/ToDo.txt"
 CHANGELOG_FILE="/tmp/release_notes_$$.md"
 
+# ------------------------------------------------------------
+# Upload protection
+# ------------------------------------------------------------
+UPLOAD_TIMEOUT=180     # seconds per attempt
+UPLOAD_RETRY=2         # number of attempts
+
 echo "=== Detecting latest tag ==="
 TAG=$(git tag --list 'v*' | sort -V | tail -n 1)
 
@@ -178,15 +184,46 @@ else
 fi
 
 # ------------------------------------------------------------
-# Upload files with renaming
+# Upload helper with retry + timeout + cleanup
+# ------------------------------------------------------------
+upload_asset() {
+    local tag="$1"
+    local src="$2"
+    local dst="$3"
+
+    echo "--------------------------------------------------"
+    echo "Uploading: $src -> $dst"
+
+    for ((i=1; i<=UPLOAD_RETRY; i++)); do
+        echo "Attempt $i/$UPLOAD_RETRY..."
+
+        # Remove broken asset if exists (ignore errors)
+        gh release delete-asset "$tag" "$dst" -y 2>/dev/null || true
+
+        if timeout "$UPLOAD_TIMEOUT" \
+            gh release upload "$tag" "$src" --name "$dst" --clobber
+        then
+            echo "Upload OK: $dst"
+            return 0
+        fi
+
+        echo "Upload failed or timeout, retrying in 5s..."
+        sleep 5
+    done
+
+    echo "ERROR: Upload failed after $UPLOAD_RETRY attempts: $dst"
+    return 1
+}
+
+# ------------------------------------------------------------
+# Upload files with renaming (protected)
 # ------------------------------------------------------------
 echo "=== Uploading files to Release ==="
 
 for pair in "${FILES[@]}"; do
     SRC="${pair%%#*}"
     DST="${pair##*#}"
-    echo "Uploading: $SRC -> $DST"
-    gh release upload "$TAG" "$APK_DIR/$pair" --clobber
+    upload_asset "$TAG" "$APK_DIR/$SRC" "$DST"
 done
 
 echo "=== Release upload completed successfully ==="
