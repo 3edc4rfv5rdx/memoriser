@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="add monthly reminders"
+COMMENT="test - add full/lock screen"
 #
 GLOBVERS='0.9'
 VER=''
