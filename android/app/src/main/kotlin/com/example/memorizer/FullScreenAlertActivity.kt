@@ -10,7 +10,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -22,13 +21,15 @@ import android.widget.TextView
  * Features:
  * - Shows on lock screen
  * - Plays sound once
- * - Swipe-down barrier to prevent accidental dismissal
- * - [OK] button to dismiss (only accessible after swipe)
+ * - Draggable circle barrier to prevent accidental dismissal
+ * - [OK] button to dismiss (only accessible after dragging circle down)
  */
 class FullScreenAlertActivity : Activity() {
     private var mediaPlayer: MediaPlayer? = null
+    private lateinit var draggableCircle: View
     private lateinit var barrierOverlay: View
-    private lateinit var gestureDetector: GestureDetector
+    private var dragStartY = 0f
+    private var initialY = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,9 +75,10 @@ class FullScreenAlertActivity : Activity() {
             dismissAlert()
         }
 
-        // Setup swipe barrier
+        // Setup barrier overlay and draggable circle
         barrierOverlay = findViewById(R.id.barrier_overlay)
-        setupSwipeGesture()
+        draggableCircle = findViewById(R.id.draggable_circle)
+        setupDragGesture()
 
         // Play sound once
         playSound(soundValue)
@@ -105,40 +107,62 @@ class FullScreenAlertActivity : Activity() {
     }
 
     /**
-     * Setup swipe gesture detector for the barrier overlay
+     * Setup drag gesture for the draggable circle barrier
      */
-    private fun setupSwipeGesture() {
-        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onFling(
-                e1: MotionEvent?,
-                e2: MotionEvent,
-                velocityX: Float,
-                velocityY: Float
-            ): Boolean {
-                // Detect swipe down: velocityY > 0 (positive = downward)
-                if (velocityY > 500) {  // Threshold: 500 pixels/sec
-                    hideBarrier()
-                    return true
+    private fun setupDragGesture() {
+        draggableCircle.setOnTouchListener { view, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    dragStartY = view.y
+                    initialY = event.rawY
+                    true
                 }
-                return false
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaY = event.rawY - initialY
+                    if (deltaY > 0) {  // Only allow dragging down
+                        view.y = dragStartY + deltaY
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    val deltaY = event.rawY - initialY
+                    if (deltaY > 400) {  // Dragged down at least 400 pixels
+                        hideCircle()
+                    } else {
+                        // Snap back to original position
+                        view.animate()
+                            .y(dragStartY)
+                            .setDuration(200)
+                            .start()
+                    }
+                    true
+                }
+                else -> false
             }
-        })
-
-        barrierOverlay.setOnTouchListener { _, event ->
-            gestureDetector.onTouchEvent(event)
-            true
         }
     }
 
     /**
-     * Hide the barrier overlay with fade animation
+     * Hide the barrier overlay and draggable circle with fade animation
      */
-    private fun hideBarrier() {
+    private fun hideCircle() {
+        // Remove touch listener first to stop consuming events
+        draggableCircle.setOnTouchListener(null)
+
+        // Hide both overlay and circle with animation
         barrierOverlay.animate()
             .alpha(0f)
             .setDuration(300)
             .withEndAction {
                 barrierOverlay.visibility = View.GONE
+            }
+            .start()
+
+        draggableCircle.animate()
+            .alpha(0f)
+            .setDuration(300)
+            .withEndAction {
+                draggableCircle.visibility = View.GONE
             }
             .start()
     }
@@ -227,7 +251,7 @@ class FullScreenAlertActivity : Activity() {
     }
 
     /**
-     * Disable back button - user must swipe and tap OK
+     * Disable back button - user must drag circle and tap OK
      */
     override fun onBackPressed() {
         // Do nothing - user must use OK button

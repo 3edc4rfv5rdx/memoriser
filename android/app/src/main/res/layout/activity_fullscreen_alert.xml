@@ -11,24 +11,24 @@
         android:orientation="vertical"
         android:padding="32dp">
 
-        <!-- Top section - 4/5 of screen -->
+        <!-- Top section - 1/8 of screen (Memorizer + Time at 7/8 from bottom) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="4"
+            android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center">
 
-            <!-- App name "Memorizer" at top -->
+            <!-- App name "Memorizer" -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Memorizer"
-                android:textSize="24sp"
+                android:textSize="20sp"
                 android:textStyle="bold"
                 android:textColor="#000000"
                 android:gravity="center"
-                android:layout_marginBottom="16dp"/>
+                android:layout_marginBottom="8dp"/>
 
             <!-- Current time -->
             <TextView
@@ -36,11 +36,21 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="12:00"
-                android:textSize="48sp"
+                android:textSize="36sp"
                 android:textStyle="bold"
                 android:textColor="#000000"
-                android:gravity="center"
-                android:layout_marginBottom="32dp"/>
+                android:gravity="center"/>
+
+        </LinearLayout>
+
+        <!-- Middle section - 6/8 of screen (Message content) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="6"
+            android:orientation="vertical"
+            android:gravity="center_horizontal|top"
+            android:paddingTop="40dp">
 
             <!-- Reminder title -->
             <TextView
@@ -48,7 +58,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Reminder: Title"
-                android:textSize="20sp"
+                android:textSize="22sp"
                 android:textStyle="bold"
                 android:textColor="#000000"
                 android:gravity="center"
@@ -68,7 +78,7 @@
 
         </LinearLayout>
 
-        <!-- Bottom section - 1/5 of screen -->
+        <!-- Bottom section - 1/8 of screen (OK button) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -91,19 +101,30 @@
 
     </LinearLayout>
 
-    <!-- Transparent barrier overlay (swipe down to dismiss) -->
+    <!-- Semi-transparent barrier overlay that blocks all clicks -->
     <FrameLayout
         android:id="@+id/barrier_overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#AA000000"
-        android:clickable="true">
+        android:background="#66000000"
+        android:clickable="true"
+        android:focusable="true"/>
 
-        <!-- Lock icon and arrow centered -->
+    <!-- Draggable circle barrier (1/4 screen diameter) -->
+    <FrameLayout
+        android:id="@+id/draggable_circle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal|top"
+        android:layout_marginTop="150dp"
+        android:background="@drawable/draggable_circle"
+        android:clickable="false"
+        android:focusable="false">
+
+        <!-- Lock icon and arrow inside circle -->
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
+            android:layout_width="200dp"
+            android:layout_height="200dp"
             android:orientation="vertical"
             android:gravity="center">
 
@@ -112,18 +133,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="🔒"
-                android:textSize="80sp"
-                android:gravity="center"
-                android:layout_marginBottom="24dp"/>
-
-            <!-- Down arrow -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="⬇"
                 android:textSize="60sp"
-                android:textColor="#FFFFFF"
-                android:gravity="center"/>
+                android:gravity="center"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- Down arrow (wide) -->
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/ic_arrow_down_wide"
+                android:contentDescription="Drag down"/>
 
         </LinearLayout>
 
