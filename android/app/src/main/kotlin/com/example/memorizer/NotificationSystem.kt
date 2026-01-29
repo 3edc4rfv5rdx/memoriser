@@ -1187,7 +1187,7 @@ class NotificationReceiver : BroadcastReceiver() {
                     return
                 }
 
-                val itemTitle = if (itemData.title.isNotEmpty()) "Reminder: ${itemData.title}" else title
+                val itemTitle = if (itemData.title.isNotEmpty()) itemData.title else title
                 val itemContent = itemData.content.ifEmpty { body }
 
                 // Get default sound from app settings (not from item)

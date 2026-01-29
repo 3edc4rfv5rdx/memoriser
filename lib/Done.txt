@@ -1,3 +1,51 @@
+  + Active flag for reminders (quick enable/disable):
+    - Per-item "active" flag with checkbox on main screen
+    - DB version 14: 'active' column (INTEGER DEFAULT 1)
+    - Checkbox displayed in leading area for items with any reminder type
+    - Green checkbox appears left of title (not conflicting with priority stars)
+    - Priority stars moved to title row on right side
+    - Toggle changes 'active' field in database
+    - NotificationSystem checks active flag before showing notification/alert
+    - Inactive reminders (active=0) are skipped silently
+    - Reschedules next occurrence for daily reminders even when inactive
+    - Works for all reminder types: one-time, daily, monthly, yearly
+    - Localization: ru/ua for "Reminder activated", "Reminder deactivated"
+
+  + Fullscreen alert redesign (draggable circle barrier):
+    - Layout: 1/8 (Memorizer+time) + 6/8 (content raised) + 1/8 (OK button)
+    - Text split into 3 lines with increasing size:
+      * Line 1: "Reminder:" label (18sp)
+      * Line 2: Title (26sp bold)
+      * Line 3: Content (30sp) - largest
+    - Draggable circle barrier (200dp diameter, #AA000000)
+      * Semi-transparent black oval with lock emoji 🔒 and wide down arrow
+      * Positioned higher (150dp from top) instead of center
+      * Drag gesture: must drag down 400+ pixels to dismiss
+      * Snap back animation if drag < 400px
+    - Full-screen semi-transparent barrier overlay (#66000000)
+      * Blocks all clicks to OK button until circle dismissed
+      * Both overlay and circle fade out together when threshold reached
+    - Wide vector arrow drawable (ic_arrow_down_wide.xml) instead of emoji
+    - Touch listener removed after dismissal to stop consuming events
+    - Title no longer includes "Reminder:" prefix (now separate line)
+
+  + Bug fixes:
+    - Settings sound picker: Added missing custom sounds section and "Choose file" option
+      * Import file_picker in settings.dart
+      * Added getCustomSounds() call and custom sounds list in dialog
+      * Added _pickSoundFile() function with FilePicker integration
+      * Copies selected file to Sounds directory via copySoundFile()
+    - Camera/gallery photo capture: Fixed Permission denied error
+      * Modified getDocumentsDirectory() with fallback to app-specific storage
+      * Added try/catch with write access test to Documents/Memorizer/Photo
+      * Falls back to getApplicationDocumentsDirectory() on permission denial
+      * Added requestLegacyExternalStorage/preserveLegacyExternalStorage to manifest
+      * Added detailed logging in _takePicture() for debugging
+    - Fullscreen alert OK button: Fixed accessibility without barrier dismissal
+      * Added full-screen barrier overlay (clickable/focusable) to block button
+      * Draggable circle set to non-clickable/non-focusable
+      * OK button only accessible after circle dragged and barriers dismissed
+
   + Fullscreen alert windows for reminders:
     - Per-item checkbox "Fullscreen alert" in reminder section
     - DB version 13: 'fullscreen' column (INTEGER DEFAULT 0)
