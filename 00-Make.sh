@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="test - add full/lock screen"
+COMMENT="add full/lock screen"
 #
 GLOBVERS='0.9'
 VER=''
