@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FB8500">
+
+    <!-- Main content -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/alert_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Reminder"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- Content -->
+        <TextView
+            android:id="@+id/alert_content"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="20sp"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:layout_marginBottom="40dp"/>
+
+        <!-- OK Button -->
+        <Button
+            android:id="@+id/alert_ok_button"
+            android:layout_width="200dp"
+            android:layout_height="60dp"
+            android:text="OK"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:backgroundTint="#023047"
+            android:textColor="#FFFFFF"/>
+
+    </LinearLayout>
+
+    <!-- Transparent barrier overlay (swipe down to dismiss) -->
+    <FrameLayout
+        android:id="@+id/barrier_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#AA000000"
+        android:clickable="true">
+
+        <!-- Hint text -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⬇ Swipe down to access button"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:layout_gravity="center_horizontal|top"
+            android:layout_marginTop="100dp"/>
+
+    </FrameLayout>
+
+</FrameLayout>

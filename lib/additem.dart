@@ -60,6 +60,9 @@ class _EditItemPageState extends State<EditItemPage> {
   String? _dailySound; // For daily reminders
   List<Map<String, String>> _systemSounds = [];
 
+  // Fullscreen alert field
+  bool _fullscreen = false;
+
   // List of tags for dropdown
   List<Map<String, dynamic>> _tagsWithCounts = [];
 
@@ -187,6 +190,9 @@ class _EditItemPageState extends State<EditItemPage> {
         _sound = item['sound'];
         _dailySound = item['daily_sound'];
 
+        // Load fullscreen field
+        _fullscreen = item['fullscreen'] == 1;
+
         // If daily sound is empty and daily is enabled, get default from settings
         if (_dailySound == null && _daily) {
           _dailySound = await SimpleNotifications.getDefaultDailySound();
@@ -302,6 +308,7 @@ class _EditItemPageState extends State<EditItemPage> {
     final removeValue = _removeAfterReminder ? 1 : 0;
     final yearlyValue = _yearly ? 1 : 0; // NEW: Yearly field
     final monthlyValue = _monthly ? 1 : 0; // NEW: Monthly field
+    final fullscreenValue = _fullscreen ? 1 : 0; // Fullscreen field
 
     // Daily reminder fields
     final dailyValue = _daily ? 1 : 0;
@@ -347,6 +354,7 @@ class _EditItemPageState extends State<EditItemPage> {
             'daily_days': dailyDaysValue,
             'sound': _sound,
             'daily_sound': _dailySound,
+            'fullscreen': fullscreenValue,
             'photo': photoData,
           },
           where: 'id = ?',
@@ -390,6 +398,7 @@ class _EditItemPageState extends State<EditItemPage> {
           'daily_days': dailyDaysValue,
           'sound': _sound,
           'daily_sound': _dailySound,
+          'fullscreen': fullscreenValue,
           'photo': null, // Will update after moving photos
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -857,6 +866,12 @@ class _EditItemPageState extends State<EditItemPage> {
                 SizedBox(height: 12),
                 _buildSoundSelector(isDaily: true),
               ],
+
+              // Fullscreen alert checkbox (shown for both one-time and daily reminders)
+              if (_remind || _daily) ...[
+                SizedBox(height: 10),
+                _buildFullscreenSelector(),
+              ],
             ],
           ],
         ),
@@ -981,6 +996,41 @@ class _EditItemPageState extends State<EditItemPage> {
               color: (_yearly || _monthly || !_remind) ? clText.withValues(alpha: 0.5) : clText,
               fontSize: fsMedium,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Widget for fullscreen alert selector
+  Widget _buildFullscreenSelector() {
+    final bool reminderActive = _remind || _daily;
+    return GestureDetector(
+      onLongPress: () => showHelp(44),
+      child: Row(
+        children: [
+          Checkbox(
+            value: _fullscreen,
+            activeColor: Colors.deepOrange,
+            checkColor: clText,
+            onChanged: reminderActive ? (value) {
+              setState(() {
+                _fullscreen = value ?? false;
+              });
+            } : null,
+          ),
+          Text(
+            lw('Fullscreen alert'),
+            style: TextStyle(
+              color: reminderActive ? clText : clText.withValues(alpha: 0.5),
+              fontSize: fsMedium,
+            ),
+          ),
+          SizedBox(width: 4),
+          Icon(
+            Icons.fullscreen,
+            color: reminderActive ? Colors.deepOrange : Colors.deepOrange.withValues(alpha: 0.5),
+            size: 16,
           ),
         ],
       ),

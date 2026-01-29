@@ -23,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 12, // Increased from 11 to 12 for monthly field
+    version: 13, // Increased from 12 to 13 for fullscreen field
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -45,7 +45,8 @@ Future<void> initDatabases() async {
           daily_times TEXT DEFAULT NULL,
           daily_days INTEGER DEFAULT 127,
           daily_sound TEXT DEFAULT NULL,
-          sound TEXT DEFAULT NULL
+          sound TEXT DEFAULT NULL,
+          fullscreen INTEGER DEFAULT 0
         )
       ''');
     },
@@ -140,6 +141,12 @@ Future<void> initDatabases() async {
         // Migration for version 12 - add monthly field for monthly repeating reminders
         await db.execute('ALTER TABLE items ADD COLUMN monthly INTEGER DEFAULT 0');
         myPrint("Database upgraded to version 12: Added 'monthly' field");
+      }
+
+      if (oldVersion < 13) {
+        // Migration for version 13 - add fullscreen field for fullscreen alert windows
+        await db.execute('ALTER TABLE items ADD COLUMN fullscreen INTEGER DEFAULT 0');
+        myPrint("Database upgraded to version 13: Added 'fullscreen' field");
       }
     },
   );

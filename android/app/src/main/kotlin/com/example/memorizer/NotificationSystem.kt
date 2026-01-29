@@ -693,11 +693,16 @@ class NotificationReceiver : BroadcastReceiver() {
             val itemContent = itemData.content.ifEmpty { body }
             val itemSound = itemData.dailySound
 
-            // Create notification channel for daily reminders with custom sound
-            val channelId = createDailyNotificationChannel(context, itemSound)
+            // Check if fullscreen alert is enabled
+            if (itemData.fullscreen == 1) {
+                launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound)
+            } else {
+                // Create notification channel for daily reminders with custom sound
+                val channelId = createDailyNotificationChannel(context, itemSound)
 
-            // Show notification (later can be replaced with dialog activity)
-            showDailyNotification(context, itemId, hour, minute, itemTitle, itemContent, itemSound, channelId)
+                // Show notification
+                showDailyNotification(context, itemId, hour, minute, itemTitle, itemContent, itemSound, channelId)
+            }
 
             // Reschedule for next occurrence
             rescheduleNextDailyReminder(context, itemId, hour, minute, daysMask, title, body)
@@ -1169,13 +1174,18 @@ class NotificationReceiver : BroadcastReceiver() {
                 // Get default sound from app settings (not from item)
                 val defaultSound = getDefaultSound(context)
 
-                // Create notification channel with sound from settings
-                val channelId = createReminderNotificationChannel(context, defaultSound)
+                // Check if fullscreen alert is enabled
+                if (itemData.fullscreen == 1) {
+                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, defaultSound)
+                } else {
+                    // Create notification channel with sound from settings
+                    val channelId = createReminderNotificationChannel(context, defaultSound)
 
-                // Show notification with the channel
-                showEventNotification(context, itemId, itemTitle, itemContent, itemId, channelId)
+                    // Show notification with the channel
+                    showEventNotification(context, itemId, itemTitle, itemContent, itemId, channelId)
 
-                Log.d("MemorizerApp", "Specific reminder shown for item $itemId with channel $channelId, sound: $defaultSound")
+                    Log.d("MemorizerApp", "Specific reminder shown for item $itemId with channel $channelId, sound: $defaultSound")
+                }
             } else {
                 Log.d("MemorizerApp", "Item $itemId no longer exists or reminder disabled, skipping notification")
             }
@@ -1185,8 +1195,15 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Data class for item data with sound
-    data class ItemData(val title: String, val content: String, val sound: String?, val dailySound: String?)
+    // Data class for item data with sound and fullscreen
+    data class ItemData(
+        val title: String,
+        val content: String,
+        val sound: String?,
+        val dailySound: String?,
+        val hidden: Int,
+        val fullscreen: Int
+    )
 
     // Decode Base64 obfuscated text (same logic as Flutter's deobfuscateText)
     private fun deobfuscateText(encodedText: String): String {
@@ -1206,16 +1223,16 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Get item data from database including sound and daily_sound
+    // Get item data from database including sound, daily_sound, hidden, and fullscreen
     private fun getItemData(context: Context, itemId: Int): ItemData {
         return try {
             val dbPath = context.getDatabasePath("memorizer.db")
-            if (!dbPath.exists()) return ItemData("", "", null, null)
+            if (!dbPath.exists()) return ItemData("", "", null, null, 0, 0)
 
             val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
 
             val cursor = db.rawQuery(
-                "SELECT title, content, sound, daily_sound, hidden FROM items WHERE id = ?",
+                "SELECT title, content, sound, daily_sound, hidden, fullscreen FROM items WHERE id = ?",
                 arrayOf(itemId.toString())
             )
 
@@ -1225,6 +1242,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 val sound = cursor.getString(2)
                 val dailySound = cursor.getString(3)
                 val hidden = cursor.getInt(4)
+                val fullscreen = cursor.getInt(5)
 
                 // Decode hidden items for notifications (always show readable text in notifications)
                 if (hidden == 1) {
@@ -1232,9 +1250,9 @@ class NotificationReceiver : BroadcastReceiver() {
                     content = deobfuscateText(content)
                 }
 
-                ItemData(title, content, sound, dailySound)
+                ItemData(title, content, sound, dailySound, hidden, fullscreen)
             } else {
-                ItemData("", "", null, null)
+                ItemData("", "", null, null, 0, 0)
             }
 
             cursor.close()
@@ -1242,7 +1260,7 @@ class NotificationReceiver : BroadcastReceiver() {
             result
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error getting item data: ${e.message}")
-            ItemData("", "", null, null)
+            ItemData("", "", null, null, 0, 0)
         }
     }
 
@@ -1271,6 +1289,31 @@ class NotificationReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error checking if item is active: ${e.message}")
             false
+        }
+    }
+
+    // Launch fullscreen alert activity
+    private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?) {
+        try {
+            val intent = Intent(context, FullScreenAlertActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("itemId", itemId)
+                putExtra("title", title)
+                putExtra("content", content)
+                putExtra("sound", soundValue)
+            }
+            context.startActivity(intent)
+            Log.d("MemorizerApp", "Launched fullscreen alert for item $itemId")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error launching fullscreen alert: ${e.message}")
+            // Fallback to notification if fullscreen launch fails
+            try {
+                val channelId = createReminderNotificationChannel(context, soundValue)
+                showEventNotification(context, itemId, title, content, itemId, channelId)
+                Log.d("MemorizerApp", "Fallback: Showed notification instead of fullscreen alert")
+            } catch (fallbackException: Exception) {
+                Log.e("MemorizerApp", "Fallback notification also failed: ${fallbackException.message}")
+            }
         }
     }
 
