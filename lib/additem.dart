@@ -331,6 +331,8 @@ class _EditItemPageState extends State<EditItemPage> {
     }
 
     try {
+      myPrint("Saving item - fullscreen: $_fullscreen (value: $fullscreenValue)");
+
       if (widget.itemId != null) {
         // Update existing item - photos are already in item_X directory
         final photoData = encodePhotoPaths(_photoPaths);
@@ -360,7 +362,7 @@ class _EditItemPageState extends State<EditItemPage> {
           where: 'id = ?',
           whereArgs: [widget.itemId],
         );
-        myPrint("Item updated: ${widget.itemId} - $titleText - Photos: ${_photoPaths.length}");
+        myPrint("Item updated: ${widget.itemId} - $titleText - fullscreen: $fullscreenValue - Photos: ${_photoPaths.length}");
 
         // Update/cancel specific reminder for this item
         await SimpleNotifications.updateSpecificReminder(
@@ -403,7 +405,7 @@ class _EditItemPageState extends State<EditItemPage> {
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-        myPrint("Item inserted with ID: $insertedId");
+        myPrint("Item inserted with ID: $insertedId - fullscreen: $fullscreenValue");
 
         // Move photos from temp directory to item directory
         if (_currentPhotoDir != null && _photoPaths.isNotEmpty) {

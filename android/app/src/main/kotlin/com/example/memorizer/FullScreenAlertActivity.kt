@@ -33,6 +33,8 @@ class FullScreenAlertActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        Log.d("MemorizerApp", "FullScreenAlertActivity.onCreate() called")
+
         // Setup window flags for lock screen display
         setupWindowFlags()
 
@@ -43,6 +45,17 @@ class FullScreenAlertActivity : Activity() {
         val title = intent.getStringExtra("title") ?: "Reminder"
         val content = intent.getStringExtra("content") ?: ""
         val soundValue = intent.getStringExtra("sound")
+
+        Log.d("MemorizerApp", "FullScreenAlert - itemId: $itemId, title: $title, sound: $soundValue")
+
+        // Cancel the notification now that fullscreen is shown
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.cancel(itemId)
+            Log.d("MemorizerApp", "Cancelled notification for item $itemId")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error cancelling notification: ${e.message}")
+        }
 
         // Set text in views
         findViewById<TextView>(R.id.alert_title).text = title
@@ -150,6 +163,8 @@ class FullScreenAlertActivity : Activity() {
                 }
             }
 
+            Log.d("MemorizerApp", "Starting to play sound: $soundValue, URI: $soundUri")
+
             mediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -161,13 +176,22 @@ class FullScreenAlertActivity : Activity() {
                 prepare()
                 start()
 
+                val duration = this.duration
+                Log.d("MemorizerApp", "Sound started playing, duration: $duration ms")
+
                 setOnCompletionListener {
+                    Log.d("MemorizerApp", "Sound playback completed")
                     release()
                     mediaPlayer = null
                 }
+
+                setOnErrorListener { mp, what, extra ->
+                    Log.e("MemorizerApp", "MediaPlayer error: what=$what, extra=$extra")
+                    false
+                }
             }
 
-            Log.d("MemorizerApp", "Playing sound: $soundValue")
+            Log.d("MemorizerApp", "MediaPlayer created and started")
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error playing sound: ${e.message}")
             // Continue without sound if error occurs
@@ -178,9 +202,11 @@ class FullScreenAlertActivity : Activity() {
      * Dismiss the alert activity
      */
     private fun dismissAlert() {
+        Log.d("MemorizerApp", "dismissAlert() called")
         try {
             // Stop and release media player
             mediaPlayer?.let {
+                Log.d("MemorizerApp", "Stopping MediaPlayer, isPlaying: ${it.isPlaying}")
                 if (it.isPlaying) {
                     it.stop()
                 }
@@ -192,6 +218,7 @@ class FullScreenAlertActivity : Activity() {
         }
 
         finish()
+        Log.d("MemorizerApp", "FullScreenAlertActivity finished")
     }
 
     /**

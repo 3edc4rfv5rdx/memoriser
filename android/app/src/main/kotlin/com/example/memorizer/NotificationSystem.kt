@@ -693,10 +693,14 @@ class NotificationReceiver : BroadcastReceiver() {
             val itemContent = itemData.content.ifEmpty { body }
             val itemSound = itemData.dailySound
 
+            Log.d("MemorizerApp", "Daily reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}")
+
             // Check if fullscreen alert is enabled
             if (itemData.fullscreen == 1) {
+                Log.d("MemorizerApp", "Fullscreen is ENABLED for daily reminder $itemId, launching fullscreen alert")
                 launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound)
             } else {
+                Log.d("MemorizerApp", "Fullscreen is DISABLED for daily reminder $itemId, showing notification")
                 // Create notification channel for daily reminders with custom sound
                 val channelId = createDailyNotificationChannel(context, itemSound)
 
@@ -1174,10 +1178,14 @@ class NotificationReceiver : BroadcastReceiver() {
                 // Get default sound from app settings (not from item)
                 val defaultSound = getDefaultSound(context)
 
+                Log.d("MemorizerApp", "Specific reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}")
+
                 // Check if fullscreen alert is enabled
                 if (itemData.fullscreen == 1) {
+                    Log.d("MemorizerApp", "Fullscreen is ENABLED for specific reminder $itemId, launching fullscreen alert")
                     launchFullscreenAlert(context, itemId, itemTitle, itemContent, defaultSound)
                 } else {
+                    Log.d("MemorizerApp", "Fullscreen is DISABLED for specific reminder $itemId, showing notification")
                     // Create notification channel with sound from settings
                     val channelId = createReminderNotificationChannel(context, defaultSound)
 
@@ -1244,6 +1252,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 val hidden = cursor.getInt(4)
                 val fullscreen = cursor.getInt(5)
 
+                Log.d("MemorizerApp", "getItemData($itemId): fullscreen=$fullscreen, title=$title")
+
                 // Decode hidden items for notifications (always show readable text in notifications)
                 if (hidden == 1) {
                     title = deobfuscateText(title)
@@ -1252,6 +1262,7 @@ class NotificationReceiver : BroadcastReceiver() {
 
                 ItemData(title, content, sound, dailySound, hidden, fullscreen)
             } else {
+                Log.d("MemorizerApp", "getItemData($itemId): Item not found in database")
                 ItemData("", "", null, null, 0, 0)
             }
 
@@ -1292,18 +1303,70 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Launch fullscreen alert activity
+    // Launch fullscreen alert activity using full-screen intent notification
     private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?) {
         try {
-            val intent = Intent(context, FullScreenAlertActivity::class.java).apply {
+            // Check if we can use full-screen intents (Android 10+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                if (!notificationManager.canUseFullScreenIntent()) {
+                    Log.w("MemorizerApp", "Cannot use full-screen intent - permission not granted")
+                }
+            }
+            // Create intent for the fullscreen activity
+            val fullScreenIntent = Intent(context, FullScreenAlertActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 putExtra("itemId", itemId)
                 putExtra("title", title)
                 putExtra("content", content)
                 putExtra("sound", soundValue)
             }
-            context.startActivity(intent)
-            Log.d("MemorizerApp", "Launched fullscreen alert for item $itemId")
+
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                context,
+                itemId,
+                fullScreenIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Create notification channel for fullscreen alerts (without sound - sound plays in Activity)
+            val channelId = "fullscreen_alerts"
+            val channel = NotificationChannel(
+                channelId,
+                "Fullscreen Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Fullscreen reminder alerts"
+                setShowBadge(false)
+                enableVibration(false)
+                setSound(null, null) // No sound in notification - Activity will play it
+                setBypassDnd(true)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+            }
+
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+
+            // Build notification with full-screen intent (no sound - Activity plays it)
+            val notification = NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setAutoCancel(true)
+                .setOngoing(false)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setSound(null) // No sound - Activity will play it
+                .build()
+
+            notificationManager.notify(itemId, notification)
+
+            // Note: Notification will be cancelled by FullScreenAlertActivity when it opens
+            // Don't auto-cancel here to avoid interrupting Activity startup
+
+            Log.d("MemorizerApp", "Launched fullscreen alert via notification for item $itemId")
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error launching fullscreen alert: ${e.message}")
             // Fallback to notification if fullscreen launch fails
