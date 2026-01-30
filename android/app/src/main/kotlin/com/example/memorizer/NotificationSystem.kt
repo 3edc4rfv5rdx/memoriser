@@ -1199,6 +1199,110 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
+    // Reschedule recurring reminder (yearly or monthly)
+    private fun rescheduleRecurringReminder(context: Context, itemId: Int, itemData: ItemData) {
+        try {
+            if (itemData.date == null) {
+                Log.e("MemorizerApp", "Cannot reschedule recurring reminder for item $itemId - no date")
+                return
+            }
+
+            // Parse original date (YYYYMMDD)
+            val originalYear = itemData.date / 10000
+            val originalMonth = (itemData.date % 10000) / 100
+            val originalDay = itemData.date % 100
+
+            // Get time (HH and MM)
+            val hour = itemData.time?.let { it / 100 } ?: 9
+            val minute = itemData.time?.let { it % 100 } ?: 30
+
+            // Calculate next occurrence
+            val calendar = Calendar.getInstance()
+
+            if (itemData.yearly == 1) {
+                // Yearly: same month and day, next year
+                calendar.set(Calendar.YEAR, calendar.get(Calendar.YEAR) + 1)
+                calendar.set(Calendar.MONTH, originalMonth - 1)
+                calendar.set(Calendar.DAY_OF_MONTH, originalDay)
+                Log.d("MemorizerApp", "Rescheduling YEARLY reminder for item $itemId to next year")
+            } else if (itemData.monthly == 1) {
+                // Monthly: same day, next month
+                calendar.add(Calendar.MONTH, 1)
+                calendar.set(Calendar.DAY_OF_MONTH, originalDay)
+                Log.d("MemorizerApp", "Rescheduling MONTHLY reminder for item $itemId to next month")
+            } else {
+                Log.d("MemorizerApp", "Item $itemId is not recurring, skipping reschedule")
+                return
+            }
+
+            calendar.set(Calendar.HOUR_OF_DAY, hour)
+            calendar.set(Calendar.MINUTE, minute)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+
+            // Schedule the next occurrence
+            val nextYear = calendar.get(Calendar.YEAR)
+            val nextMonth = calendar.get(Calendar.MONTH) + 1
+            val nextDay = calendar.get(Calendar.DAY_OF_MONTH)
+
+            // Create intent for next reminder
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.SPECIFIC_REMINDER"
+                putExtra("itemId", itemId)
+                putExtra("title", "Memorizer")
+                putExtra("body", "Reminder")
+            }
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                itemId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            if (calendar.timeInMillis > System.currentTimeMillis()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+            }
+
+            // Update date in database for next occurrence
+            try {
+                val dbPath = context.getDatabasePath("memorizer.db")
+                val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READWRITE)
+
+                val newDate = nextYear * 10000 + nextMonth * 100 + nextDay
+                val values = ContentValues().apply {
+                    put("date", newDate)
+                }
+                db.update("items", values, "id = ?", arrayOf(itemId.toString()))
+                db.close()
+
+                Log.d("MemorizerApp", "Updated database date for item $itemId to $newDate")
+            } catch (dbError: Exception) {
+                Log.e("MemorizerApp", "Error updating database date: ${dbError.message}")
+            }
+
+            Log.d("MemorizerApp", "Recurring reminder rescheduled for item $itemId: $nextYear-$nextMonth-$nextDay $hour:$minute")
+
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error rescheduling recurring reminder: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
     // Handle specific reminder
     private fun handleSpecificReminder(context: Context, intent: Intent) {
         try {
@@ -1231,7 +1335,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 // Get default sound from app settings (not from item)
                 val defaultSound = getDefaultSound(context)
 
-                Log.d("MemorizerApp", "Specific reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}, active: ${itemData.active}")
+                Log.d("MemorizerApp", "Specific reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}, active: ${itemData.active}, yearly: ${itemData.yearly}, monthly: ${itemData.monthly}")
 
                 // Check if fullscreen alert is enabled
                 if (itemData.fullscreen == 1) {
@@ -1247,6 +1351,11 @@ class NotificationReceiver : BroadcastReceiver() {
 
                     Log.d("MemorizerApp", "Specific reminder shown for item $itemId with channel $channelId, sound: $defaultSound")
                 }
+
+                // Reschedule if yearly or monthly
+                if (itemData.yearly == 1 || itemData.monthly == 1) {
+                    rescheduleRecurringReminder(context, itemId, itemData)
+                }
             } else {
                 Log.d("MemorizerApp", "Item $itemId no longer exists or reminder disabled, skipping notification")
             }
@@ -1256,7 +1365,7 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Data class for item data with sound, fullscreen, and active
+    // Data class for item data with sound, fullscreen, active, yearly, monthly
     data class ItemData(
         val title: String,
         val content: String,
@@ -1264,7 +1373,11 @@ class NotificationReceiver : BroadcastReceiver() {
         val dailySound: String?,
         val hidden: Int,
         val fullscreen: Int,
-        val active: Int
+        val active: Int,
+        val yearly: Int,
+        val monthly: Int,
+        val date: Int?,
+        val time: Int?
     )
 
     // Decode Base64 obfuscated text (same logic as Flutter's deobfuscateText)
@@ -1285,16 +1398,16 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Get item data from database including sound, daily_sound, hidden, fullscreen, and active
+    // Get item data from database including sound, daily_sound, hidden, fullscreen, active, yearly, monthly, date, time
     private fun getItemData(context: Context, itemId: Int): ItemData {
         return try {
             val dbPath = context.getDatabasePath("memorizer.db")
-            if (!dbPath.exists()) return ItemData("", "", null, null, 0, 0, 1)
+            if (!dbPath.exists()) return ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null)
 
             val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
 
             val cursor = db.rawQuery(
-                "SELECT title, content, sound, daily_sound, hidden, fullscreen, active FROM items WHERE id = ?",
+                "SELECT title, content, sound, daily_sound, hidden, fullscreen, active, yearly, monthly, date, time FROM items WHERE id = ?",
                 arrayOf(itemId.toString())
             )
 
@@ -1306,8 +1419,12 @@ class NotificationReceiver : BroadcastReceiver() {
                 val hidden = cursor.getInt(4)
                 val fullscreen = cursor.getInt(5)
                 val active = cursor.getInt(6)
+                val yearly = cursor.getInt(7)
+                val monthly = cursor.getInt(8)
+                val date = if (cursor.isNull(9)) null else cursor.getInt(9)
+                val time = if (cursor.isNull(10)) null else cursor.getInt(10)
 
-                Log.d("MemorizerApp", "getItemData($itemId): fullscreen=$fullscreen, active=$active, title=$title")
+                Log.d("MemorizerApp", "getItemData($itemId): fullscreen=$fullscreen, active=$active, yearly=$yearly, monthly=$monthly, title=$title")
 
                 // Decode hidden items for notifications (always show readable text in notifications)
                 if (hidden == 1) {
@@ -1315,10 +1432,10 @@ class NotificationReceiver : BroadcastReceiver() {
                     content = deobfuscateText(content)
                 }
 
-                ItemData(title, content, sound, dailySound, hidden, fullscreen, active)
+                ItemData(title, content, sound, dailySound, hidden, fullscreen, active, yearly, monthly, date, time)
             } else {
                 Log.d("MemorizerApp", "getItemData($itemId): Item not found in database")
-                ItemData("", "", null, null, 0, 0, 1)
+                ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null)
             }
 
             cursor.close()
@@ -1326,7 +1443,7 @@ class NotificationReceiver : BroadcastReceiver() {
             result
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error getting item data: ${e.message}")
-            ItemData("", "", null, null, 0, 0, 1)
+            ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null)
         }
     }
 

@@ -43,6 +43,7 @@ class _EditItemPageState extends State<EditItemPage> {
   DateTime? _date;
   int _priority = 0; // Default priority value
   bool _remind = false; // Default remind value
+  bool _active = true; // Default active value for reminders
   bool _hidden = false; // Default hidden value for privacy feature
   bool _isLoading = false; // Loading indicator
   bool _removeAfterReminder = false; // Default value for auto-remove
@@ -176,6 +177,7 @@ class _EditItemPageState extends State<EditItemPage> {
         // Initialize other fields
         _priority = item['priority'] ?? 0;
         _remind = item['remind'] == 1;
+        _active = item['active'] == 1;
         _hidden = item['hidden'] == 1;
         _removeAfterReminder = item['remove'] == 1;
         _yearly = item['yearly'] == 1; // NEW: Load yearly field
@@ -304,6 +306,7 @@ class _EditItemPageState extends State<EditItemPage> {
     // Convert date to YYYYMMDD format for storage
     final dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
     final remindValue = _remind ? 1 : 0;
+    final activeValue = _active ? 1 : 0;
     final hiddenValue = _hidden ? 1 : 0;
     final removeValue = _removeAfterReminder ? 1 : 0;
     final yearlyValue = _yearly ? 1 : 0; // NEW: Yearly field
@@ -347,6 +350,7 @@ class _EditItemPageState extends State<EditItemPage> {
             'date': dateValue,
             'time': timeValue,
             'remind': remindValue,
+            'active': activeValue,
             'hidden': hiddenValue,
             'remove': removeValue,
             'yearly': yearlyValue,
@@ -391,6 +395,7 @@ class _EditItemPageState extends State<EditItemPage> {
           'date': dateValue,
           'time': timeValue,
           'remind': remindValue,
+          'active': activeValue,
           'hidden': hiddenValue,
           'remove': removeValue,
           'yearly': yearlyValue,
@@ -713,78 +718,58 @@ class _EditItemPageState extends State<EditItemPage> {
   Widget _buildPrioritySelector() {
     return GestureDetector(
       onLongPress: () => showHelp(34), // ID 34 для всех элементов приоритета
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
           // Label for priority
           Text(
-            lw('Priority (0-3)'),
+            lw('Priority'),
             style: TextStyle(color: clText, fontSize: fsMedium),
           ),
-          SizedBox(height: 8),
-          // Single row containing all elements
-          Row(
-            children: [
-              // LEFT SIDE: Minus button with upbar color
-              ElevatedButton(
-                onPressed:
-                    _priority > 0 ? () => setState(() => _priority--) : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: clUpBar,
-                  foregroundColor: clText,
-                  shape: CircleBorder(),
-                  padding: EdgeInsets.all(8),
-                  minimumSize: Size(36, 36),
-                ),
-                child: Icon(Icons.remove, size: 20),
+          SizedBox(width: 12),
+          // Minus button with upbar color
+          ElevatedButton(
+            onPressed:
+                _priority > 0 ? () => setState(() => _priority--) : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: clUpBar,
+              foregroundColor: clText,
+              shape: CircleBorder(),
+              padding: EdgeInsets.all(8),
+              minimumSize: Size(36, 36),
+            ),
+            child: Icon(Icons.remove, size: 20),
+          ),
+          Container(
+            width: 40,
+            height: 40,
+            margin: EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: clFill,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: clUpBar),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              _priority.toString(),
+              style: TextStyle(
+                color: clText,
+                fontSize: fsMedium,
+                fontWeight: fwBold,
               ),
-              Container(
-                width: 40,
-                height: 40,
-                margin: EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: clFill,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: clUpBar),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _priority.toString(),
-                  style: TextStyle(
-                    color: clText,
-                    fontSize: fsMedium,
-                    fontWeight: fwBold,
-                  ),
-                ),
-              ),
-              // Plus button with upbar color
-              ElevatedButton(
-                onPressed:
-                    _priority < 3 ? () => setState(() => _priority++) : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: clUpBar,
-                  foregroundColor: clText,
-                  shape: CircleBorder(),
-                  padding: EdgeInsets.all(8),
-                  minimumSize: Size(36, 36),
-                ),
-                child: Icon(Icons.add, size: 20),
-              ),
-
-              // MIDDLE: Stars moved to center with expanded space on both sides
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(3, (index) {
-                    return Icon(
-                      Icons.star,
-                      color: index < _priority ? clUpBar : clFill,
-                      size: 34, // Larger stars
-                    );
-                  }),
-                ),
-              ),
-            ],
+            ),
+          ),
+          // Plus button with upbar color
+          ElevatedButton(
+            onPressed:
+                _priority < 3 ? () => setState(() => _priority++) : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: clUpBar,
+              foregroundColor: clText,
+              shape: CircleBorder(),
+              padding: EdgeInsets.all(8),
+              minimumSize: Size(36, 36),
+            ),
+            child: Icon(Icons.add, size: 20),
           ),
         ],
       ),
@@ -852,7 +837,29 @@ class _EditItemPageState extends State<EditItemPage> {
 
             // Show options only when reminder is enabled
             if (reminderEnabled) ...[
-              SizedBox(height: 12),
+              // Active checkbox on separate line
+              Row(
+                children: [
+                  Checkbox(
+                    value: _active,
+                    activeColor: Colors.green,
+                    checkColor: clText,
+                    onChanged: (value) {
+                      setState(() {
+                        _active = value ?? true;
+                      });
+                    },
+                  ),
+                  Text(
+                    lw('Active'),
+                    style: TextStyle(
+                      color: clText,
+                      fontSize: fsMedium,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
 
               // One-time / Daily toggle
               _buildReminderTypeToggle(),
@@ -865,8 +872,10 @@ class _EditItemPageState extends State<EditItemPage> {
                 SizedBox(height: 10),
                 _buildTimeOptions(),
                 SizedBox(height: 10),
+                _buildFullscreenSelector(),
+                SizedBox(height: 4),
                 _buildRepeatSelector(),
-                SizedBox(height: 10),
+                SizedBox(height: 4),
                 _buildRemoveAfterReminderSelector(),
                 // Sound for one-time reminders is taken from app Settings
               ],
@@ -878,10 +887,6 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildDailyDaysSection(),
                 SizedBox(height: 12),
                 _buildSoundSelector(isDaily: true),
-              ],
-
-              // Fullscreen alert checkbox (shown for both one-time and daily reminders)
-              if (_remind || _daily) ...[
                 SizedBox(height: 10),
                 _buildFullscreenSelector(),
               ],
@@ -1036,12 +1041,6 @@ class _EditItemPageState extends State<EditItemPage> {
               fontSize: fsMedium,
             ),
           ),
-          SizedBox(width: 4),
-          Icon(
-            Icons.fullscreen,
-            color: reminderActive ? Colors.deepOrange : Colors.deepOrange.withValues(alpha: 0.5),
-            size: 16,
-          ),
         ],
       ),
     );
@@ -1125,6 +1124,7 @@ class _EditItemPageState extends State<EditItemPage> {
       children: [
         Row(
           children: [
+            SizedBox(width: 40), // Shift to center
             Icon(Icons.access_time, color: clText, size: 16),
             SizedBox(width: 8),
             Text(
@@ -1132,14 +1132,21 @@ class _EditItemPageState extends State<EditItemPage> {
               style: TextStyle(color: clText, fontSize: fsNormal, fontWeight: fwBold),
             ),
             Spacer(),
-            // Add time button
-            IconButton(
-              icon: Icon(Icons.add_circle, color: clUpBar, size: 24),
-              onPressed: () => _showAddTimeDialog(),
-              tooltip: lw('Add time'),
-              padding: EdgeInsets.zero,
-              constraints: BoxConstraints(),
+            // Add time button - highlighted
+            Container(
+              decoration: BoxDecoration(
+                color: clUpBar.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: Icon(Icons.add_circle, color: clUpBar, size: 28),
+                onPressed: () => _showAddTimeDialog(),
+                tooltip: lw('Add time'),
+                padding: EdgeInsets.all(4),
+                constraints: BoxConstraints(),
+              ),
             ),
+            SizedBox(width: 40), // Balance right side
           ],
         ),
         SizedBox(height: 8),
@@ -1222,6 +1229,7 @@ class _EditItemPageState extends State<EditItemPage> {
         // Header with toggle buttons
         Row(
           children: [
+            SizedBox(width: 40), // Shift to center
             Icon(Icons.calendar_today, color: clText, size: 16),
             SizedBox(width: 8),
             Text(
@@ -1289,6 +1297,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 ),
               ),
             ),
+            SizedBox(width: 40), // Balance right side
           ],
         ),
         SizedBox(height: 12),
@@ -1317,7 +1326,7 @@ class _EditItemPageState extends State<EditItemPage> {
                       ),
                     ),
                     child: isEnabled
-                        ? Icon(Icons.check, color: clText, size: 18)
+                        ? Icon(Icons.done, color: clText, size: 22, weight: 700)
                         : null,
                   ),
                   SizedBox(height: 4),
@@ -1345,6 +1354,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
     return Row(
       children: [
+        SizedBox(width: 16), // Shift right
         Icon(Icons.volume_up, color: clText, size: 20),
         SizedBox(width: 8),
         // Hide "Sound:" label for daily reminders to save space
@@ -1359,7 +1369,7 @@ class _EditItemPageState extends State<EditItemPage> {
           child: GestureDetector(
             onTap: () => _showSoundPicker(isDaily: isDaily),
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 border: Border.all(color: clText.withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(8),
@@ -1642,60 +1652,59 @@ class _EditItemPageState extends State<EditItemPage> {
   Widget _buildDateField() {
     return GestureDetector(
       onLongPress: () => showHelp(36), // ID 36 для поля даты и кнопок
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: dateController,
-              style: TextStyle(color: clText),
-              readOnly: false,
-              // Allow manual input
-              onChanged: (value) {
-                if (value.isEmpty) {
-                  setState(() {
-                    _date = null;
-                  });
-                } else if (validateDateInput(value)) {
-                  // If valid date input, update _date
-                  setState(() {
-                    _date = DateFormat(ymdDateFormat).parse(value);
-                  });
-                }
-              },
-              decoration: InputDecoration(
-                labelText: lw('Date (YYYY-MM-DD)'),
-                labelStyle: TextStyle(color: clText),
-                fillColor: clFill,
-                filled: true,
-                border: OutlineInputBorder(),
+      child: TextField(
+        controller: dateController,
+        style: TextStyle(color: clText),
+        readOnly: false,
+        // Allow manual input
+        onChanged: (value) {
+          if (value.isEmpty) {
+            setState(() {
+              _date = null;
+            });
+          } else if (validateDateInput(value)) {
+            // If valid date input, update _date
+            setState(() {
+              _date = DateFormat(ymdDateFormat).parse(value);
+            });
+          }
+        },
+        decoration: InputDecoration(
+          labelText: lw('Date (YYYY-MM-DD)'),
+          labelStyle: TextStyle(color: clText),
+          fillColor: clFill,
+          filled: true,
+          border: OutlineInputBorder(),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.calendar_today, color: clText),
+                onPressed: () => _selectDate(context),
               ),
-            ),
+              // Clear button
+              IconButton(
+                icon: Icon(Icons.clear, color: clText),
+                onPressed: () {
+                  setState(() {
+                    dateController.clear();
+                    _date = null;
+                    // Also clear the reminder checkbox when date is cleared
+                    _remind = false;
+                    // Clear time field and radio buttons
+                    timeController.clear();
+                    _time = null;
+                    _selectedTimeOption = null;
+                    // Clear remove after reminder checkbox
+                    _removeAfterReminder = false;
+                  });
+                  // Optionally show a message that reminder was cleared
+                  okInfoBarBlue(lw('Date and reminder cleared'));
+                },
+              ),
+            ],
           ),
-          IconButton(
-            icon: Icon(Icons.calendar_today, color: clText),
-            onPressed: () => _selectDate(context),
-          ),
-          // Clear button
-          IconButton(
-            icon: Icon(Icons.clear, color: clText),
-            onPressed: () {
-              setState(() {
-                dateController.clear();
-                _date = null;
-                // Also clear the reminder checkbox when date is cleared
-                _remind = false;
-                // Clear time field and radio buttons
-                timeController.clear();
-                _time = null;
-                _selectedTimeOption = null;
-                // Clear remove after reminder checkbox
-                _removeAfterReminder = false;
-              });
-              // Optionally show a message that reminder was cleared
-              okInfoBarBlue(lw('Date and reminder cleared'));
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1704,62 +1713,61 @@ class _EditItemPageState extends State<EditItemPage> {
   Widget _buildTimeField() {
     return GestureDetector(
       onLongPress: () => showHelp(39), // ID 39 для поля времени
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: timeController,
-              style: TextStyle(color: clText),
-              readOnly: false, // Разрешаем ручной ввод
-              enabled: _remind, // Активно только если включено напоминание
-              onChanged: (value) {
-                if (value.isEmpty) {
+      child: TextField(
+        controller: timeController,
+        style: TextStyle(color: clText),
+        readOnly: false, // Разрешаем ручной ввод
+        enabled: _remind, // Активно только если включено напоминание
+        onChanged: (value) {
+          if (value.isEmpty) {
+            setState(() {
+              _time = null;
+              _selectedTimeOption = null; // Сбрасываем выбор радио-кнопок
+            });
+          } else if (isValidTimeFormat(value)) {
+            // Если ввод корректен, обновляем _time
+            setState(() {
+              _time = timeStringToInt(value);
+
+              // Проверяем, соответствует ли введенное время одному из предустановленных вариантов
+              if (_time == timeMorning) {
+                _selectedTimeOption = 0;
+              } else if (_time == timeDay) {
+                _selectedTimeOption = 1;
+              } else if (_time == timeEvening) {
+                _selectedTimeOption = 2;
+              } else {
+                _selectedTimeOption = null;
+              }
+            });
+          }
+        },
+        decoration: InputDecoration(
+          labelText: lw('Time (HH:MM)'),
+          labelStyle: TextStyle(color: _remind ? clText : clText.withValues(alpha: 0.5)),
+          fillColor: clFill,
+          filled: true,
+          border: OutlineInputBorder(),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.access_time, color: _remind ? clText : clText.withValues(alpha: 0.5)),
+                onPressed: _remind ? () => _selectTime(context) : null,
+              ),
+              IconButton(
+                icon: Icon(Icons.clear, color: _remind ? clText : clText.withValues(alpha: 0.5)),
+                onPressed: _remind ? () {
                   setState(() {
+                    timeController.clear();
                     _time = null;
                     _selectedTimeOption = null; // Сбрасываем выбор радио-кнопок
                   });
-                } else if (isValidTimeFormat(value)) {
-                  // Если ввод корректен, обновляем _time
-                  setState(() {
-                    _time = timeStringToInt(value);
-
-                    // Проверяем, соответствует ли введенное время одному из предустановленных вариантов
-                    if (_time == timeMorning) {
-                      _selectedTimeOption = 0;
-                    } else if (_time == timeDay) {
-                      _selectedTimeOption = 1;
-                    } else if (_time == timeEvening) {
-                      _selectedTimeOption = 2;
-                    } else {
-                      _selectedTimeOption = null;
-                    }
-                  });
-                }
-              },
-              decoration: InputDecoration(
-                labelText: lw('Time (HH:MM)'),
-                labelStyle: TextStyle(color: _remind ? clText : clText.withValues(alpha: 0.5)),
-                fillColor: clFill,
-                filled: true,
-                border: OutlineInputBorder(),
+                } : null,
               ),
-            ),
+            ],
           ),
-          IconButton(
-            icon: Icon(Icons.access_time, color: _remind ? clText : clText.withValues(alpha: 0.5)),
-            onPressed: _remind ? () => _selectTime(context) : null,
-          ),
-          IconButton(
-            icon: Icon(Icons.clear, color: _remind ? clText : clText.withValues(alpha: 0.5)),
-            onPressed: _remind ? () {
-              setState(() {
-                timeController.clear();
-                _time = null;
-                _selectedTimeOption = null; // Сбрасываем выбор радио-кнопок
-              });
-            } : null,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -2191,36 +2199,35 @@ class _EditItemPageState extends State<EditItemPage> {
   Widget _buildTagsField() {
     return GestureDetector(
       onLongPress: () => showHelp(33), // ID 33 для поля тегов
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: tagsController,
-              style: TextStyle(color: clText),
-              decoration: InputDecoration(
-                labelText: lw('Tags (comma separated)'),
-                labelStyle: TextStyle(color: clText),
-                fillColor: clFill,
-                filled: true,
-                border: OutlineInputBorder(),
+      child: TextField(
+        controller: tagsController,
+        style: TextStyle(color: clText),
+        decoration: InputDecoration(
+          labelText: lw('Tags (comma separated)'),
+          labelStyle: TextStyle(color: clText),
+          fillColor: clFill,
+          filled: true,
+          border: OutlineInputBorder(),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.tag, color: clText),
+                tooltip: lw('Select from existing tags'),
+                onPressed: _showTagsDialog,
               ),
-            ),
+              IconButton(
+                icon: Icon(Icons.clear, color: clText),
+                tooltip: lw('Clear tags'),
+                onPressed: () {
+                  setState(() {
+                    tagsController.clear();
+                  });
+                },
+              ),
+            ],
           ),
-          IconButton(
-            icon: Icon(Icons.tag, color: clText),
-            tooltip: lw('Select from existing tags'),
-            onPressed: _showTagsDialog,
-          ),
-          IconButton(
-            icon: Icon(Icons.clear, color: clText),
-            tooltip: lw('Clear tags'),
-            onPressed: () {
-              setState(() {
-                tagsController.clear();
-              });
-            },
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -1,3 +1,47 @@
+  + Auto-reschedule monthly/yearly reminders after trigger:
+    - Extended ItemData with yearly, monthly, date, time fields
+    - Modified getItemData() to query yearly, monthly, date, time from DB
+    - Added rescheduleRecurringReminder() method in NotificationReceiver
+    - Yearly reminders: schedule for same month/day next year
+    - Monthly reminders: schedule for same day next month
+    - Updates date in DB after rescheduling (for correct boot recovery)
+    - Inline alarm scheduling (no external method dependency)
+    - Handles calendar edge cases (month overflow, invalid dates)
+
+  + UI improvements - compact form layout:
+    - Tags/Date/Time fields: inline buttons via suffixIcon (stretch to right edge)
+    - Priority redesigned: single line "Priority - X +" layout
+      * Removed stars display and "(0-3)" from label
+      * Label + buttons in one Row with spacing
+    - Active checkbox: moved below "Reminder" header (separate line)
+      * Shows only when reminder enabled
+      * Green color for visual distinction
+      * Saves to DB 'active' field
+    - Reminder checkboxes reordered (one-time):
+      * Fullscreen alert (first)
+      * Monthly repeat
+      * Yearly repeat
+      * Remove after reminder (last)
+      * Reduced spacing between checkboxes (10px -> 4px)
+    - Removed fullscreen icon after "Fullscreen alert" text
+
+  + Daily reminders compact layout:
+    - Times section: center-aligned with offset (+40px left, +40px right balance)
+      * Highlighted (+) button with background circle
+      * Increased button size (24px -> 28px)
+    - Days section: center-aligned with offset (+40px left, +40px right balance)
+      * "All"/"Weekdays" buttons balanced
+      * Checkmarks made bolder (Icons.done, size 22, weight 700)
+    - Sound selector: reduced height and shifted right
+      * Padding reduced (vertical 8px -> 6px)
+      * Left edge shifted right (+16px)
+      * Icon and selector more compact
+
+  + Translations:
+    - Added "Priority" -> ru: "Приоритет", ua: "Пріоритет"
+    - Added "Active" -> ru: "Активное", ua: "Активне"
+    - Removed obsolete "Priority (0-3)" translation
+
   + Active flag for reminders (quick enable/disable):
     - Per-item "active" flag with checkbox on main screen
     - DB version 14: 'active' column (INTEGER DEFAULT 1)
