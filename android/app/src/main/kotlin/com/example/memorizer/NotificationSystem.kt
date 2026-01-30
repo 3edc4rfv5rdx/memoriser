@@ -399,7 +399,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 set(Calendar.MILLISECOND, 0)
             }
 
-            val timePassed = calendar.timeInMillis <= System.currentTimeMillis()
+            val timePassed = calendar.timeInMillis < System.currentTimeMillis()
 
             // Check if today matches daysMask
             val todayDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
@@ -436,20 +436,13 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-            // Schedule repeating alarm
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
+            // Use setAlarmClock for guaranteed exact timing even in Doze mode
+            // This is appropriate for user-scheduled daily reminders
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(
+                calendar.timeInMillis,
+                pendingIntent
+            )
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
             Log.d("MemorizerApp", "Daily reminder scheduled for item $itemId at ${calendar.time}")
         } catch (e: Exception) {
@@ -809,19 +802,12 @@ class NotificationReceiver : BroadcastReceiver() {
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
+            // Use setAlarmClock for guaranteed exact timing even in Doze mode
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(
+                calendar.timeInMillis,
+                pendingIntent
+            )
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
             Log.d("MemorizerApp", "Daily reminder rescheduled for item $itemId at ${calendar.time}")
         } catch (e: Exception) {
@@ -1703,7 +1689,7 @@ class BootReceiver : BroadcastReceiver() {
                     calendar.set(Calendar.MILLISECOND, 0)
 
                     // If this year's date passed, schedule for next year
-                    if (calendar.timeInMillis <= System.currentTimeMillis()) {
+                    if (calendar.timeInMillis < System.currentTimeMillis()) {
                         calendar.add(Calendar.YEAR, 1)
                     }
 
@@ -1759,7 +1745,7 @@ class BootReceiver : BroadcastReceiver() {
                     calendar.set(Calendar.MILLISECOND, 0)
 
                     // If this month's date passed, schedule for next month
-                    if (calendar.timeInMillis <= System.currentTimeMillis()) {
+                    if (calendar.timeInMillis < System.currentTimeMillis()) {
                         calendar.add(Calendar.MONTH, 1)
                     }
 
@@ -1826,7 +1812,7 @@ class BootReceiver : BroadcastReceiver() {
                 set(Calendar.MILLISECOND, 0)
             }
 
-            val timePassed = calendar.timeInMillis <= System.currentTimeMillis()
+            val timePassed = calendar.timeInMillis < System.currentTimeMillis()
 
             // Check if today matches daysMask
             val todayDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
@@ -1863,19 +1849,12 @@ class BootReceiver : BroadcastReceiver() {
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
+            // Use setAlarmClock for guaranteed exact timing even in Doze mode
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(
+                calendar.timeInMillis,
+                pendingIntent
+            )
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
             Log.d("MemorizerApp", "Daily reminder rescheduled in boot receiver for item $itemId at ${calendar.time}")
         } catch (e: Exception) {

@@ -652,15 +652,11 @@ void main() async {
   // Initialize notification system
   await SimpleNotifications.initNotifications();
 
-  // НОВОЕ: Перепланировать все напоминания при каждом запуске приложения
-  try {
-    myPrint('Rescheduling all reminders on app startup...');
-    await SimpleNotifications.rescheduleAllReminders();
-    myPrint('Reminders rescheduled successfully on startup');
-  } catch (e) {
-    myPrint('Error rescheduling reminders on startup: $e');
-    // Не показываем ошибку пользователю при запуске, только логируем
-  }
+  // Reminders are preserved in Android AlarmManager - no need to reschedule on every app start
+  // Rescheduling happens only when:
+  // 1. User changes reminder settings
+  // 2. User restores from backup
+  // 3. Device reboots (handled by BootReceiver)
 
   await initLogging();
 

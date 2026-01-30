@@ -221,9 +221,54 @@ class SimpleNotifications {
       myPrint('=== RESCHEDULING COMPLETE ===');
       myPrint('Successfully rescheduled $scheduledCount individual reminders');
 
+      // Check if daily reminders are enabled
+      final enableDailyReminders = await getSetting("Enable daily reminders") ?? defSettings["Enable daily reminders"];
+
+      int dailyScheduledCount = 0;
+      if (enableDailyReminders == "true") {
+        // Also reschedule all daily reminders
+        final dailyReminders = await mainDb.query(
+        'items',
+        where: 'daily = 1 AND active = 1',
+      );
+
+        myPrint('Found ${dailyReminders.length} daily reminders to reschedule');
+
+        for (var item in dailyReminders) {
+          try {
+            final itemId = item['id'] as int;
+            final title = item['title'] as String? ?? '';
+            final dailyTimesStr = item['daily_times'] as String?;
+            final dailyDays = item['daily_days'] as int? ?? 127;
+
+            if (dailyTimesStr == null || dailyTimesStr.isEmpty) {
+              myPrint('Skipping daily item $itemId - no times');
+              continue;
+            }
+
+            final dailyTimes = parseDailyTimes(dailyTimesStr);
+            if (dailyTimes.isEmpty) {
+              myPrint('Skipping daily item $itemId - empty times');
+              continue;
+            }
+
+            // Schedule all times for this daily reminder
+            await scheduleAllDailyReminders(itemId, dailyTimes, dailyDays, title);
+            dailyScheduledCount++;
+
+          } catch (e) {
+            myPrint('Error rescheduling daily reminder for item ${item['id']}: $e');
+          }
+        }
+
+        myPrint('Successfully rescheduled $dailyScheduledCount daily reminders');
+      } else {
+        myPrint('Daily reminders are disabled, not rescheduling daily reminders');
+      }
+
       // Show success message using existing translations
-      if (scheduledCount > 0) {
-        okInfoBarGreen('${lw('Settings saved')}: $scheduledCount ${lw('reminders')}');
+      if (scheduledCount > 0 || dailyScheduledCount > 0) {
+        okInfoBarGreen('${lw('Settings saved')}: $scheduledCount ${lw('reminders')}, $dailyScheduledCount daily');
       } else {
         okInfoBarBlue(lw('No events for today'));
       }
