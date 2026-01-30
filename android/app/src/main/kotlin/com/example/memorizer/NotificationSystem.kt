@@ -391,16 +391,46 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Set time for next reminder (today or tomorrow)
+            // Set time for next reminder (find next valid day from daysMask)
             val calendar = Calendar.getInstance().apply {
                 set(Calendar.HOUR_OF_DAY, hour)
                 set(Calendar.MINUTE, minute)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
+            }
 
-                // If time already passed today, schedule for tomorrow
-                if (timeInMillis <= System.currentTimeMillis()) {
-                    add(Calendar.DAY_OF_YEAR, 1)
+            val timePassed = calendar.timeInMillis <= System.currentTimeMillis()
+
+            // Check if today matches daysMask
+            val todayDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+            val todayIndex = if (todayDayOfWeek == Calendar.SUNDAY) 6 else todayDayOfWeek - 2
+            val todayInMask = (daysMask and (1 shl todayIndex)) != 0
+
+            // If time hasn't passed and today is in mask, use today
+            // Otherwise, search for next valid day
+            if (timePassed || !todayInMask) {
+                // Start search from tomorrow
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+
+                // Find next valid day that matches daysMask (search up to 7 days)
+                var foundValidDay = false
+                for (i in 0 until 7) {
+                    val calendarDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+                    val dayIndex = if (calendarDayOfWeek == Calendar.SUNDAY) 6 else calendarDayOfWeek - 2
+
+                    if ((daysMask and (1 shl dayIndex)) != 0) {
+                        // This day is in the mask
+                        foundValidDay = true
+                        break
+                    }
+
+                    // Try next day
+                    calendar.add(Calendar.DAY_OF_YEAR, 1)
+                }
+
+                if (!foundValidDay) {
+                    Log.e("MemorizerApp", "No valid day found in daysMask $daysMask for item $itemId")
+                    return
                 }
             }
 
@@ -746,13 +776,35 @@ class NotificationReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Schedule for tomorrow at the same time
+            // Find next day that matches daysMask
             val calendar = Calendar.getInstance().apply {
+                // Start from tomorrow
                 add(Calendar.DAY_OF_YEAR, 1)
                 set(Calendar.HOUR_OF_DAY, hour)
                 set(Calendar.MINUTE, minute)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
+            }
+
+            // Search for next valid day (up to 7 days ahead)
+            var foundValidDay = false
+            for (i in 0 until 7) {
+                val calendarDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+                val dayIndex = if (calendarDayOfWeek == Calendar.SUNDAY) 6 else calendarDayOfWeek - 2
+
+                if ((daysMask and (1 shl dayIndex)) != 0) {
+                    // This day is in the mask
+                    foundValidDay = true
+                    break
+                }
+
+                // Try next day
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+            }
+
+            if (!foundValidDay) {
+                Log.e("MemorizerApp", "No valid day found in daysMask $daysMask for item $itemId")
+                return
             }
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -1573,11 +1625,261 @@ class BootReceiver : BroadcastReceiver() {
             }
 
             cursor.close()
+
+            // Also reschedule daily reminders
+            val dailyCursor = db.rawQuery(
+                "SELECT id, title, daily_times, daily_days FROM items WHERE daily = 1 AND active = 1",
+                null
+            )
+
+            var rescheduledDailyCount = 0
+
+            while (dailyCursor.moveToNext()) {
+                try {
+                    val itemId = dailyCursor.getInt(0)
+                    val title = dailyCursor.getString(1) ?: ""
+                    val dailyTimes = dailyCursor.getString(2) ?: ""
+                    val dailyDays = dailyCursor.getInt(3)
+
+                    // Parse times (format: "6:18,18:18")
+                    val times = dailyTimes.split(",").filter { it.isNotBlank() }
+
+                    for (timeStr in times) {
+                        val parts = timeStr.trim().split(":")
+                        if (parts.size == 2) {
+                            val hour = parts[0].toIntOrNull() ?: continue
+                            val minute = parts[1].toIntOrNull() ?: continue
+
+                            scheduleDailyReminderInBootReceiver(
+                                context,
+                                itemId,
+                                hour,
+                                minute,
+                                dailyDays,
+                                title
+                            )
+
+                            rescheduledDailyCount++
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("MemorizerApp", "Error rescheduling daily item: ${e.message}")
+                }
+            }
+
+            dailyCursor.close()
+
+            // Reschedule yearly reminders
+            val yearlyCursor = db.rawQuery(
+                "SELECT id, title, content, date, time FROM items WHERE yearly = 1 AND active = 1",
+                null
+            )
+
+            var rescheduledYearlyCount = 0
+
+            while (yearlyCursor.moveToNext()) {
+                try {
+                    val itemId = yearlyCursor.getInt(0)
+                    val title = yearlyCursor.getString(1) ?: ""
+                    val content = yearlyCursor.getString(2) ?: ""
+                    val date = yearlyCursor.getInt(3)
+                    val time = if (yearlyCursor.isNull(4)) null else yearlyCursor.getInt(4)
+
+                    // Parse date (YYYYMMDD)
+                    val month = (date % 10000) / 100
+                    val day = date % 100
+
+                    // Parse time or use default
+                    val hour = time?.let { it / 100 } ?: 9
+                    val minute = time?.let { it % 100 } ?: 30
+
+                    // Find next yearly occurrence
+                    val calendar = Calendar.getInstance()
+                    calendar.set(Calendar.MONTH, month - 1)
+                    calendar.set(Calendar.DAY_OF_MONTH, day)
+                    calendar.set(Calendar.HOUR_OF_DAY, hour)
+                    calendar.set(Calendar.MINUTE, minute)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+
+                    // If this year's date passed, schedule for next year
+                    if (calendar.timeInMillis <= System.currentTimeMillis()) {
+                        calendar.add(Calendar.YEAR, 1)
+                    }
+
+                    scheduleSpecificReminder(
+                        context,
+                        itemId,
+                        calendar.get(Calendar.YEAR),
+                        month,
+                        day,
+                        hour,
+                        minute,
+                        title,
+                        content
+                    )
+
+                    rescheduledYearlyCount++
+                } catch (e: Exception) {
+                    Log.e("MemorizerApp", "Error rescheduling yearly item: ${e.message}")
+                }
+            }
+
+            yearlyCursor.close()
+
+            // Reschedule monthly reminders
+            val monthlyCursor = db.rawQuery(
+                "SELECT id, title, content, date, time FROM items WHERE monthly = 1 AND active = 1",
+                null
+            )
+
+            var rescheduledMonthlyCount = 0
+
+            while (monthlyCursor.moveToNext()) {
+                try {
+                    val itemId = monthlyCursor.getInt(0)
+                    val title = monthlyCursor.getString(1) ?: ""
+                    val content = monthlyCursor.getString(2) ?: ""
+                    val date = monthlyCursor.getInt(3)
+                    val time = if (monthlyCursor.isNull(4)) null else monthlyCursor.getInt(4)
+
+                    // Parse date (YYYYMMDD) - use day of month
+                    val day = date % 100
+
+                    // Parse time or use default
+                    val hour = time?.let { it / 100 } ?: 9
+                    val minute = time?.let { it % 100 } ?: 30
+
+                    // Find next monthly occurrence
+                    val calendar = Calendar.getInstance()
+                    calendar.set(Calendar.DAY_OF_MONTH, day)
+                    calendar.set(Calendar.HOUR_OF_DAY, hour)
+                    calendar.set(Calendar.MINUTE, minute)
+                    calendar.set(Calendar.SECOND, 0)
+                    calendar.set(Calendar.MILLISECOND, 0)
+
+                    // If this month's date passed, schedule for next month
+                    if (calendar.timeInMillis <= System.currentTimeMillis()) {
+                        calendar.add(Calendar.MONTH, 1)
+                    }
+
+                    scheduleSpecificReminder(
+                        context,
+                        itemId,
+                        calendar.get(Calendar.YEAR),
+                        calendar.get(Calendar.MONTH) + 1,
+                        day,
+                        hour,
+                        minute,
+                        title,
+                        content
+                    )
+
+                    rescheduledMonthlyCount++
+                } catch (e: Exception) {
+                    Log.e("MemorizerApp", "Error rescheduling monthly item: ${e.message}")
+                }
+            }
+
+            monthlyCursor.close()
             db.close()
 
-            Log.d("MemorizerApp", "Rescheduled $rescheduledCount reminders after reboot")
+            Log.d("MemorizerApp", "Rescheduled after reboot: $rescheduledCount specific, $rescheduledDailyCount daily, $rescheduledYearlyCount yearly, $rescheduledMonthlyCount monthly reminders")
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error in rescheduleAllReminders: ${e.message}")
+        }
+    }
+
+    private fun scheduleDailyReminderInBootReceiver(
+        context: Context,
+        itemId: Int,
+        hour: Int,
+        minute: Int,
+        daysMask: Int,
+        title: String
+    ) {
+        try {
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.DAILY_REMINDER"
+                putExtra("itemId", itemId)
+                putExtra("hour", hour)
+                putExtra("minute", minute)
+                putExtra("daysMask", daysMask)
+                putExtra("title", title)
+                putExtra("body", "")
+            }
+
+            val requestCode = itemId * 10000 + hour * 100 + minute
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Find next valid day from daysMask
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            val timePassed = calendar.timeInMillis <= System.currentTimeMillis()
+
+            // Check if today matches daysMask
+            val todayDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+            val todayIndex = if (todayDayOfWeek == Calendar.SUNDAY) 6 else todayDayOfWeek - 2
+            val todayInMask = (daysMask and (1 shl todayIndex)) != 0
+
+            // If time hasn't passed and today is in mask, use today
+            // Otherwise, search for next valid day
+            if (timePassed || !todayInMask) {
+                // Start search from tomorrow
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+
+                // Find next valid day that matches daysMask (search up to 7 days)
+                var foundValidDay = false
+                for (i in 0 until 7) {
+                    val calendarDayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+                    val dayIndex = if (calendarDayOfWeek == Calendar.SUNDAY) 6 else calendarDayOfWeek - 2
+
+                    if ((daysMask and (1 shl dayIndex)) != 0) {
+                        // This day is in the mask
+                        foundValidDay = true
+                        break
+                    }
+
+                    // Try next day
+                    calendar.add(Calendar.DAY_OF_YEAR, 1)
+                }
+
+                if (!foundValidDay) {
+                    Log.e("MemorizerApp", "No valid day found in daysMask $daysMask for item $itemId in boot receiver")
+                    return
+                }
+            }
+
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+
+            Log.d("MemorizerApp", "Daily reminder rescheduled in boot receiver for item $itemId at ${calendar.time}")
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error scheduling daily reminder in boot receiver: ${e.message}")
         }
     }
 

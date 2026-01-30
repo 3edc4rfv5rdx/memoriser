@@ -1680,28 +1680,8 @@ class _HomePageState extends State<HomePage> {
         'photo': null, // Don't copy photos
       });
 
-      // Schedule reminders for copied item
-      if (originalItem['remind'] == 1 && originalItem['date'] != null) {
-        final date = yyyymmddToDateTime(originalItem['date'] as int);
-        if (date != null) {
-          await SimpleNotifications.scheduleSpecificReminder(
-            newItemId,
-            date,
-            originalItem['time'] as int?,
-          );
-        }
-      }
-
-      if (originalItem['daily'] == 1) {
-        final dailyTimes = parseDailyTimes(originalItem['daily_times']);
-        await SimpleNotifications.updateDailyReminders(
-          newItemId,
-          true,
-          dailyTimes,
-          originalItem['daily_days'] as int? ?? 127,
-          newTitle,
-        );
-      }
+      // Don't schedule reminders for copied item - it's a draft template
+      // User will edit and save it, which will trigger scheduling
 
       _refreshItems();
       okInfoBarGreen(lw('Item copied'));
@@ -2053,6 +2033,12 @@ class _HomePageState extends State<HomePage> {
           final hasPhoto = photoPaths.isNotEmpty;
           final photoCount = photoPaths.length;
 
+          // Parse daily times for display
+          final dailyTimes = isDaily ? parseDailyTimes(item['daily_times']) : <String>[];
+          final dailyTimesFormatted = dailyTimes.isNotEmpty
+              ? dailyTimes.join(', ')
+              : null;
+
           final todayDate = dateTimeToYYYYMMDD(DateTime.now());
           final isToday = hasDate && item['date'] == todayDate;
 
@@ -2262,6 +2248,24 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                         ],
+                      ],
+                    ),
+                  // Daily reminder times
+                  if (isDaily && dailyTimesFormatted != null)
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, color: Colors.blue, size: 16),
+                        SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            dailyTimesFormatted,
+                            style: TextStyle(
+                              fontSize: fsMedium,
+                              color: Colors.blue,
+                              fontWeight: fwBold,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                 ],
