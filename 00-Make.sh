@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="add full/lock screen"
+COMMENT="test alarms"
 #
 GLOBVERS='0.9'
 VER=''
