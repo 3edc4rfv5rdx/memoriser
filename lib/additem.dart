@@ -15,7 +15,7 @@ class EditItemPage extends StatefulWidget {
   const EditItemPage({super.key, this.itemId});
 
   @override
-  _EditItemPageState createState() => _EditItemPageState();
+  State<EditItemPage> createState() => _EditItemPageState();
 }
 
 class _EditItemPageState extends State<EditItemPage> {
@@ -36,9 +36,9 @@ class _EditItemPageState extends State<EditItemPage> {
   int? _selectedTimeOption; // 0 - morning, 1 - day, 2 - evening, null - none selected
 
   // Time option constants
-  static const int TIME_MORNING = 930;  // 09:30
-  static const int TIME_DAY = 1230;     // 12:30
-  static const int TIME_EVENING = 1830; // 18:30
+  static const int timeMorning = 930;  // 09:30
+  static const int timeDay = 1230;     // 12:30
+  static const int timeEvening = 1830; // 18:30
 
   DateTime? _date;
   int _priority = 0; // Default priority value
@@ -214,11 +214,11 @@ class _EditItemPageState extends State<EditItemPage> {
             timeController.text = timeStr;
 
             // Check if time matches one of the preset options
-            if (_time == TIME_MORNING) {
+            if (_time == timeMorning) {
               _selectedTimeOption = 0;
-            } else if (_time == TIME_DAY) {
+            } else if (_time == timeDay) {
               _selectedTimeOption = 1;
-            } else if (_time == TIME_EVENING) {
+            } else if (_time == timeEvening) {
               _selectedTimeOption = 2;
             } else {
               _selectedTimeOption = null;
@@ -444,7 +444,7 @@ class _EditItemPageState extends State<EditItemPage> {
       }
 
       _isSaved = true; // Mark as saved so dispose won't delete photos
-      Navigator.pop(context, true);
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       // Show error message if database operation fails
       okInfoBarPurple('${lw('Error saving item')}: $e');
@@ -823,7 +823,7 @@ class _EditItemPageState extends State<EditItemPage> {
                         _daily = false;
                         // Set default time
                         _selectedTimeOption = 0;
-                        _time = TIME_MORNING;
+                        _time = timeMorning;
                         timeController.text = '09:30';
                       } else {
                         // Disable all reminders
@@ -904,7 +904,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _remind = true;
                 _daily = false;
                 _selectedTimeOption = 0;
-                _time = TIME_MORNING;
+                _time = timeMorning;
                 timeController.text = '09:30';
               });
             },
@@ -938,10 +938,7 @@ class _EditItemPageState extends State<EditItemPage> {
           child: GestureDetector(
             onTap: () async {
               // Load default daily sound if not set
-              String? defaultSound = _dailySound;
-              if (defaultSound == null) {
-                defaultSound = await SimpleNotifications.getDefaultDailySound();
-              }
+              final defaultSound = _dailySound ?? await SimpleNotifications.getDefaultDailySound();
               setState(() {
                 _daily = true;
                 _remind = false;
@@ -1610,42 +1607,6 @@ class _EditItemPageState extends State<EditItemPage> {
     }
   }
 
-  // Validate reminder date is in the future
-  void _validateReminderDate() {
-    // Check if date is set
-    if (_date == null) {
-      okInfoBarOrange(lw('Please set a date for the reminder'));
-      setState(() {
-        _remind = false;
-      });
-      return;
-    }
-
-    try {
-      // Get today's date (start of day)
-      final today = DateTime(
-        DateTime.now().year,
-        DateTime.now().month,
-        DateTime.now().day,
-      );
-
-      // Check if date is at least today (not in the past)
-      if (_date!.isBefore(today)) {
-        okInfoBarOrange(lw('Reminder date cannot be in the past'));
-        // Automatically uncheck the reminder if date is invalid
-        setState(() {
-          _remind = false;
-        });
-      }
-    } catch (e) {
-      // Handle any exceptions that might occur
-      myPrint('Error validating reminder date: $e');
-      setState(() {
-        _remind = false;
-      });
-      okInfoBarRed(lw('Error validating date'));
-    }
-  }
 
   // Build hidden checkbox (only shown in hidden mode)
   Widget _buildHiddenSelector() {
@@ -1763,11 +1724,11 @@ class _EditItemPageState extends State<EditItemPage> {
                     _time = timeStringToInt(value);
 
                     // Проверяем, соответствует ли введенное время одному из предустановленных вариантов
-                    if (_time == TIME_MORNING) {
+                    if (_time == timeMorning) {
                       _selectedTimeOption = 0;
-                    } else if (_time == TIME_DAY) {
+                    } else if (_time == timeDay) {
                       _selectedTimeOption = 1;
-                    } else if (_time == TIME_EVENING) {
+                    } else if (_time == timeEvening) {
                       _selectedTimeOption = 2;
                     } else {
                       _selectedTimeOption = null;
@@ -1813,13 +1774,16 @@ class _EditItemPageState extends State<EditItemPage> {
           // Утро
           Row(
             children: [
+              // ignore: deprecated_member_use
               Radio<int>(
                 value: 0,
+                // ignore: deprecated_member_use
                 groupValue: _selectedTimeOption,
+                // ignore: deprecated_member_use
                 onChanged: _remind ? (int? value) {
                   setState(() {
                     _selectedTimeOption = value;
-                    _time = TIME_MORNING; // 09:30
+                    _time = timeMorning; // 09:30
                     timeController.text = '09:30';
                   });
                 } : null,
@@ -1835,13 +1799,16 @@ class _EditItemPageState extends State<EditItemPage> {
           // День
           Row(
             children: [
+              // ignore: deprecated_member_use
               Radio<int>(
                 value: 1,
+                // ignore: deprecated_member_use
                 groupValue: _selectedTimeOption,
+                // ignore: deprecated_member_use
                 onChanged: _remind ? (int? value) {
                   setState(() {
                     _selectedTimeOption = value;
-                    _time = TIME_DAY; // 12:30
+                    _time = timeDay; // 12:30
                     timeController.text = '12:30';
                   });
                 } : null,
@@ -1857,13 +1824,16 @@ class _EditItemPageState extends State<EditItemPage> {
           // Вечер
           Row(
             children: [
+              // ignore: deprecated_member_use
               Radio<int>(
                 value: 2,
+                // ignore: deprecated_member_use
                 groupValue: _selectedTimeOption,
+                // ignore: deprecated_member_use
                 onChanged: _remind ? (int? value) {
                   setState(() {
                     _selectedTimeOption = value;
-                    _time = TIME_EVENING; // 18:30
+                    _time = timeEvening; // 18:30
                     timeController.text = '18:30';
                   });
                 } : null,
@@ -1938,11 +1908,11 @@ class _EditItemPageState extends State<EditItemPage> {
         timeController.text = timeIntToString(_time) ?? '';
 
         // Проверяем, соответствует ли выбранное время одному из предустановленных вариантов
-        if (_time == TIME_MORNING) {
+        if (_time == timeMorning) {
           _selectedTimeOption = 0;
-        } else if (_time == TIME_DAY) {
+        } else if (_time == timeDay) {
           _selectedTimeOption = 1;
-        } else if (_time == TIME_EVENING) {
+        } else if (_time == timeEvening) {
           _selectedTimeOption = 2;
         } else {
           _selectedTimeOption = null; // Не соответствует предустановленным вариантам

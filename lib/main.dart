@@ -702,7 +702,7 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  _HomePageState createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
@@ -1124,7 +1124,9 @@ class _HomePageState extends State<HomePage> {
       builder: (dialogContext) {
         // Используем Future.delayed для надежной установки фокуса
         Future.delayed(Duration.zero, () {
-          FocusScope.of(dialogContext).requestFocus(focusNode);
+          if (dialogContext.mounted) {
+            FocusScope.of(dialogContext).requestFocus(focusNode);
+          }
         });
 
         return AlertDialog(
@@ -1222,7 +1224,9 @@ class _HomePageState extends State<HomePage> {
       builder: (dialogContext) {
         // Используем Future.delayed вместо addPostFrameCallback
         Future.delayed(Duration.zero, () {
-          FocusScope.of(dialogContext).requestFocus(focusNode);
+          if (dialogContext.mounted) {
+            FocusScope.of(dialogContext).requestFocus(focusNode);
+          }
         });
         return AlertDialog(
           backgroundColor: clFill,
@@ -1275,7 +1279,9 @@ class _HomePageState extends State<HomePage> {
               onPressed: () async {
                 // Проверяем PIN-код
                 if (await verifyPin(enteredPin)) {
-                  Navigator.pop(dialogContext);
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
 
                   // Активируем режим скрытых записей
                   setState(() {
@@ -1293,7 +1299,9 @@ class _HomePageState extends State<HomePage> {
                   okInfoBarGreen(lw('Private mode activated'));
                 } else {
                   // Показываем ошибку, если PIN неверный
-                  Navigator.pop(dialogContext);
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
                   okInfoBarRed(lw('Incorrect PIN'));
                 }
               },
@@ -1659,7 +1667,7 @@ class _HomePageState extends State<HomePage> {
       String newTitle = 'copy-$originalTitle';
 
       // Insert new item with all fields copied (without photos)
-      final newItemId = await mainDb.insert('items', {
+      await mainDb.insert('items', {
         'title': newTitle,
         'content': originalItem['content'],
         'tags': originalItem['tags'],
@@ -1844,9 +1852,14 @@ class _HomePageState extends State<HomePage> {
                 _exitMonthlyFolder();
               } else {
                 await vacuumDatabases();
-                Navigator.of(context).canPop()
-                    ? Navigator.of(context).pop()
-                    : SystemNavigator.pop();
+                if (!mounted) return;
+                // ignore: use_build_context_synchronously
+                if (Navigator.of(context).canPop()) {
+                  // ignore: use_build_context_synchronously
+                  Navigator.of(context).pop();
+                } else {
+                  SystemNavigator.pop();
+                }
               }
             },
           ),

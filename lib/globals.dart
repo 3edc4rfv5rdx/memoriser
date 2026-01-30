@@ -187,6 +187,7 @@ Future<void> readLocale(String locale) async {
 
 void myPrint(String msg) {
   if (xvDebug) {
+    // ignore: avoid_print
     print('>>> $msg');
 
     if (_logsEnabled && _currentLogFile != null) {

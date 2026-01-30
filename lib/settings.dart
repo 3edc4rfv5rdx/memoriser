@@ -315,7 +315,9 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           if (shouldSave == true) {
             await _saveChanges();
           } else {
-            if (mounted) Navigator.of(context).pop();
+            if (!mounted) return;
+            // ignore: use_build_context_synchronously
+            Navigator.of(context).pop();
           }
         }
       },
