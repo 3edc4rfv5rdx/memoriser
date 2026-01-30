@@ -1,5 +1,15 @@
 # Memorizer Project Notes
 
+## IMPORTANT: Work Rules
+**CRITICAL - MUST FOLLOW:**
+1. **Git is READ-ONLY** - Never use git commands (commit, push, etc.)
+2. **Version numbers/tags are USER-ONLY** - Never create or modify version numbers in:
+   - `lib/ToDo.txt` (e.g., `# v0.9.260130+78`)
+   - `lib/globals.dart` (version constants)
+   - `pubspec.yaml` (version field)
+3. **Only add tasks** with markers `o`/`+`/`?` without version tags
+4. **Don't check build** - Never run `gradlew assembleDebug` or similar build commands (saves time/tokens, user rebuilds anyway)
+
 ## ToDo.txt Structure
 Location: `lib/ToDo.txt`
 
@@ -7,6 +17,7 @@ Location: `lib/ToDo.txt`
 - `o` or `>` — new/current tasks
 - `?` — possible/maybe tasks
 - `+` — completed tasks
+- `#` — tag version
 
 ### Sections:
 - `===TODO:` — tasks to do
@@ -14,7 +25,8 @@ Location: `lib/ToDo.txt`
 - `===ERRORS:` — known errors
 - Tags/releases are also recorded here
 
-### Important: New entries are added at the TOP of each section (right after ===XXX:)
+### Important: 
+New entries are added at the TOP of each section (right after ===XXX:)
 
 ### Done.txt
 Location: `lib/Done.txt`

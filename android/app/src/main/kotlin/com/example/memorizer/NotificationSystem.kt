@@ -1226,10 +1226,14 @@ class NotificationReceiver : BroadcastReceiver() {
                 calendar.set(Calendar.DAY_OF_MONTH, originalDay)
                 Log.d("MemorizerApp", "Rescheduling YEARLY reminder for item $itemId to next year")
             } else if (itemData.monthly == 1) {
-                // Monthly: same day, next month
+                // Monthly: same day, next month (handle month overflow)
                 calendar.add(Calendar.MONTH, 1)
-                calendar.set(Calendar.DAY_OF_MONTH, originalDay)
-                Log.d("MemorizerApp", "Rescheduling MONTHLY reminder for item $itemId to next month")
+                // Get max day in target month
+                val maxDayInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+                // Use original day or last day of month if original day doesn't exist
+                val targetDay = if (originalDay > maxDayInMonth) maxDayInMonth else originalDay
+                calendar.set(Calendar.DAY_OF_MONTH, targetDay)
+                Log.d("MemorizerApp", "Rescheduling MONTHLY reminder for item $itemId to next month (day $targetDay)")
             } else {
                 Log.d("MemorizerApp", "Item $itemId is not recurring, skipping reschedule")
                 return
@@ -1855,7 +1859,10 @@ class BootReceiver : BroadcastReceiver() {
 
                     // Find next monthly occurrence
                     val calendar = Calendar.getInstance()
-                    calendar.set(Calendar.DAY_OF_MONTH, day)
+                    // Handle month overflow: use min of original day and max day in current month
+                    val maxDayInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    val targetDay = if (day > maxDayInMonth) maxDayInMonth else day
+                    calendar.set(Calendar.DAY_OF_MONTH, targetDay)
                     calendar.set(Calendar.HOUR_OF_DAY, hour)
                     calendar.set(Calendar.MINUTE, minute)
                     calendar.set(Calendar.SECOND, 0)
@@ -1864,6 +1871,10 @@ class BootReceiver : BroadcastReceiver() {
                     // If this month's date passed, schedule for next month
                     if (calendar.timeInMillis < System.currentTimeMillis()) {
                         calendar.add(Calendar.MONTH, 1)
+                        // Re-check day validity in next month
+                        val maxDayInNextMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+                        val targetDayNext = if (day > maxDayInNextMonth) maxDayInNextMonth else day
+                        calendar.set(Calendar.DAY_OF_MONTH, targetDayNext)
                     }
 
                     scheduleSpecificReminder(

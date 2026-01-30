@@ -1,3 +1,13 @@
+  + Monthly reminders: fixed month overflow bug:
+    - Problem: 30 Jan + 1 month = 2 Mar (instead of 28 Feb)
+    - Calendar.add(MONTH) + set(DAY_OF_MONTH) overflows invalid days
+    - Solution: use getActualMaximum(DAY_OF_MONTH) to get max day in target month
+    - Use min(originalDay, maxDayInMonth) for target day
+    - Fixed in rescheduleRecurringReminder() for auto-reschedule after trigger
+    - Fixed in BootReceiver monthly section for recovery after reboot
+    - Now: 30 Jan -> 28 Feb (or 29 in leap year)
+    - Now: 31 Jan -> 28/29/30 Feb depending on month
+
   + Auto-reschedule monthly/yearly reminders after trigger:
     - Extended ItemData with yearly, monthly, date, time fields
     - Modified getItemData() to query yearly, monthly, date, time from DB
