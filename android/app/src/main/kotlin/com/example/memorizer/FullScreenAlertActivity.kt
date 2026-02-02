@@ -1,8 +1,11 @@
 package com.example.memorizer
 
 import android.app.Activity
+import android.app.AlarmManager
 import android.app.KeyguardManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -15,6 +18,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import java.util.Calendar
 
 /**
  * FullScreenAlertActivity displays a fullscreen alert window for reminders.
@@ -73,6 +77,23 @@ class FullScreenAlertActivity : Activity() {
         // Setup OK button
         findViewById<Button>(R.id.alert_ok_button).setOnClickListener {
             dismissAlert()
+        }
+
+        // Setup snooze buttons
+        findViewById<Button>(R.id.snooze_10min).setOnClickListener {
+            snoozeReminder(itemId, title, content, soundValue, 10)
+        }
+        findViewById<Button>(R.id.snooze_20min).setOnClickListener {
+            snoozeReminder(itemId, title, content, soundValue, 20)
+        }
+        findViewById<Button>(R.id.snooze_30min).setOnClickListener {
+            snoozeReminder(itemId, title, content, soundValue, 30)
+        }
+        findViewById<Button>(R.id.snooze_1hour).setOnClickListener {
+            snoozeReminder(itemId, title, content, soundValue, 60)
+        }
+        findViewById<Button>(R.id.snooze_3hours).setOnClickListener {
+            snoozeReminder(itemId, title, content, soundValue, 180)
         }
 
         // Setup barrier overlay and draggable circle
@@ -224,6 +245,58 @@ class FullScreenAlertActivity : Activity() {
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error playing sound: ${e.message}")
             // Continue without sound if error occurs
+        }
+    }
+
+    /**
+     * Snooze the reminder - reschedule for X minutes from now
+     */
+    private fun snoozeReminder(itemId: Int, title: String, content: String, soundValue: String?, minutesFromNow: Int) {
+        try {
+            Log.d("MemorizerApp", "Snoozing reminder for item $itemId for $minutesFromNow minutes")
+
+            // Calculate snooze time
+            val calendar = Calendar.getInstance()
+            calendar.add(Calendar.MINUTE, minutesFromNow)
+
+            // Create intent for the snoozed reminder
+            val intent = Intent(this, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.SNOOZED_REMINDER"
+                putExtra("itemId", itemId)
+                putExtra("title", title)
+                putExtra("content", content)
+                putExtra("sound", soundValue)
+            }
+
+            // Use unique requestCode for snoozed reminders (negative itemId to avoid conflicts)
+            val requestCode = -itemId
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            // Schedule the snoozed reminder using setAlarmClock for guaranteed exact timing
+            // This ensures it fires even in Doze mode and shows in system alarms
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(
+                calendar.timeInMillis,
+                pendingIntent
+            )
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+
+            Log.d("MemorizerApp", "Snoozed reminder scheduled for ${calendar.time}")
+
+            // Close the alert
+            dismissAlert()
+
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error snoozing reminder: ${e.message}")
+            // Close anyway
+            dismissAlert()
         }
     }
 

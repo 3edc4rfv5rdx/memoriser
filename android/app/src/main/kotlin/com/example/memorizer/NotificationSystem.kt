@@ -665,6 +665,11 @@ class NotificationReceiver : BroadcastReceiver() {
                     handleDailyReminder(context, intent)
                     return
                 }
+                "com.example.memorizer.SNOOZED_REMINDER" -> {
+                    // Handle snoozed reminder
+                    handleSnoozedReminder(context, intent)
+                    return
+                }
             }
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error in NotificationReceiver.onReceive: ${e.message}")
@@ -1366,6 +1371,24 @@ class NotificationReceiver : BroadcastReceiver() {
 
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error handling specific reminder: ${e.message}")
+        }
+    }
+
+    // Handle snoozed reminder (always show fullscreen alert with original data)
+    private fun handleSnoozedReminder(context: Context, intent: Intent) {
+        try {
+            val itemId = intent.getIntExtra("itemId", 0)
+            val title = intent.getStringExtra("title") ?: "Memorizer"
+            val content = intent.getStringExtra("content") ?: "Reminder"
+            val soundValue = intent.getStringExtra("sound")
+
+            Log.d("MemorizerApp", "Handling snoozed reminder for item $itemId")
+
+            // Always show fullscreen alert for snoozed reminders
+            launchFullscreenAlert(context, itemId, title, content, soundValue)
+
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error handling snoozed reminder: ${e.message}")
         }
     }
 

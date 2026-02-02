@@ -89,13 +89,94 @@
 
         </LinearLayout>
 
-        <!-- Bottom section - 1/8 of screen (OK button) -->
+        <!-- Bottom section - 1/8 of screen (Snooze + OK button) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:gravity="center">
+            android:gravity="center"
+            android:paddingTop="8dp">
+
+            <!-- Snooze label -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Postpone for:"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#000000"
+                android:layout_marginBottom="6dp"/>
+
+            <!-- Snooze buttons - first row -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="4dp">
+
+                <Button
+                    android:id="@+id/snooze_10min"
+                    android:layout_width="70dp"
+                    android:layout_height="40dp"
+                    android:text="10 min"
+                    android:textSize="12sp"
+                    android:background="@drawable/rounded_button"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginHorizontal="3dp"/>
+
+                <Button
+                    android:id="@+id/snooze_20min"
+                    android:layout_width="70dp"
+                    android:layout_height="40dp"
+                    android:text="20 min"
+                    android:textSize="12sp"
+                    android:background="@drawable/rounded_button"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginHorizontal="3dp"/>
+
+                <Button
+                    android:id="@+id/snooze_30min"
+                    android:layout_width="70dp"
+                    android:layout_height="40dp"
+                    android:text="30 min"
+                    android:textSize="12sp"
+                    android:background="@drawable/rounded_button"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginHorizontal="3dp"/>
+
+            </LinearLayout>
+
+            <!-- Snooze buttons - second row -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="8dp">
+
+                <Button
+                    android:id="@+id/snooze_1hour"
+                    android:layout_width="70dp"
+                    android:layout_height="40dp"
+                    android:text="1 hour"
+                    android:textSize="12sp"
+                    android:background="@drawable/rounded_button"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginHorizontal="3dp"/>
+
+                <Button
+                    android:id="@+id/snooze_3hours"
+                    android:layout_width="70dp"
+                    android:layout_height="40dp"
+                    android:text="3 hours"
+                    android:textSize="12sp"
+                    android:background="@drawable/rounded_button"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginHorizontal="3dp"/>
+
+            </LinearLayout>
 
             <!-- OK Button with rounded corners -->
             <Button
