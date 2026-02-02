@@ -727,9 +727,11 @@ class NotificationReceiver : BroadcastReceiver() {
 
             val itemTitle = if (itemData.title.isNotEmpty()) itemData.title else title
             val itemContent = itemData.content.ifEmpty { body }
-            val itemSound = itemData.dailySound
+            // Use item's custom sound, or fall back to default daily sound from settings
+            val itemSound = itemData.dailySound ?: getDefaultDailySound(context)
 
             Log.d("MemorizerApp", "Daily reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}, active: ${itemData.active}")
+            Log.d("MemorizerApp", "Sound: item=${itemData.dailySound}, final=$itemSound")
 
             // Check if fullscreen alert is enabled
             if (itemData.fullscreen == 1) {
