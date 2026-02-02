@@ -43,11 +43,11 @@
 
         </LinearLayout>
 
-        <!-- Middle section - 6/8 of screen (Message content) -->
+        <!-- Middle section - 5/8 of screen (Message content) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="6"
+            android:layout_weight="5"
             android:orientation="vertical"
             android:gravity="center_horizontal|top"
             android:paddingTop="40dp">
@@ -89,11 +89,11 @@
 
         </LinearLayout>
 
-        <!-- Bottom section - 1/8 of screen (Snooze + OK button) -->
+        <!-- Bottom section - 2/8 of screen (Snooze + OK button) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_weight="2"
             android:orientation="vertical"
             android:gravity="center"
             android:paddingTop="8dp">
@@ -154,7 +154,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="20dp">
 
                 <Button
                     android:id="@+id/snooze_1hour"

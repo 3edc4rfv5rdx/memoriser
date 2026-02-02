@@ -666,7 +666,7 @@ class NotificationReceiver : BroadcastReceiver() {
                     return
                 }
                 "com.example.memorizer.SNOOZED_REMINDER" -> {
-                    // Handle snoozed reminder
+                    // Handle snoozed reminder (no DB, just from intent)
                     handleSnoozedReminder(context, intent)
                     return
                 }
@@ -1374,21 +1374,25 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Handle snoozed reminder (always show fullscreen alert with original data)
+    // Handle snoozed reminder - use data from intent, no DB lookup
     private fun handleSnoozedReminder(context: Context, intent: Intent) {
         try {
+            Log.d("MemorizerApp", "=== SNOOZED REMINDER FIRED ===")
+
             val itemId = intent.getIntExtra("itemId", 0)
             val title = intent.getStringExtra("title") ?: "Memorizer"
-            val content = intent.getStringExtra("content") ?: "Reminder"
+            val content = intent.getStringExtra("content") ?: ""
             val soundValue = intent.getStringExtra("sound")
 
-            Log.d("MemorizerApp", "Handling snoozed reminder for item $itemId")
+            Log.d("MemorizerApp", "Snooze fired at: ${java.util.Date()}")
+            Log.d("MemorizerApp", "Data: itemId=$itemId, title=$title")
 
-            // Always show fullscreen alert for snoozed reminders
+            // Always show fullscreen alert with data from intent (no DB check)
             launchFullscreenAlert(context, itemId, title, content, soundValue)
 
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error handling snoozed reminder: ${e.message}")
+            e.printStackTrace()
         }
     }
 

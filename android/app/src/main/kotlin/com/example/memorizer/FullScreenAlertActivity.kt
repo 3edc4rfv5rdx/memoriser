@@ -79,9 +79,9 @@ class FullScreenAlertActivity : Activity() {
             dismissAlert()
         }
 
-        // Setup snooze buttons
+        // Setup snooze buttons (10 min = 3 min for testing)
         findViewById<Button>(R.id.snooze_10min).setOnClickListener {
-            snoozeReminder(itemId, title, content, soundValue, 10)
+            snoozeReminder(itemId, title, content, soundValue, 3)
         }
         findViewById<Button>(R.id.snooze_20min).setOnClickListener {
             snoozeReminder(itemId, title, content, soundValue, 20)
@@ -253,13 +253,22 @@ class FullScreenAlertActivity : Activity() {
      */
     private fun snoozeReminder(itemId: Int, title: String, content: String, soundValue: String?, minutesFromNow: Int) {
         try {
-            Log.d("MemorizerApp", "Snoozing reminder for item $itemId for $minutesFromNow minutes")
+            Log.d("MemorizerApp", "=== SNOOZE REMINDER START ===")
+            Log.d("MemorizerApp", "itemId: $itemId, minutes: $minutesFromNow")
+            Log.d("MemorizerApp", "title: $title, content: $content, sound: $soundValue")
 
-            // Calculate snooze time
+            // Calculate snooze time (round to minutes, no seconds)
             val calendar = Calendar.getInstance()
             calendar.add(Calendar.MINUTE, minutesFromNow)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+            val now = Calendar.getInstance().time
+            val snoozeTime = calendar.time
 
-            // Create intent for the snoozed reminder
+            Log.d("MemorizerApp", "Current time: $now")
+            Log.d("MemorizerApp", "Snooze time: $snoozeTime (${calendar.timeInMillis}ms)")
+
+            // Create intent for the snoozed reminder - store all data in intent (no DB lookup)
             val intent = Intent(this, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SNOOZED_REMINDER"
                 putExtra("itemId", itemId)
@@ -268,8 +277,10 @@ class FullScreenAlertActivity : Activity() {
                 putExtra("sound", soundValue)
             }
 
-            // Use unique requestCode for snoozed reminders (negative itemId to avoid conflicts)
-            val requestCode = -itemId
+            // Use unique requestCode for snoozed reminders (1000000 + itemId to avoid conflicts)
+            val requestCode = 1000000 + itemId
+
+            Log.d("MemorizerApp", "Using requestCode: $requestCode")
 
             val pendingIntent = PendingIntent.getBroadcast(
                 this,
@@ -288,13 +299,15 @@ class FullScreenAlertActivity : Activity() {
             )
             alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
-            Log.d("MemorizerApp", "Snoozed reminder scheduled for ${calendar.time}")
+            Log.d("MemorizerApp", "setAlarmClock called successfully")
+            Log.d("MemorizerApp", "=== SNOOZE REMINDER SCHEDULED ===")
 
             // Close the alert
             dismissAlert()
 
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error snoozing reminder: ${e.message}")
+            e.printStackTrace()
             // Close anyway
             dismissAlert()
         }
