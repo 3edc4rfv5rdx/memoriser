@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-COMMENT="errors - no alarms"
+COMMENT="errors, fixes"
 #
 GLOBVERS='0.9'
 VER=''
