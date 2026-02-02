@@ -1681,6 +1681,8 @@ class _HomePageState extends State<HomePage> {
         'daily_days': originalItem['daily_days'],
         'daily_sound': originalItem['daily_sound'],
         'sound': originalItem['sound'],
+        'active': 0, // Set inactive - user will activate manually
+        'fullscreen': originalItem['fullscreen'], // Copy fullscreen flag
         'photo': null, // Don't copy photos
       });
 

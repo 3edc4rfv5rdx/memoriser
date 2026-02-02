@@ -1733,48 +1733,52 @@ class BootReceiver : BroadcastReceiver() {
 
             cursor.close()
 
-            // Also reschedule daily reminders
-            val dailyCursor = db.rawQuery(
-                "SELECT id, title, daily_times, daily_days FROM items WHERE daily = 1 AND active = 1",
-                null
-            )
-
+            // Also reschedule daily reminders (check if daily reminders are enabled)
             var rescheduledDailyCount = 0
+            if (isDailyRemindersEnabled(context)) {
+                val dailyCursor = db.rawQuery(
+                    "SELECT id, title, daily_times, daily_days FROM items WHERE daily = 1 AND active = 1",
+                    null
+                )
 
-            while (dailyCursor.moveToNext()) {
-                try {
-                    val itemId = dailyCursor.getInt(0)
-                    val title = dailyCursor.getString(1) ?: ""
-                    val dailyTimes = dailyCursor.getString(2) ?: ""
-                    val dailyDays = dailyCursor.getInt(3)
+                while (dailyCursor.moveToNext()) {
+                    try {
+                        val itemId = dailyCursor.getInt(0)
+                        val title = dailyCursor.getString(1) ?: ""
+                        val dailyTimes = dailyCursor.getString(2) ?: ""
+                        val dailyDays = dailyCursor.getInt(3)
 
-                    // Parse times (format: "6:18,18:18")
-                    val times = dailyTimes.split(",").filter { it.isNotBlank() }
+                        // Parse times (format: "6:18,18:18")
+                        val times = dailyTimes.split(",").filter { it.isNotBlank() }
 
-                    for (timeStr in times) {
-                        val parts = timeStr.trim().split(":")
-                        if (parts.size == 2) {
-                            val hour = parts[0].toIntOrNull() ?: continue
-                            val minute = parts[1].toIntOrNull() ?: continue
+                        for (timeStr in times) {
+                            val parts = timeStr.trim().split(":")
+                            if (parts.size == 2) {
+                                val hour = parts[0].toIntOrNull() ?: continue
+                                val minute = parts[1].toIntOrNull() ?: continue
 
-                            scheduleDailyReminderInBootReceiver(
-                                context,
-                                itemId,
-                                hour,
-                                minute,
-                                dailyDays,
-                                title
-                            )
+                                scheduleDailyReminderInBootReceiver(
+                                    context,
+                                    itemId,
+                                    hour,
+                                    minute,
+                                    dailyDays,
+                                    title
+                                )
 
-                            rescheduledDailyCount++
+                                rescheduledDailyCount++
+                            }
                         }
+                    } catch (e: Exception) {
+                        Log.e("MemorizerApp", "Error rescheduling daily item: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    Log.e("MemorizerApp", "Error rescheduling daily item: ${e.message}")
                 }
-            }
 
-            dailyCursor.close()
+                dailyCursor.close()
+                Log.d("MemorizerApp", "Rescheduled $rescheduledDailyCount daily reminders after boot")
+            } else {
+                Log.d("MemorizerApp", "Daily reminders are disabled, not rescheduling daily reminders after boot")
+            }
 
             // Reschedule yearly reminders
             val yearlyCursor = db.rawQuery(
@@ -2077,6 +2081,39 @@ class BootReceiver : BroadcastReceiver() {
             return result
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error checking if reminders enabled: ${e.message}")
+            return true
+        }
+    }
+
+    private fun isDailyRemindersEnabled(context: Context): Boolean {
+        try {
+            val dbPath = context.getDatabasePath("settings.db")
+            if (!dbPath.exists()) {
+                return true
+            }
+
+            val db = SQLiteDatabase.openDatabase(
+                dbPath.absolutePath,
+                null,
+                SQLiteDatabase.OPEN_READONLY
+            )
+
+            val cursor = db.rawQuery(
+                "SELECT value FROM settings WHERE key = ?",
+                arrayOf("Enable daily reminders")
+            )
+
+            val result = if (cursor.moveToFirst()) {
+                cursor.getString(0) == "true"
+            } else {
+                true
+            }
+
+            cursor.close()
+            db.close()
+            return result
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error checking if daily reminders enabled: ${e.message}")
             return true
         }
     }
