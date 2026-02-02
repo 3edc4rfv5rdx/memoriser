@@ -51,7 +51,15 @@ class FullScreenAlertActivity : Activity() {
         val content = intent.getStringExtra("content") ?: ""
         val soundValue = intent.getStringExtra("sound")
 
+        // Get translated labels (fallback to English if not provided)
+        val labelReminder = intent.getStringExtra("label_reminder") ?: "Reminder:"
+        val labelPostpone = intent.getStringExtra("label_postpone") ?: "Postpone for:"
+        val labelMin = intent.getStringExtra("label_min") ?: "min"
+        val labelHour = intent.getStringExtra("label_hour") ?: "hour"
+        val labelHours = intent.getStringExtra("label_hours") ?: "hours"
+
         Log.d("MemorizerApp", "FullScreenAlert - itemId: $itemId, title: $title, sound: $soundValue")
+        Log.d("MemorizerApp", "Labels - reminder: $labelReminder, postpone: $labelPostpone")
 
         // Cancel the notification now that fullscreen is shown
         try {
@@ -67,6 +75,10 @@ class FullScreenAlertActivity : Activity() {
             .format(java.util.Date())
         findViewById<TextView>(R.id.alert_time).text = currentTime
 
+        // Set translated labels
+        findViewById<TextView>(R.id.label_reminder).text = labelReminder
+        findViewById<TextView>(R.id.label_postpone).text = labelPostpone
+
         // Set text in views
         findViewById<TextView>(R.id.alert_title).text = title
         findViewById<TextView>(R.id.alert_content).apply {
@@ -74,14 +86,21 @@ class FullScreenAlertActivity : Activity() {
             visibility = if (content.isEmpty()) View.GONE else View.VISIBLE
         }
 
+        // Set button texts with translations
+        findViewById<Button>(R.id.snooze_10min).text = "10 $labelMin"
+        findViewById<Button>(R.id.snooze_20min).text = "20 $labelMin"
+        findViewById<Button>(R.id.snooze_30min).text = "30 $labelMin"
+        findViewById<Button>(R.id.snooze_1hour).text = "1 $labelHour"
+        findViewById<Button>(R.id.snooze_3hours).text = "3 $labelHours"
+
         // Setup OK button
         findViewById<Button>(R.id.alert_ok_button).setOnClickListener {
             dismissAlert()
         }
 
-        // Setup snooze buttons (10 min = 3 min for testing)
+        // Setup snooze buttons
         findViewById<Button>(R.id.snooze_10min).setOnClickListener {
-            snoozeReminder(itemId, title, content, soundValue, 3)
+            snoozeReminder(itemId, title, content, soundValue, 10)
         }
         findViewById<Button>(R.id.snooze_20min).setOnClickListener {
             snoozeReminder(itemId, title, content, soundValue, 20)
@@ -147,7 +166,7 @@ class FullScreenAlertActivity : Activity() {
                 }
                 MotionEvent.ACTION_UP -> {
                     val deltaY = event.rawY - initialY
-                    if (deltaY > 400) {  // Dragged down at least 400 pixels
+                    if (deltaY > 600) {  // Dragged down at least 600 pixels (longer path)
                         hideCircle()
                     } else {
                         // Snap back to original position

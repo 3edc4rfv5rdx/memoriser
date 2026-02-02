@@ -54,6 +54,7 @@
 
             <!-- Line 1: "Reminder:" label -->
             <TextView
+                android:id="@+id/label_reminder"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Reminder:"
@@ -100,6 +101,7 @@
 
             <!-- Snooze label -->
             <TextView
+                android:id="@+id/label_postpone"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Postpone for:"

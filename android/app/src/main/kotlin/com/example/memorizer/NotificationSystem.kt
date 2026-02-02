@@ -1523,6 +1523,12 @@ class NotificationReceiver : BroadcastReceiver() {
                 putExtra("title", title)
                 putExtra("content", content)
                 putExtra("sound", soundValue)
+                // Pass translations for UI labels (add punctuation programmatically)
+                putExtra("label_reminder", translate(context, "Reminder") + ":")
+                putExtra("label_postpone", translate(context, "Postpone for") + ":")
+                putExtra("label_min", translate(context, "min"))
+                putExtra("label_hour", translate(context, "hour"))
+                putExtra("label_hours", translate(context, "hours"))
             }
 
             val fullScreenPendingIntent = PendingIntent.getActivity(
@@ -1665,6 +1671,58 @@ class NotificationReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error checking if reminders enabled: ${e.message}")
             return true // Default if error
+        }
+    }
+
+    // Get current language from settings
+    private fun getCurrentLanguage(context: Context): String {
+        return try {
+            val dbPath = context.getDatabasePath("settings.db")
+            if (!dbPath.exists()) return "en"
+
+            val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery("SELECT value FROM settings WHERE key = ?", arrayOf("Language"))
+
+            val lang = if (cursor.moveToFirst()) {
+                cursor.getString(0) ?: "en"
+            } else {
+                "en"
+            }
+
+            cursor.close()
+            db.close()
+            lang
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error getting language: ${e.message}")
+            "en"
+        }
+    }
+
+    // Translation function - reads from assets/locales.json
+    private fun translate(context: Context, key: String): String {
+        return try {
+            val lang = getCurrentLanguage(context)
+
+            // Read locales.json from assets
+            val json = context.assets.open("flutter_assets/assets/locales.json")
+                .bufferedReader().use { it.readText() }
+
+            val jsonObject = org.json.JSONObject(json)
+
+            // Get translation for key and language
+            if (jsonObject.has(key)) {
+                val translations = jsonObject.getJSONObject(key)
+                if (translations.has(lang)) {
+                    translations.getString(lang)
+                } else {
+                    key // Fallback to key if language not found
+                }
+            } else {
+                key // Fallback to key if key not found
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error translating '$key': ${e.message}")
+            key // Fallback to key on error
         }
     }
 }

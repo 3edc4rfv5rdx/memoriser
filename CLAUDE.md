@@ -52,3 +52,13 @@ Documents/Memorizer/
 ## Code Style
 - All code comments must be in English. Translate any non-English comments to English.
 - ToDo.txt and Done.txt entries should also be in English.
+
+## Localization Rules
+**CRITICAL - Localization Best Practices:**
+- **Clean strings only** in `assets/locales.json` - no punctuation marks
+- **Punctuation added programmatically** in code
+- Example:
+  - ❌ WRONG: `"Reminder:": {"ru": "Напоминание:"}`
+  - ✅ CORRECT: `"Reminder": {"ru": "Напоминание"}` + add ":" in code
+- Reason: Different languages may use different punctuation, same word used in different contexts
+- Native Android code reads from `flutter_assets/assets/locales.json` using `context.assets.open()`
