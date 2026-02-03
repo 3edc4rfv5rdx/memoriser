@@ -436,6 +436,13 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
+            // Check permission on Android 12+ (setAlarmClock works without permission, but log for info)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    Log.w("MemorizerApp", "SCHEDULE_EXACT_ALARM permission not granted (setAlarmClock should still work)")
+                }
+            }
+
             // Use setAlarmClock for guaranteed exact timing even in Doze mode
             // This is appropriate for user-scheduled daily reminders
             val alarmClockInfo = AlarmManager.AlarmClockInfo(
@@ -499,6 +506,16 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
         try {
             Log.d("MemorizerApp", "Scheduling specific reminder for item $itemId at $year-$month-$day $hour:$minute")
 
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            // Check permission on Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    Log.e("MemorizerApp", "SCHEDULE_EXACT_ALARM permission not granted! Alarms may not fire.")
+                    Log.e("MemorizerApp", "User needs to enable 'Alarms & reminders' in Settings > Apps > Memorizer")
+                }
+            }
+
             // Create intent for specific reminder
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SPECIFIC_REMINDER"
@@ -525,8 +542,6 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }
-
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
             // Schedule exact reminder only if time is in the future
             if (calendar.timeInMillis > System.currentTimeMillis()) {
@@ -1260,8 +1275,8 @@ class NotificationReceiver : BroadcastReceiver() {
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SPECIFIC_REMINDER"
                 putExtra("itemId", itemId)
-                putExtra("title", "Memorizer")
-                putExtra("body", "Reminder")
+                putExtra("title", itemData.title ?: "")
+                putExtra("body", itemData.content ?: "")
             }
 
             val pendingIntent = PendingIntent.getBroadcast(
@@ -1835,8 +1850,12 @@ class BootReceiver : BroadcastReceiver() {
                         val dailyTimes = dailyCursor.getString(2) ?: ""
                         val dailyDays = dailyCursor.getInt(3)
 
-                        // Parse times (format: "6:18,18:18")
-                        val times = dailyTimes.split(",").filter { it.isNotBlank() }
+                        // Parse times from JSON array format: ["06:33","18:33"] or ["16:56"]
+                        val cleanedTimes = dailyTimes
+                            .replace("[", "")
+                            .replace("]", "")
+                            .replace("\"", "")
+                        val times = cleanedTimes.split(",").filter { it.isNotBlank() }
 
                         for (timeStr in times) {
                             val parts = timeStr.trim().split(":")
@@ -2096,8 +2115,8 @@ class BootReceiver : BroadcastReceiver() {
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SPECIFIC_REMINDER"
                 putExtra("itemId", itemId)
-                putExtra("title", "Memorizer")
-                putExtra("body", "Reminder")
+                putExtra("title", title)
+                putExtra("body", body)
             }
 
             val pendingIntent = PendingIntent.getBroadcast(

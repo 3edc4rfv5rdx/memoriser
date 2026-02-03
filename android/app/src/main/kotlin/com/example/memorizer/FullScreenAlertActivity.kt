@@ -310,6 +310,13 @@ class FullScreenAlertActivity : Activity() {
 
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
+            // Check permission on Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    Log.w("MemorizerApp", "SCHEDULE_EXACT_ALARM permission not granted (setAlarmClock should still work)")
+                }
+            }
+
             // Schedule the snoozed reminder using setAlarmClock for guaranteed exact timing
             // This ensures it fires even in Doze mode and shows in system alarms
             val alarmClockInfo = AlarmManager.AlarmClockInfo(
