@@ -64,6 +64,7 @@
                 <action android:name="com.example.memorizer.CHECK_REMINDERS"/>
                 <!-- Добавляем действие для конкретных напоминаний -->
                 <action android:name="com.example.memorizer.SPECIFIC_REMINDER"/>
+                <action android:name="com.example.memorizer.STOP_SOUND"/>
             </intent-filter>
         </receiver>
 

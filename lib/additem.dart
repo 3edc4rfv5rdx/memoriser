@@ -310,10 +310,9 @@ class _EditItemPageState extends State<EditItemPage> {
         final conflictTitle = await _checkTimeConflict(timeStr);
         if (conflictTitle != null) {
           okInfoBarOrange(
-            '${lw('Time conflict with')}: $conflictTitle $timeStr',
+            '${lw('Same time as')}: $conflictTitle $timeStr',
             duration: Duration(seconds: 4),
           );
-          return;
         }
       }
     }
@@ -1198,23 +1197,26 @@ class _EditItemPageState extends State<EditItemPage> {
     final excludeId = widget.itemId;
     final timeInt = timeStringToInt(timeHHMM);
 
-    // Check one-time reminders with same time
-    String whereClause = 'remind = 1 AND time = ?';
-    List<dynamic> whereArgs = [timeInt];
-    if (excludeId != null) {
-      whereClause += ' AND id != ?';
-      whereArgs.add(excludeId);
-    }
+    // Check one-time reminders with same time AND same date
+    if (_remind && _date != null) {
+      final dateInt = dateTimeToYYYYMMDD(_date);
+      String whereClause = 'remind = 1 AND time = ? AND date = ?';
+      List<dynamic> whereArgs = [timeInt, dateInt];
+      if (excludeId != null) {
+        whereClause += ' AND id != ?';
+        whereArgs.add(excludeId);
+      }
 
-    final oneTimeItems = await mainDb.query(
-      'items',
-      columns: ['id', 'title'],
-      where: whereClause,
-      whereArgs: whereArgs,
-    );
+      final oneTimeItems = await mainDb.query(
+        'items',
+        columns: ['id', 'title'],
+        where: whereClause,
+        whereArgs: whereArgs,
+      );
 
-    if (oneTimeItems.isNotEmpty) {
-      return oneTimeItems.first['title'] as String?;
+      if (oneTimeItems.isNotEmpty) {
+        return oneTimeItems.first['title'] as String?;
+      }
     }
 
     // Check daily reminders containing this time
@@ -1278,15 +1280,14 @@ class _EditItemPageState extends State<EditItemPage> {
       if (_dailyTimes.contains(timeStr)) {
         okInfoBarOrange('${lw('Time already added')}: $timeStr');
       } else {
-        // Check cross-item time conflict
+        // Check cross-item time conflict (warn only)
         final conflictTitle = await _checkTimeConflict(timeStr);
         if (conflictTitle != null) {
-          okInfoBarOrange('${lw('Time conflict with')}: $conflictTitle $timeStr');
-        } else {
-          setState(() {
-            _dailyTimes = addDailyTime(_dailyTimes, timeStr);
-          });
+          okInfoBarOrange('${lw('Same time as')}: $conflictTitle $timeStr');
         }
+        setState(() {
+          _dailyTimes = addDailyTime(_dailyTimes, timeStr);
+        });
       }
     }
   }

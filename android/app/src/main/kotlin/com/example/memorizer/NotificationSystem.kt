@@ -185,8 +185,24 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
         }
     }
 
-    // Media player for sound playback
-    private var mediaPlayer: android.media.MediaPlayer? = null
+    // Media player for sound playback (companion for access from NotificationReceiver)
+    companion object {
+        var mediaPlayer: android.media.MediaPlayer? = null
+
+        fun stopSoundStatic() {
+            try {
+                mediaPlayer?.let {
+                    if (it.isPlaying) {
+                        it.stop()
+                    }
+                    it.release()
+                }
+                mediaPlayer = null
+            } catch (e: Exception) {
+                Log.e("MemorizerApp", "Error stopping sound (static): ${e.message}")
+            }
+        }
+    }
 
     // Get list of system notification sounds
     private fun getSystemSounds(): List<Map<String, String>> {
@@ -265,17 +281,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
     // Stop currently playing sound
     private fun stopSound() {
-        try {
-            mediaPlayer?.let {
-                if (it.isPlaying) {
-                    it.stop()
-                }
-                it.release()
-            }
-            mediaPlayer = null
-        } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error stopping sound: ${e.message}")
-        }
+        stopSoundStatic()
     }
 
     // Get default daily sound from settings (or system default if not set)
@@ -392,10 +398,11 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             )
 
             // Set time for next reminder (find next valid day from daysMask)
+            // Spread conflicting times by 3 seconds based on itemId
             val calendar = Calendar.getInstance().apply {
                 set(Calendar.HOUR_OF_DAY, hour)
                 set(Calendar.MINUTE, minute)
-                set(Calendar.SECOND, 0)
+                set(Calendar.SECOND, ((itemId ?: 0) % 20) * 3)
                 set(Calendar.MILLISECOND, 0)
             }
 
@@ -683,6 +690,15 @@ class NotificationReceiver : BroadcastReceiver() {
                 "com.example.memorizer.SNOOZED_REMINDER" -> {
                     // Handle snoozed reminder (no DB, just from intent)
                     handleSnoozedReminder(context, intent)
+                    return
+                }
+                "com.example.memorizer.STOP_SOUND" -> {
+                    // Stop playing sound and dismiss notification
+                    NotificationService.stopSoundStatic()
+                    val notifId = intent.getIntExtra("notificationId", 0)
+                    if (notifId != 0) {
+                        NotificationManagerCompat.from(context).cancel(notifId)
+                    }
                     return
                 }
             }
@@ -1159,6 +1175,18 @@ class NotificationReceiver : BroadcastReceiver() {
                 .bigText(content)
                 .setBigContentTitle(title)
 
+            // Stop sound intent (for action button and swipe dismiss)
+            val stopIntent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.STOP_SOUND"
+                putExtra("notificationId", notificationId)
+            }
+            val stopPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId + 900000,
+                stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             // Use the channel with custom sound
             val builder = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.notification_icon)
@@ -1171,6 +1199,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 .setAutoCancel(true)
                 .setColor(blueColor)
                 .setColorized(true)
+                .setDeleteIntent(stopPendingIntent)
+                .addAction(R.drawable.notification_icon, "Stop", stopPendingIntent)
 
             // For Android < 8, set sound directly on notification
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -1203,7 +1233,9 @@ class NotificationReceiver : BroadcastReceiver() {
     // Play sound file manually for notifications (workaround for file:// URI restrictions)
     private fun playSoundFile(context: Context, filePath: String) {
         try {
-            val mediaPlayer = android.media.MediaPlayer().apply {
+            // Stop any currently playing sound first
+            NotificationService.stopSoundStatic()
+            NotificationService.mediaPlayer = android.media.MediaPlayer().apply {
                 setDataSource(filePath)
                 setAudioAttributes(
                     android.media.AudioAttributes.Builder()
@@ -1213,7 +1245,10 @@ class NotificationReceiver : BroadcastReceiver() {
                 )
                 prepare()
                 start()
-                setOnCompletionListener { it.release() }
+                setOnCompletionListener {
+                    it.release()
+                    NotificationService.mediaPlayer = null
+                }
             }
             Log.d("MemorizerApp", "Playing sound file: $filePath")
         } catch (e: Exception) {
@@ -1629,6 +1664,18 @@ class NotificationReceiver : BroadcastReceiver() {
                 .bigText(content)
                 .setBigContentTitle(title)
 
+            // Stop sound intent (for action button and swipe dismiss)
+            val stopIntent = Intent(context, NotificationReceiver::class.java).apply {
+                action = "com.example.memorizer.STOP_SOUND"
+                putExtra("notificationId", notificationId)
+            }
+            val stopPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId + 900000,
+                stopIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             // Create notification with specified channel
             val builder = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.notification_icon)
@@ -1642,6 +1689,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 .setColor(orangeColor)
                 .setColorized(true)
                 .setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
+                .setDeleteIntent(stopPendingIntent)
+                .addAction(R.drawable.notification_icon, "Stop", stopPendingIntent)
 
             // Show notification with permission check
             try {
