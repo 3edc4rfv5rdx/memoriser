@@ -480,15 +480,17 @@ Future<void> removeExpiredItems() async {
 
     myPrint('Found ${expiredItems.length} expired items to delete');
 
-    // Delete photo folders for expired items
+    // Delete photo folders and cancel alarms for expired items
     int deletedFolders = 0;
     for (var item in expiredItems) {
       final itemId = item['id'] as int;
       try {
         await deleteItemPhotoDir(itemId);
+        await SimpleNotifications.cancelSpecificReminder(itemId);
+        await SimpleNotifications.cancelAllDailyReminders(itemId);
         deletedFolders++;
       } catch (e) {
-        myPrint('Error deleting photo folder for item $itemId: $e');
+        myPrint('Error cleaning up expired item $itemId: $e');
       }
     }
 
@@ -1516,24 +1518,55 @@ class _HomePageState extends State<HomePage> {
       List<Map<String, dynamic>> finalItems = [];
 
       if (_isInYearlyFolder) {
-        // В папке Yearly - только ежегодные записи
+        // Yearly folder - sort by date/time ASC (nearest first)
         final yearlyItems = items.where((item) => item['yearly'] == 1).toList();
+        yearlyItems.sort((a, b) {
+          final dateA = a['date'] as int? ?? 99999999;
+          final dateB = b['date'] as int? ?? 99999999;
+          if (dateA != dateB) return dateA.compareTo(dateB);
+          final timeA = a['time'] as int? ?? 0;
+          final timeB = b['time'] as int? ?? 0;
+          return timeA.compareTo(timeB);
+        });
         finalItems.addAll(yearlyItems);
 
       } else if (_isInNotesFolder) {
-        // В папке Notes - только записи без времени, не ежегодные и не daily
+        // Notes folder - sort by created date (respect "Newest first" setting)
         final notesItems = items.where((item) =>
         item['time'] == null && item['yearly'] != 1 && item['daily'] != 1).toList();
+        final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
+        notesItems.sort((a, b) {
+          final createdA = a['created'] as int? ?? 0;
+          final createdB = b['created'] as int? ?? 0;
+          return newestFirst == "true"
+              ? createdB.compareTo(createdA)
+              : createdA.compareTo(createdB);
+        });
         finalItems.addAll(notesItems);
 
       } else if (_isInDailyFolder) {
-        // В папке Daily - только записи с ежедневными напоминаниями
+        // Daily folder - sort by first daily time ASC
         final dailyItems = items.where((item) => item['daily'] == 1).toList();
+        dailyItems.sort((a, b) {
+          final timesA = parseDailyTimes(a['daily_times']);
+          final timesB = parseDailyTimes(b['daily_times']);
+          final firstA = timesA.isNotEmpty ? timesA.first : '99:99';
+          final firstB = timesB.isNotEmpty ? timesB.first : '99:99';
+          return firstA.compareTo(firstB);
+        });
         finalItems.addAll(dailyItems);
 
       } else if (_isInMonthlyFolder) {
-        // In Monthly folder - only monthly reminder records
+        // Monthly folder - sort by priority DESC, then time ASC (nearest first)
         final monthlyItems = items.where((item) => item['monthly'] == 1).toList();
+        monthlyItems.sort((a, b) {
+          final prioA = a['priority'] as int? ?? 0;
+          final prioB = b['priority'] as int? ?? 0;
+          if (prioA != prioB) return prioB.compareTo(prioA);
+          final timeA = a['time'] as int? ?? 0;
+          final timeB = b['time'] as int? ?? 0;
+          return timeA.compareTo(timeB);
+        });
         finalItems.addAll(monthlyItems);
 
       } else {
@@ -1754,8 +1787,9 @@ class _HomePageState extends State<HomePage> {
                     // Delete item photo folder
                     await deleteItemPhotoDir(item['id']);
 
-                    // Cancel specific reminder if it exists
+                    // Cancel all reminders for this item
                     await SimpleNotifications.cancelSpecificReminder(item['id']);
+                    await SimpleNotifications.cancelAllDailyReminders(item['id']);
 
                     // Delete item from database
                     await mainDb.delete(
@@ -2134,7 +2168,9 @@ class _HomePageState extends State<HomePage> {
                     // Delete item photo folder
                     await deleteItemPhotoDir(item['id']);
 
+                    // Cancel all reminders for this item
                     await SimpleNotifications.cancelSpecificReminder(item['id']);
+                    await SimpleNotifications.cancelAllDailyReminders(item['id']);
 
                     await mainDb.delete(
                       'items',

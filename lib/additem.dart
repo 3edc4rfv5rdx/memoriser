@@ -303,6 +303,21 @@ class _EditItemPageState extends State<EditItemPage> {
       }
     }
 
+    // Check time conflicts with other items
+    if (_remind && _time != null) {
+      final timeStr = timeIntToString(_time);
+      if (timeStr != null) {
+        final conflictTitle = await _checkTimeConflict(timeStr);
+        if (conflictTitle != null) {
+          okInfoBarOrange(
+            '${lw('Time conflict with')}: $conflictTitle $timeStr',
+            duration: Duration(seconds: 4),
+          );
+          return;
+        }
+      }
+    }
+
     // Convert date to YYYYMMDD format for storage
     final dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
     final remindValue = _remind ? 1 : 0;
@@ -1178,6 +1193,55 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
+  // Check if a time "HH:MM" conflicts with reminders in other items
+  Future<String?> _checkTimeConflict(String timeHHMM) async {
+    final excludeId = widget.itemId;
+    final timeInt = timeStringToInt(timeHHMM);
+
+    // Check one-time reminders with same time
+    String whereClause = 'remind = 1 AND time = ?';
+    List<dynamic> whereArgs = [timeInt];
+    if (excludeId != null) {
+      whereClause += ' AND id != ?';
+      whereArgs.add(excludeId);
+    }
+
+    final oneTimeItems = await mainDb.query(
+      'items',
+      columns: ['id', 'title'],
+      where: whereClause,
+      whereArgs: whereArgs,
+    );
+
+    if (oneTimeItems.isNotEmpty) {
+      return oneTimeItems.first['title'] as String?;
+    }
+
+    // Check daily reminders containing this time
+    String dailyWhere = 'daily = 1';
+    List<dynamic> dailyArgs = [];
+    if (excludeId != null) {
+      dailyWhere += ' AND id != ?';
+      dailyArgs.add(excludeId);
+    }
+
+    final dailyItems = await mainDb.query(
+      'items',
+      columns: ['id', 'title', 'daily_times'],
+      where: dailyWhere,
+      whereArgs: dailyArgs,
+    );
+
+    for (var item in dailyItems) {
+      final times = parseDailyTimes(item['daily_times']);
+      if (times.contains(timeHHMM)) {
+        return item['title'] as String?;
+      }
+    }
+
+    return null; // No conflict
+  }
+
   // Show dialog to add a new time
   Future<void> _showAddTimeDialog() async {
     TimeOfDay? selectedTime = await showTimePicker(
@@ -1211,9 +1275,19 @@ class _EditItemPageState extends State<EditItemPage> {
 
     if (selectedTime != null) {
       final timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
-      setState(() {
-        _dailyTimes = addDailyTime(_dailyTimes, timeStr);
-      });
+      if (_dailyTimes.contains(timeStr)) {
+        okInfoBarOrange('${lw('Time already added')}: $timeStr');
+      } else {
+        // Check cross-item time conflict
+        final conflictTitle = await _checkTimeConflict(timeStr);
+        if (conflictTitle != null) {
+          okInfoBarOrange('${lw('Time conflict with')}: $conflictTitle $timeStr');
+        } else {
+          setState(() {
+            _dailyTimes = addDailyTime(_dailyTimes, timeStr);
+          });
+        }
+      }
     }
   }
 

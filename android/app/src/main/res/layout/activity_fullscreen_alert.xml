@@ -43,11 +43,11 @@
 
         </LinearLayout>
 
-        <!-- Middle section - 5/8 of screen (Message content) -->
+        <!-- Middle section - 3/8 of screen (Message content) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="5"
+            android:layout_weight="3"
             android:orientation="vertical"
             android:gravity="center_horizontal|top"
             android:paddingTop="40dp">
@@ -90,11 +90,11 @@
 
         </LinearLayout>
 
-        <!-- Bottom section - 2/8 of screen (Snooze + OK button) -->
+        <!-- Bottom section - 4/8 of screen (Snooze + OK button) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="2"
+            android:layout_weight="4"
             android:orientation="vertical"
             android:gravity="center"
             android:paddingTop="8dp">
