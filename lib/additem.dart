@@ -1428,11 +1428,8 @@ class _EditItemPageState extends State<EditItemPage> {
 
     return Row(
       children: [
-        SizedBox(width: 16), // Shift right
-        Icon(Icons.volume_up, color: clText, size: 20),
-        SizedBox(width: 8),
-        // Hide "Sound:" label for daily reminders to save space
         if (!isDaily) ...[
+          SizedBox(width: 16),
           Text(
             lw('Sound:'),
             style: TextStyle(color: clText, fontSize: fsNormal),
@@ -1474,6 +1471,14 @@ class _EditItemPageState extends State<EditItemPage> {
             constraints: BoxConstraints(),
           ),
         ],
+        // Stop button
+        SizedBox(width: 4),
+        IconButton(
+          icon: Icon(Icons.stop, color: clText),
+          onPressed: () => SimpleNotifications.stopSound(),
+          padding: EdgeInsets.zero,
+          constraints: BoxConstraints(),
+        ),
       ],
     );
   }

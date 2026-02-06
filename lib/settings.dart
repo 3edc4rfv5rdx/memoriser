@@ -526,13 +526,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       child: Row(
         children: [
           Expanded(
-            flex: 60,
+            flex: 50,
             child: Text(
               label,
               style: TextStyle(color: clText, fontSize: fsMedium),
             ),
           ),
-          Expanded(flex: 40, child: child),
+          Expanded(flex: 50, child: child),
         ],
       ),
     );
@@ -720,40 +720,51 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     final currentSound = isDaily ? _newDefaultDailySound : _newDefaultSound;
     final soundName = _getSoundName(currentSound);
 
-    return GestureDetector(
-      onTap: () => _showSoundPicker(isDaily: isDaily),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: clFill,
-          border: Border.all(color: clUpBar),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                soundName,
-                style: TextStyle(color: clText, fontSize: fsMedium),
-                overflow: TextOverflow.ellipsis,
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _showSoundPicker(isDaily: isDaily),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: clFill,
+                border: Border.all(color: clUpBar),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      soundName,
+                      style: TextStyle(color: clText, fontSize: fsMedium),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(Icons.arrow_drop_down, color: clText),
+                ],
               ),
             ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (currentSound != null)
-                  GestureDetector(
-                    onTap: () => SimpleNotifications.playSound(soundUri: currentSound),
-                    child: Icon(Icons.play_arrow, color: clText, size: 20),
-                  ),
-                SizedBox(width: 4),
-                Icon(Icons.arrow_drop_down, color: clText),
-              ],
-            ),
-          ],
+          ),
         ),
-      ),
+        if (currentSound != null) ...[
+          SizedBox(width: 8),
+          IconButton(
+            icon: Icon(Icons.play_arrow, color: clText),
+            onPressed: () => SimpleNotifications.playSound(soundUri: currentSound),
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(),
+          ),
+        ],
+        SizedBox(width: 4),
+        IconButton(
+          icon: Icon(Icons.stop, color: clText),
+          onPressed: () => SimpleNotifications.stopSound(),
+          padding: EdgeInsets.zero,
+          constraints: BoxConstraints(),
+        ),
+      ],
     );
   }
 
