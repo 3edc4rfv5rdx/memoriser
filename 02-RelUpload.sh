@@ -201,7 +201,7 @@ upload_asset() {
         gh release delete-asset "$tag" "$dst" -y 2>/dev/null || true
 
         if timeout "$UPLOAD_TIMEOUT" \
-            gh release upload "$tag" "$src" --name "$dst" --clobber
+            gh release upload "$tag" "${src}#${dst}" --clobber
         then
             echo "Upload OK: $dst"
             return 0
