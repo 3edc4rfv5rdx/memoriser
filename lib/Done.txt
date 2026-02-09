@@ -1,3 +1,9 @@
+  + Localize day names: replaced hardcoded dayNames/dayNamesRu arrays with lw() keys
+    - Added 7 locale keys (Mo..Su) to locales.json with ru/ua translations
+    - getDayName() now uses lw(dayKeys[i]) instead of hardcoded arrays
+    - getDaysCompact() takes first letter of localized day name
+    - Removed const dayNames and dayNamesRu arrays from globals.dart
+
   + Monthly reminders: fixed month overflow bug:
     - Problem: 30 Jan + 1 month = 2 Mar (instead of 28 Feb)
     - Calendar.add(MONTH) + set(DAY_OF_MONTH) overflows invalid days

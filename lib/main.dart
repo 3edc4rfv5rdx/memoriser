@@ -1557,12 +1557,12 @@ class _HomePageState extends State<HomePage> {
         finalItems.addAll(dailyItems);
 
       } else if (_isInMonthlyFolder) {
-        // Monthly folder - sort by priority DESC, then time ASC (nearest first)
+        // Monthly folder - sort by date ASC (nearest first), then time ASC
         final monthlyItems = items.where((item) => item['monthly'] == 1).toList();
         monthlyItems.sort((a, b) {
-          final prioA = a['priority'] as int? ?? 0;
-          final prioB = b['priority'] as int? ?? 0;
-          if (prioA != prioB) return prioB.compareTo(prioA);
+          final dateA = a['date'] as int? ?? 99999999;
+          final dateB = b['date'] as int? ?? 99999999;
+          if (dateA != dateB) return dateA.compareTo(dateB);
           final timeA = a['time'] as int? ?? 0;
           final timeB = b['time'] as int? ?? 0;
           return timeA.compareTo(timeB);
@@ -2297,20 +2297,35 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ],
                     ),
+                  // Daily reminder days
+                  if (isDaily)
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today, color: Colors.blue, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          getDaysCompact((item['daily_days'] as int?) ?? dayAllDays),
+                          style: TextStyle(
+                            fontSize: fsMedium,
+                            color: Colors.blue,
+                            fontWeight: fwBold,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
                   // Daily reminder times
                   if (isDaily && dailyTimesFormatted != null)
                     Row(
                       children: [
                         Icon(Icons.access_time, color: Colors.blue, size: 16),
                         SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            dailyTimesFormatted,
-                            style: TextStyle(
-                              fontSize: fsMedium,
-                              color: Colors.blue,
-                              fontWeight: fwBold,
-                            ),
+                        Text(
+                          dailyTimesFormatted,
+                          style: TextStyle(
+                            fontSize: fsMedium,
+                            color: Colors.blue,
+                            fontWeight: fwBold,
                           ),
                         ),
                       ],
