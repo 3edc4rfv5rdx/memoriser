@@ -15,8 +15,8 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-const String progVersion = '0.9.260206';
-const int buildNumber = 85;
+const String progVersion = '0.9.260209';
+const int buildNumber = 86;
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -1430,6 +1430,19 @@ String getDaysString(int dayMask) {
 
   final enabledDays = getEnabledDays(dayMask);
   return enabledDays.map((i) => getDayName(i)).join(', ');
+}
+
+/// Get compact days string (e.g., "пвсчп--" or "MTWTF--")
+String getDaysCompact(int dayMask) {
+  const lettersRu = ['п', 'в', 'с', 'ч', 'п', 'с', 'в'];
+  const lettersEn = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  final letters = currentLocale == 'ru' ? lettersRu : lettersEn;
+
+  final sb = StringBuffer();
+  for (int i = 0; i < 7; i++) {
+    sb.write(isDayEnabled(dayMask, i) ? letters[i] : '-');
+  }
+  return sb.toString();
 }
 
 // ============ Daily Times JSON Utilities ============
