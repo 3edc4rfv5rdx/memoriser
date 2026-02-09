@@ -16,7 +16,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 const String progVersion = '0.9.260209';
-const int buildNumber = 86;
+const int buildNumber = 87;
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -1375,15 +1375,13 @@ const int dayAllDays = 127;   // 0b1111111 (all days)
 const int dayWeekdays = 31;   // 0b0011111 (Mon-Fri)
 const int dayWeekend = 96;    // 0b1100000 (Sat-Sun)
 
-// Day names for UI (ordered: Mon-Sun)
-const List<String> dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const List<String> dayNamesRu = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+// Day name keys for localization (ordered: Mon-Sun)
+const List<String> dayKeys = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
 /// Get localized day name for index (0=Monday, 6=Sunday)
 String getDayName(int dayIndex) {
   if (dayIndex < 0 || dayIndex > 6) return '';
-  final names = currentLocale == 'ru' ? dayNamesRu : dayNames;
-  return names[dayIndex];
+  return lw(dayKeys[dayIndex]);
 }
 
 /// Check if a specific day is set in the bitmask
@@ -1434,13 +1432,13 @@ String getDaysString(int dayMask) {
 
 /// Get compact days string (e.g., "пвсчп--" or "MTWTF--")
 String getDaysCompact(int dayMask) {
-  const lettersRu = ['п', 'в', 'с', 'ч', 'п', 'с', 'в'];
-  const lettersEn = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  final letters = currentLocale == 'ru' ? lettersRu : lettersEn;
-
   final sb = StringBuffer();
   for (int i = 0; i < 7; i++) {
-    sb.write(isDayEnabled(dayMask, i) ? letters[i] : '-');
+    if (isDayEnabled(dayMask, i)) {
+      sb.write(lw(dayKeys[i])[0].toLowerCase());
+    } else {
+      sb.write('-');
+    }
   }
   return sb.toString();
 }
