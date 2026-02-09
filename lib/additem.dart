@@ -391,6 +391,7 @@ class _EditItemPageState extends State<EditItemPage> {
         );
 
         // Update daily reminders for this item
+        myPrint("Daily save: id=${widget.itemId}, daily=$_daily, active=$_active, times=$_dailyTimes, days=$_dailyDays");
         await SimpleNotifications.updateDailyReminders(
           widget.itemId!,
           _daily,
@@ -1174,17 +1175,21 @@ class _EditItemPageState extends State<EditItemPage> {
         else
           Wrap(
             spacing: 8,
-            runSpacing: 4,
+            runSpacing: 6,
             children: _dailyTimes.map((time) {
-              return Chip(
-                label: Text(time, style: TextStyle(color: clText)),
-                backgroundColor: clUpBar,
-                deleteIcon: Icon(Icons.close, size: 16, color: clRed),
-                onDeleted: () {
-                  setState(() {
-                    _dailyTimes = removeDailyTime(_dailyTimes, time);
-                  });
-                },
+              return GestureDetector(
+                onTap: () => _editDailyTime(time),
+                child: Chip(
+                  label: Text(time, style: TextStyle(color: clText, fontSize: fsLarge, fontWeight: fwBold)),
+                  backgroundColor: clUpBar,
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  deleteIcon: Icon(Icons.close, size: 18, color: clRed),
+                  onDeleted: () {
+                    setState(() {
+                      _dailyTimes = removeDailyTime(_dailyTimes, time);
+                    });
+                  },
+                ),
               );
             }).toList(),
           ),
@@ -1242,6 +1247,60 @@ class _EditItemPageState extends State<EditItemPage> {
     }
 
     return null; // No conflict
+  }
+
+  // Edit existing daily time
+  Future<void> _editDailyTime(String oldTime) async {
+    final parts = oldTime.split(':');
+    final initialTime = TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? 9,
+      minute: int.tryParse(parts[1]) ?? 0,
+    );
+
+    TimeOfDay? selectedTime = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: clUpBar,
+              onPrimary: clText,
+              surface: clBgrnd,
+              onSurface: clText,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedTime != null) {
+      final newTime = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+      if (newTime == oldTime) return;
+      if (_dailyTimes.contains(newTime)) {
+        okInfoBarOrange('${lw('Time already added')}: $newTime');
+      } else {
+        final conflictTitle = await _checkTimeConflict(newTime);
+        if (conflictTitle != null) {
+          okInfoBarOrange('${lw('Same time as')}: $conflictTitle $newTime');
+        }
+        setState(() {
+          _dailyTimes = removeDailyTime(_dailyTimes, oldTime);
+          _dailyTimes = addDailyTime(_dailyTimes, newTime);
+        });
+      }
+    }
   }
 
   // Show dialog to add a new time
