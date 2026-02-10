@@ -1,3 +1,20 @@
+  + Wake screen on reminder trigger (non-fullscreen):
+    - Added wakeScreen() in NotificationReceiver using PowerManager
+    - SCREEN_BRIGHT_WAKE_LOCK + ACQUIRE_CAUSES_WAKEUP + ON_AFTER_RELEASE
+    - Wakes screen for 3 seconds, only if screen is off (isInteractive check)
+    - Called from handleDailyReminder and handleSpecificReminder (non-fullscreen branch)
+    - Fullscreen alerts already wake screen via FullScreenAlertActivity flags
+    - File: NotificationSystem.kt
+
+  + Fix photo/sounds restore from backup:
+    - Problem: FilePicker on Android returns cached copy of .db file, so parent dir
+      points to cache instead of actual backup directory containing Photo/ and Sounds/
+    - Fix: check if Photo/Sounds exist in picked parent; if not, extract date from
+      filename (memorizer-YYYYMMDD.db) and look for mem-YYYYMMDD dir in Memorizer folder
+    - Added logging to _copyDirectoryRecursive: source/target paths, source existence
+      check, entity count for tracing
+    - File: backup.dart
+
   + Localize day names: replaced hardcoded dayNames/dayNamesRu arrays with lw() keys
     - Added 7 locale keys (Mo..Su) to locales.json with ru/ua translations
     - getDayName() now uses lw(dayKeys[i]) instead of hardcoded arrays

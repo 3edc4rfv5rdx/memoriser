@@ -15,6 +15,7 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
@@ -721,6 +722,26 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
+    // Wake screen briefly for notification (when fullscreen alert is not used)
+    private fun wakeScreen(context: Context) {
+        try {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!powerManager.isInteractive) {
+                @Suppress("DEPRECATION")
+                val wakeLock = powerManager.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                    PowerManager.ON_AFTER_RELEASE,
+                    "memorizer:reminder"
+                )
+                wakeLock.acquire(5000) // Wake screen for 5 seconds
+                Log.d("MemorizerApp", "Screen woken up for reminder")
+            }
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error waking screen: ${e.message}")
+        }
+    }
+
     // Handle daily reminder
     private fun handleDailyReminder(context: Context, intent: Intent) {
         try {
@@ -783,6 +804,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound)
             } else {
                 Log.d("MemorizerApp", "Fullscreen is DISABLED for daily reminder $itemId, showing notification")
+                wakeScreen(context)
                 // Create notification channel for daily reminders with custom sound
                 val channelId = createDailyNotificationChannel(context, itemSound)
 
@@ -1417,6 +1439,7 @@ class NotificationReceiver : BroadcastReceiver() {
                     launchFullscreenAlert(context, itemId, itemTitle, itemContent, defaultSound)
                 } else {
                     Log.d("MemorizerApp", "Fullscreen is DISABLED for specific reminder $itemId, showing notification")
+                    wakeScreen(context)
                     // Create notification channel with sound from settings
                     val channelId = createReminderNotificationChannel(context, defaultSound)
 

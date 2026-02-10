@@ -96,11 +96,17 @@ Future<String> createBackup() async {
 
 // Recursively copy directory preserving structure
 Future<int> _copyDirectoryRecursive(Directory source, Directory target, {bool skipTemp = false}) async {
+  myPrint('_copyDirectoryRecursive: ${source.path} -> ${target.path}');
+  if (!await source.exists()) {
+    myPrint('_copyDirectoryRecursive: source does not exist!');
+    return 0;
+  }
   if (!await target.exists()) {
     await target.create(recursive: true);
   }
   int copiedFiles = 0;
   final entities = await source.list().toList();
+  myPrint('_copyDirectoryRecursive: found ${entities.length} entities in source');
   for (var entity in entities) {
     final name = entity.path.split('/').last;
     if (skipTemp && name.startsWith('temp_')) continue;
@@ -437,12 +443,31 @@ Future<String> restoreBackup() async {
       return lw('Error reopening database');
     }
 
-    // Restore Photo folder if exists in backup
-    final backupDir = Directory(filePath).parent;
-    await _restorePhotoFolder(backupDir.path);
+    // Restore Photo and Sounds folders from backup
+    // File picker may return a cached copy, so parent dir might not be the actual backup dir
+    final pickedParent = File(filePath).parent.path;
+    String backupDirPath = pickedParent;
+    myPrint('Picked file parent dir: $pickedParent');
 
-    // Restore Sounds folder if exists in backup
-    await _restoreSoundsFolder(backupDir.path);
+    final hasPhotoInParent = await Directory('$pickedParent/Photo').exists();
+    final hasSoundsInParent = await Directory('$pickedParent/Sounds').exists();
+    myPrint('Photo in parent: $hasPhotoInParent, Sounds in parent: $hasSoundsInParent');
+
+    if (!hasPhotoInParent && !hasSoundsInParent) {
+      // File picker returned a cached copy - find actual backup dir by filename
+      final fileName = path.basename(filePath);
+      final dateMatch = RegExp(r'memorizer-(\d{8})\.db').firstMatch(fileName);
+      if (dateMatch != null) {
+        final candidatePath = '${memorizerDir.path}/mem-${dateMatch.group(1)}';
+        if (await Directory(candidatePath).exists()) {
+          backupDirPath = candidatePath;
+          myPrint('Using actual backup dir: $backupDirPath');
+        }
+      }
+    }
+
+    await _restorePhotoFolder(backupDirPath);
+    await _restoreSoundsFolder(backupDirPath);
 
     // НОВОЕ: Перепланируем все напоминания после успешного восстановления
     myPrint('Rescheduling reminders after restore...');
