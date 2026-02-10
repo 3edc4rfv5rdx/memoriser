@@ -94,6 +94,28 @@ Future<String> createBackup() async {
   }
 }
 
+// Recursively copy directory preserving structure
+Future<int> _copyDirectoryRecursive(Directory source, Directory target, {bool skipTemp = false}) async {
+  if (!await target.exists()) {
+    await target.create(recursive: true);
+  }
+  int copiedFiles = 0;
+  final entities = await source.list().toList();
+  for (var entity in entities) {
+    final name = entity.path.split('/').last;
+    if (skipTemp && name.startsWith('temp_')) continue;
+    final isDir = await FileSystemEntity.isDirectory(entity.path);
+    if (isDir) {
+      final subTarget = Directory('${target.path}/$name');
+      copiedFiles += await _copyDirectoryRecursive(Directory(entity.path), subTarget);
+    } else if (await FileSystemEntity.isFile(entity.path)) {
+      await File(entity.path).copy('${target.path}/$name');
+      copiedFiles++;
+    }
+  }
+  return copiedFiles;
+}
+
 // Backup Photo folder to backup directory
 Future<void> _backupPhotoFolder(String backupDirPath) async {
   try {
@@ -105,42 +127,12 @@ Future<void> _backupPhotoFolder(String backupDirPath) async {
       return;
     }
 
+    myPrint('Photo backup: source=${photoDirectory!.path}');
+
     final backupPhotoDir = Directory('$backupDirPath/Photo');
-    if (!await backupPhotoDir.exists()) {
-      await backupPhotoDir.create(recursive: true);
-    }
+    final copiedFiles = await _copyDirectoryRecursive(photoDirectory!, backupPhotoDir, skipTemp: true);
 
-    // Copy all item folders
-    final entities = await photoDirectory!.list().toList();
-    int copiedFolders = 0;
-    int copiedFiles = 0;
-
-    for (var entity in entities) {
-      if (entity is Directory) {
-        final dirName = entity.path.split('/').last;
-        // Skip temp folders
-        if (dirName.startsWith('temp_')) continue;
-
-        // Copy item folder
-        final targetDir = Directory('${backupPhotoDir.path}/$dirName');
-        if (!await targetDir.exists()) {
-          await targetDir.create(recursive: true);
-        }
-
-        // Copy all files in the folder
-        final files = await entity.list().toList();
-        for (var file in files) {
-          if (file is File) {
-            final fileName = file.path.split('/').last;
-            await file.copy('${targetDir.path}/$fileName');
-            copiedFiles++;
-          }
-        }
-        copiedFolders++;
-      }
-    }
-
-    myPrint('Backed up $copiedFolders photo folders with $copiedFiles files');
+    myPrint('Photo backup: $copiedFiles files copied');
   } catch (e) {
     myPrint('Error backing up Photo folder: $e');
   }
@@ -168,38 +160,18 @@ Future<void> _restorePhotoFolder(String backupDirPath) async {
       await photoDirectory!.create(recursive: true);
     }
 
-    // Copy all item folders from backup
-    final entities = await backupPhotoDir.list().toList();
-    int restoredFolders = 0;
-    int restoredFiles = 0;
-
-    for (var entity in entities) {
-      if (entity is Directory) {
-        final dirName = entity.path.split('/').last;
-
-        // Create target item folder
-        final targetDir = Directory('${photoDirectory!.path}/$dirName');
-
-        // Remove existing folder if exists (to avoid duplicates)
-        if (await targetDir.exists()) {
-          await targetDir.delete(recursive: true);
-        }
-        await targetDir.create(recursive: true);
-
-        // Copy all files
-        final files = await entity.list().toList();
-        for (var file in files) {
-          if (file is File) {
-            final fileName = file.path.split('/').last;
-            await file.copy('${targetDir.path}/$fileName');
-            restoredFiles++;
-          }
-        }
-        restoredFolders++;
+    // Remove existing item_* folders to avoid duplicates
+    final existing = await photoDirectory!.list().toList();
+    for (var entity in existing) {
+      final name = entity.path.split('/').last;
+      if (name.startsWith('item_') && await FileSystemEntity.isDirectory(entity.path)) {
+        await Directory(entity.path).delete(recursive: true);
       }
     }
 
-    myPrint('Restored $restoredFolders photo folders with $restoredFiles files');
+    final restoredFiles = await _copyDirectoryRecursive(backupPhotoDir, photoDirectory!);
+
+    myPrint('Restored $restoredFiles photo files');
   } catch (e) {
     myPrint('Error restoring Photo folder: $e');
   }

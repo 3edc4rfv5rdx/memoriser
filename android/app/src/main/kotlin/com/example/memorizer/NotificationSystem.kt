@@ -14,6 +14,8 @@ import android.database.sqlite.SQLiteDatabase
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -61,6 +63,17 @@ class MainActivity : FlutterActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
+                }
+            }
+
+            // Request MANAGE_EXTERNAL_STORAGE for Android 11+ (needed for photo backup/restore)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (!Environment.isExternalStorageManager()) {
+                    Log.d("MemorizerApp", "Requesting MANAGE_EXTERNAL_STORAGE permission")
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
                 }
             }
         } catch (e: Exception) {
@@ -1092,9 +1105,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 val soundUri = getSoundUri(soundValue)
                 if (soundUri != null) {
                     val audioAttributes = android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setFlags(android.media.AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                         .build()
                     setSound(soundUri, audioAttributes)
                 }
@@ -1133,9 +1145,8 @@ class NotificationReceiver : BroadcastReceiver() {
                     val soundUri = getSoundUri(soundValue)
                     if (soundUri != null) {
                         val audioAttributes = android.media.AudioAttributes.Builder()
-                            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                             .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .setFlags(android.media.AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                             .build()
                         setSound(soundUri, audioAttributes)
                         Log.d("MemorizerApp", "Created channel $channelId with sound URI: $soundValue")
@@ -1241,9 +1252,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 setDataSource(filePath)
                 setAudioAttributes(
                     android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setFlags(android.media.AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                         .build()
                 )
                 prepare()
