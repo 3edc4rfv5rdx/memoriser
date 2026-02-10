@@ -56,7 +56,7 @@ Documents/Memorizer/
 
 ## Code Style
 - All code comments must be in English. Translate any non-English comments to English.
-- ToDo.txt and Done.txt entries should also be in English.
+- ToDo.txt and Done.txt entries should also be in English. Always translate user's Russian task descriptions to English when adding to ToDo.txt.
 
 ## Localization Rules
 **CRITICAL - Localization Best Practices:**
