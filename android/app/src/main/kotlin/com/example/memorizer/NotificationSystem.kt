@@ -1094,6 +1094,7 @@ class NotificationReceiver : BroadcastReceiver() {
                     val audioAttributes = android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setFlags(android.media.AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                         .build()
                     setSound(soundUri, audioAttributes)
                 }
@@ -1134,6 +1135,7 @@ class NotificationReceiver : BroadcastReceiver() {
                         val audioAttributes = android.media.AudioAttributes.Builder()
                             .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
                             .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setFlags(android.media.AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                             .build()
                         setSound(soundUri, audioAttributes)
                         Log.d("MemorizerApp", "Created channel $channelId with sound URI: $soundValue")
@@ -1241,6 +1243,7 @@ class NotificationReceiver : BroadcastReceiver() {
                     android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setFlags(android.media.AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                         .build()
                 )
                 prepare()
