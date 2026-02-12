@@ -221,6 +221,34 @@ class SimpleNotifications {
       myPrint('=== RESCHEDULING COMPLETE ===');
       myPrint('Successfully rescheduled $scheduledCount individual reminders');
 
+      // Reschedule period reminders
+      int periodScheduledCount = 0;
+      final periodReminders = await mainDb.query(
+        'items',
+        where: 'period = 1 AND active = 1',
+      );
+
+      myPrint('Found ${periodReminders.length} period reminders to reschedule');
+
+      for (var item in periodReminders) {
+        try {
+          final itemId = item['id'] as int;
+          final dateFrom = item['date'] as int?;
+          final dateTo = item['period_to'] as int?;
+          final itemTime = item['time'] as int?;
+          final periodDays = item['period_days'] as int? ?? 127;
+          final title = item['title'] as String? ?? '';
+
+          if (dateFrom == null || dateTo == null) continue;
+
+          await schedulePeriodReminders(itemId, dateFrom, dateTo, itemTime, periodDays, title);
+          periodScheduledCount++;
+        } catch (e) {
+          myPrint('Error rescheduling period reminder for item ${item['id']}: $e');
+        }
+      }
+      myPrint('Successfully rescheduled $periodScheduledCount period reminders');
+
       // Check if daily reminders are enabled
       final enableDailyReminders = await getSetting("Enable daily reminders") ?? defSettings["Enable daily reminders"];
 
@@ -392,6 +420,148 @@ class SimpleNotifications {
       }
     } catch (e) {
       myPrint('Error updating daily reminders: $e');
+    }
+  }
+
+  // Schedule all period reminders for an item
+  static Future<void> schedulePeriodReminders(
+    int itemId,
+    int dateFrom,
+    int dateTo,
+    int? time,
+    int daysMask,
+    String title,
+  ) async {
+    try {
+      myPrint('=== SCHEDULING PERIOD REMINDERS ===');
+      myPrint('Item ID: $itemId, from: $dateFrom, to: $dateTo, time: $time, daysMask: $daysMask');
+
+      final enableReminders = await getSetting("Enable reminders") ?? defSettings["Enable reminders"];
+      if (enableReminders != "true") {
+        myPrint('Reminders are disabled, not scheduling period');
+        return;
+      }
+
+      int hour = 9, minute = 30;
+      if (time != null) {
+        hour = time ~/ 100;
+        minute = time % 100;
+      }
+
+      final isMonthly = dateFrom >= 1 && dateFrom <= 31;
+      final dates = _calculatePeriodDates(dateFrom, dateTo, daysMask, isMonthly);
+
+      int count = 0;
+      for (final date in dates) {
+        final dt = DateTime(date.year, date.month, date.day, hour, minute);
+        if (dt.isAfter(DateTime.now())) {
+          await platform.invokeMethod('schedulePeriodReminder', {
+            'itemId': itemId,
+            'year': date.year,
+            'month': date.month,
+            'day': date.day,
+            'hour': hour,
+            'minute': minute,
+            'title': title,
+            'body': lw('Reminder'),
+          });
+          count++;
+        }
+      }
+      myPrint('Scheduled $count period reminders for item $itemId');
+    } catch (e) {
+      myPrint('Failed to schedule period reminders: $e');
+    }
+  }
+
+  // Calculate all valid dates for a period
+  static List<DateTime> _calculatePeriodDates(int dateFrom, int dateTo, int daysMask, bool isMonthly) {
+    final List<DateTime> result = [];
+    final now = DateTime.now();
+
+    if (isMonthly) {
+      // Day-of-month: schedule for current month and next month
+      for (int monthOffset = 0; monthOffset <= 1; monthOffset++) {
+        final baseDate = DateTime(now.year, now.month + monthOffset, 1);
+        final daysInMonth = DateTime(baseDate.year, baseDate.month + 1, 0).day;
+        final startDay = dateFrom.clamp(1, daysInMonth);
+        final endDay = dateTo.clamp(1, daysInMonth);
+
+        if (startDay <= endDay) {
+          for (int d = startDay; d <= endDay; d++) {
+            final date = DateTime(baseDate.year, baseDate.month, d);
+            if (_isDayInMask(date, daysMask)) {
+              result.add(date);
+            }
+          }
+        } else {
+          // Wraps around month boundary (e.g., 28 to 5)
+          for (int d = startDay; d <= daysInMonth; d++) {
+            final date = DateTime(baseDate.year, baseDate.month, d);
+            if (_isDayInMask(date, daysMask)) result.add(date);
+          }
+          final nextMonth = DateTime(baseDate.year, baseDate.month + 1, 1);
+          final nextDaysInMonth = DateTime(nextMonth.year, nextMonth.month + 1, 0).day;
+          for (int d = 1; d <= endDay.clamp(1, nextDaysInMonth); d++) {
+            final date = DateTime(nextMonth.year, nextMonth.month, d);
+            if (_isDayInMask(date, daysMask)) result.add(date);
+          }
+        }
+      }
+    } else {
+      // Full dates: schedule all days in the range
+      final fromDate = yyyymmddToDateTime(dateFrom);
+      final toDate = yyyymmddToDateTime(dateTo);
+      if (fromDate == null || toDate == null) return result;
+
+      var current = fromDate;
+      while (!current.isAfter(toDate)) {
+        if (_isDayInMask(current, daysMask)) {
+          result.add(current);
+        }
+        current = current.add(Duration(days: 1));
+      }
+    }
+
+    return result;
+  }
+
+  // Check if a date's weekday matches the daysMask (bit 0=Mon, bit 6=Sun)
+  static bool _isDayInMask(DateTime date, int daysMask) {
+    // DateTime.weekday: 1=Mon, 7=Sun -> bit index: Mon=0, Sun=6
+    final bitIndex = date.weekday == 7 ? 6 : date.weekday - 1;
+    return (daysMask & (1 << bitIndex)) != 0;
+  }
+
+  // Cancel all period reminders for an item
+  static Future<void> cancelPeriodReminders(int itemId) async {
+    try {
+      await platform.invokeMethod('cancelPeriodReminders', {
+        'itemId': itemId,
+      });
+      myPrint('All period reminders cancelled for item $itemId');
+    } catch (e) {
+      myPrint('Failed to cancel period reminders: $e');
+    }
+  }
+
+  // Update period reminders (cancel old, schedule new)
+  static Future<void> updatePeriodReminders(
+    int itemId,
+    bool enabled,
+    int? dateFrom,
+    int? dateTo,
+    int? time,
+    int daysMask,
+    String title,
+  ) async {
+    try {
+      await cancelPeriodReminders(itemId);
+      if (enabled && dateFrom != null && dateTo != null) {
+        await schedulePeriodReminders(itemId, dateFrom, dateTo, time, daysMask, title);
+      }
+    } catch (e) {
+      myPrint('Error updating period reminders: $e');
     }
   }
 

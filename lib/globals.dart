@@ -1330,6 +1330,25 @@ String? timeIntToString(int? timeInt) {
   return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
 }
 
+// Convert YYYYMMDD int to "yyyy-MM-dd" string
+String dateIntToStr(int dateInt) {
+  final y = dateInt ~/ 10000;
+  final m = (dateInt % 10000) ~/ 100;
+  final d = dateInt % 100;
+  return '${y.toString().padLeft(4, '0')}-${m.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
+}
+
+// Convert "yyyy-MM-dd" string to YYYYMMDD int
+int? dateStrToInt(String? dateStr) {
+  if (dateStr == null || dateStr.isEmpty) return null;
+  try {
+    final dt = DateFormat(ymdDateFormat).parse(dateStr);
+    return dt.year * 10000 + dt.month * 100 + dt.day;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Функция для преобразования строки "HH:MM" в int HHMM
 int? timeStringToInt(String? timeString) {
   if (timeString == null || timeString.isEmpty) return null;

@@ -23,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 14, // Increased from 13 to 14 for active field
+    version: 15, // Increased from 14 to 15 for period reminder fields
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -47,7 +47,10 @@ Future<void> initDatabases() async {
           daily_sound TEXT DEFAULT NULL,
           sound TEXT DEFAULT NULL,
           fullscreen INTEGER DEFAULT 0,
-          active INTEGER DEFAULT 1
+          active INTEGER DEFAULT 1,
+          period INTEGER DEFAULT 0,
+          period_to INTEGER DEFAULT NULL,
+          period_days INTEGER DEFAULT 127
         )
       ''');
     },
@@ -154,6 +157,14 @@ Future<void> initDatabases() async {
         // Migration for version 14 - add active field for quick reminder activation/deactivation
         await db.execute('ALTER TABLE items ADD COLUMN active INTEGER DEFAULT 1');
         myPrint("Database upgraded to version 14: Added 'active' field");
+      }
+
+      if (oldVersion < 15) {
+        // Migration for version 15 - add period reminder fields
+        await db.execute('ALTER TABLE items ADD COLUMN period INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE items ADD COLUMN period_to INTEGER DEFAULT NULL');
+        await db.execute('ALTER TABLE items ADD COLUMN period_days INTEGER DEFAULT 127');
+        myPrint("Database upgraded to version 15: Added period reminder fields");
       }
     },
   );
@@ -488,6 +499,7 @@ Future<void> removeExpiredItems() async {
         await deleteItemPhotoDir(itemId);
         await SimpleNotifications.cancelSpecificReminder(itemId);
         await SimpleNotifications.cancelAllDailyReminders(itemId);
+        await SimpleNotifications.cancelPeriodReminders(itemId);
         deletedFolders++;
       } catch (e) {
         myPrint('Error cleaning up expired item $itemId: $e');
@@ -716,6 +728,7 @@ class _HomePageState extends State<HomePage> {
   bool _isInNotesFolder = false;
   bool _isInDailyFolder = false;
   bool _isInMonthlyFolder = false;
+  bool _isInPeriodFolder = false;
 
   @override
   void initState() {
@@ -733,9 +746,11 @@ class _HomePageState extends State<HomePage> {
   void _enterNotesFolder() {
     setState(() {
       _isInNotesFolder = true;
-      _isInYearlyFolder = false; // Убеждаемся что другие папки закрыты
+      _isInYearlyFolder = false;
       _isInDailyFolder = false;
-      xvFilter = 'notes:true'; // Устанавливаем фильтр на заметки
+      _isInMonthlyFolder = false;
+      _isInPeriodFolder = false;
+      xvFilter = 'notes:true';
     });
     _refreshItems();
     _updateFilterStatus();
@@ -755,7 +770,9 @@ class _HomePageState extends State<HomePage> {
       _isInYearlyFolder = true;
       _isInNotesFolder = false;
       _isInDailyFolder = false;
-      xvFilter = 'yearly:true'; // Устанавливаем фильтр на ежегодные
+      _isInMonthlyFolder = false;
+      _isInPeriodFolder = false;
+      xvFilter = 'yearly:true';
     });
     _refreshItems();
     _updateFilterStatus();
@@ -775,6 +792,8 @@ class _HomePageState extends State<HomePage> {
       _isInDailyFolder = true;
       _isInYearlyFolder = false;
       _isInNotesFolder = false;
+      _isInMonthlyFolder = false;
+      _isInPeriodFolder = false;
       xvFilter = 'daily:true';
     });
     _refreshItems();
@@ -796,6 +815,7 @@ class _HomePageState extends State<HomePage> {
       _isInYearlyFolder = false;
       _isInNotesFolder = false;
       _isInDailyFolder = false;
+      _isInPeriodFolder = false;
       xvFilter = 'monthly:true';
     });
     _refreshItems();
@@ -805,6 +825,28 @@ class _HomePageState extends State<HomePage> {
   void _exitMonthlyFolder() {
     setState(() {
       _isInMonthlyFolder = false;
+      xvFilter = '';
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  void _enterPeriodFolder() {
+    setState(() {
+      _isInPeriodFolder = true;
+      _isInYearlyFolder = false;
+      _isInNotesFolder = false;
+      _isInDailyFolder = false;
+      _isInMonthlyFolder = false;
+      xvFilter = 'period:true';
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  void _exitPeriodFolder() {
+    setState(() {
+      _isInPeriodFolder = false;
       xvFilter = '';
     });
     _refreshItems();
@@ -938,6 +980,55 @@ class _HomePageState extends State<HomePage> {
       myPrint('Error counting monthly items: $e');
       return 0;
     }
+  }
+
+  Map<String, dynamic> _createPeriodFolderItem() {
+    return {
+      'id': -6,
+      'isVirtual': true,
+      'type': 'period_folder',
+      'title': lw('Periods'),
+      'content': '',
+      'tags': '',
+      'priority': 0,
+      'date': null,
+      'time': null,
+      'remind': 0,
+      'yearly': 0,
+      'monthly': 0,
+      'hidden': 0,
+      'photo': null,
+    };
+  }
+
+  Future<int> _getPeriodItemsCount() async {
+    try {
+      final count = await mainDb.rawQuery(
+        'SELECT COUNT(*) as count FROM items WHERE period = 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
+      );
+      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
+    } catch (e) {
+      myPrint('Error counting period items: $e');
+      return 0;
+    }
+  }
+
+  // Format period date range for display (e.g. "15 - 20" or "2026-02-15 - 2026-02-20")
+  String _formatPeriodRange(int? dateFrom, int? dateTo) {
+    if (dateFrom == null && dateTo == null) return '—';
+    String fromStr;
+    String toStr;
+    if (dateFrom != null && dateFrom > 31) {
+      fromStr = dateIntToStr(dateFrom);
+    } else {
+      fromStr = (dateFrom ?? 0).toString();
+    }
+    if (dateTo != null && dateTo > 31) {
+      toStr = dateIntToStr(dateTo);
+    } else {
+      toStr = (dateTo ?? 0).toString();
+    }
+    return '$fromStr — $toStr';
   }
 
   void _showPhotoGallery(List<String> photoPaths) {
@@ -1318,6 +1409,7 @@ class _HomePageState extends State<HomePage> {
       _isInNotesFolder = false;
       _isInDailyFolder = false;
       _isInMonthlyFolder = false;
+      _isInPeriodFolder = false;
     });
     _refreshItems();
     okInfoBarBlue(lw('All filters cleared'));
@@ -1501,6 +1593,48 @@ class _HomePageState extends State<HomePage> {
           },
         ),
       );
+    } else if (type == 'period_folder') {
+      return GestureDetector(
+        onLongPress: () => showHelp(135),
+        child: ListTile(
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.teal,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.date_range, color: clText, size: 20),
+          ),
+          title: Text(
+            lw('Periods'),
+            style: TextStyle(
+              fontWeight: fwBold,
+              color: clText,
+              fontSize: fsMedium,
+            ),
+          ),
+          subtitle: FutureBuilder<int>(
+            future: _getPeriodItemsCount(),
+            builder: (context, snapshot) {
+              final count = snapshot.data ?? 0;
+              return Text(
+                '$count ${lw('items')}',
+                style: TextStyle(color: clText, fontStyle: FontStyle.italic),
+              );
+            },
+          ),
+          trailing: Icon(Icons.folder_open, color: Colors.teal),
+          tileColor: clFill,
+          onTap: () {
+            _enterPeriodFolder();
+
+            if (xvHiddenMode) {
+              resetHiddenModeTimer();
+            }
+          },
+        ),
+      );
     }
 
     return SizedBox.shrink();
@@ -1533,7 +1667,7 @@ class _HomePageState extends State<HomePage> {
       } else if (_isInNotesFolder) {
         // Notes folder - sort by created date (respect "Newest first" setting)
         final notesItems = items.where((item) =>
-        item['time'] == null && item['yearly'] != 1 && item['daily'] != 1).toList();
+        item['time'] == null && item['yearly'] != 1 && item['daily'] != 1 && item['monthly'] != 1 && item['period'] != 1).toList();
         final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
         notesItems.sort((a, b) {
           final createdA = a['created'] as int? ?? 0;
@@ -1569,10 +1703,23 @@ class _HomePageState extends State<HomePage> {
         });
         finalItems.addAll(monthlyItems);
 
+      } else if (_isInPeriodFolder) {
+        // Period folder - sort by date (from) ASC, then time ASC
+        final periodItems = items.where((item) => item['period'] == 1).toList();
+        periodItems.sort((a, b) {
+          final dateA = a['date'] as int? ?? 99999999;
+          final dateB = b['date'] as int? ?? 99999999;
+          if (dateA != dateB) return dateA.compareTo(dateB);
+          final timeA = a['time'] as int? ?? 0;
+          final timeB = b['time'] as int? ?? 0;
+          return timeA.compareTo(timeB);
+        });
+        finalItems.addAll(periodItems);
+
       } else {
-        // На главном уровне - сначала обычные записи (исключаем yearly, daily и monthly)
+        // Main level - exclude yearly, daily, monthly, and period items
         final normalItems = items.where((item) =>
-        item['yearly'] != 1 && item['daily'] != 1 && item['monthly'] != 1 && item['time'] != null).toList();
+        item['yearly'] != 1 && item['daily'] != 1 && item['monthly'] != 1 && item['period'] != 1 && item['time'] != null).toList();
         finalItems.addAll(normalItems);
 
         // Виртуальные папки в КОНЦЕ списка
@@ -1590,6 +1737,11 @@ class _HomePageState extends State<HomePage> {
         final monthlyCount = await _getMonthlyItemsCount();
         if (monthlyCount > 0) {
           finalItems.add(_createMonthlyFolderItem());
+        }
+
+        final periodCount = await _getPeriodItemsCount();
+        if (periodCount > 0) {
+          finalItems.add(_createPeriodFolderItem());
         }
 
         final yearlyCount = await _getYearlyItemsCount();
@@ -1635,6 +1787,7 @@ class _HomePageState extends State<HomePage> {
 
       final hasRemind = item['remind'] == 1;
       final hasDaily = item['daily'] == 1;
+      final hasPeriod = item['period'] == 1;
       final dateInt = item['date'] as int?;
       final date = dateInt != null ? yyyymmddToDateTime(dateInt) : null;
       final time = item['time'] as int?;
@@ -1652,6 +1805,13 @@ class _HomePageState extends State<HomePage> {
           await SimpleNotifications.updateDailyReminders(itemId, true, dailyTimes, dailyDays, title);
           myPrint('Daily reminders reactivated for item $itemId');
         }
+        if (hasPeriod) {
+          final periodFrom = item['date'] as int?;
+          final periodTo = item['period_to'] as int?;
+          final periodDays = (item['period_days'] as int?) ?? dayAllDays;
+          await SimpleNotifications.updatePeriodReminders(itemId, true, periodFrom, periodTo, time, periodDays, title);
+          myPrint('Period reminders reactivated for item $itemId');
+        }
         okInfoBarGreen(lw('Reminder activated'));
       } else {
         // Deactivate: cancel all reminders
@@ -1662,6 +1822,10 @@ class _HomePageState extends State<HomePage> {
         if (hasDaily) {
           await SimpleNotifications.updateDailyReminders(itemId, false, [], dayAllDays, title);
           myPrint('Daily reminders cancelled for item $itemId');
+        }
+        if (hasPeriod) {
+          await SimpleNotifications.cancelPeriodReminders(itemId);
+          myPrint('Period reminders cancelled for item $itemId');
         }
         okInfoBarGreen(lw('Reminder deactivated'));
       }
@@ -1790,6 +1954,7 @@ class _HomePageState extends State<HomePage> {
                     // Cancel all reminders for this item
                     await SimpleNotifications.cancelSpecificReminder(item['id']);
                     await SimpleNotifications.cancelAllDailyReminders(item['id']);
+                    await SimpleNotifications.cancelPeriodReminders(item['id']);
 
                     // Delete item from database
                     await mainDb.delete(
@@ -1858,6 +2023,7 @@ class _HomePageState extends State<HomePage> {
                 _isInNotesFolder ? lw('Notes') :
                 _isInDailyFolder ? lw('Daily') :
                 _isInMonthlyFolder ? lw('Monthly') :
+                _isInPeriodFolder ? lw('Periods') :
                 lw('Memorizer'),
                 style: TextStyle(fontSize: fsLarge, fontWeight: fwBold),
               ),
@@ -1872,7 +2038,7 @@ class _HomePageState extends State<HomePage> {
         leading: GestureDetector(
           onLongPress: () => showHelp(21),
           child: IconButton(
-            icon: Icon((_isInYearlyFolder || _isInNotesFolder || _isInDailyFolder || _isInMonthlyFolder) ? Icons.arrow_back : Icons.close),
+            icon: Icon((_isInYearlyFolder || _isInNotesFolder || _isInDailyFolder || _isInMonthlyFolder || _isInPeriodFolder) ? Icons.arrow_back : Icons.close),
             onPressed: () async {
               if (_isInYearlyFolder) {
                 _exitYearlyFolder();
@@ -1882,6 +2048,8 @@ class _HomePageState extends State<HomePage> {
                 _exitDailyFolder();
               } else if (_isInMonthlyFolder) {
                 _exitMonthlyFolder();
+              } else if (_isInPeriodFolder) {
+                _exitPeriodFolder();
               } else {
                 await vacuumDatabases();
                 if (!mounted) return;
@@ -2048,6 +2216,8 @@ class _HomePageState extends State<HomePage> {
               ? lw('No notes yet.')
               : _isInDailyFolder
               ? lw('No daily reminders yet.')
+              : _isInPeriodFolder
+              ? lw('No period reminders yet.')
               : xvHiddenMode
               ? lw('No private items yet. Press + to add.')
               : lw('No items yet. Press + to add.'),
@@ -2072,8 +2242,9 @@ class _HomePageState extends State<HomePage> {
           final isYearly = item['yearly'] == 1;
           final isMonthly = item['monthly'] == 1;
           final isDaily = item['daily'] == 1;
+          final isPeriod = item['period'] == 1;
           final isActive = item['active'] == 1;
-          final hasAnyReminder = isReminder || isDaily;
+          final hasAnyReminder = isReminder || isDaily || isPeriod;
           final photoPaths = parsePhotoPaths(item['photo']);
           final hasPhoto = photoPaths.isNotEmpty;
           final photoCount = photoPaths.length;
@@ -2171,6 +2342,7 @@ class _HomePageState extends State<HomePage> {
                     // Cancel all reminders for this item
                     await SimpleNotifications.cancelSpecificReminder(item['id']);
                     await SimpleNotifications.cancelAllDailyReminders(item['id']);
+                    await SimpleNotifications.cancelPeriodReminders(item['id']);
 
                     await mainDb.delete(
                       'items',
@@ -2269,7 +2441,7 @@ class _HomePageState extends State<HomePage> {
                         fontStyle: FontStyle.italic,
                       ),
                     ),
-                  if (hasDate && formattedDate != null)
+                  if (hasDate && formattedDate != null && !isPeriod)
                     Row(
                       children: [
                         Icon(Icons.event, color: isToday ? clRed : clText, size: 16),
@@ -2330,6 +2502,51 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ],
                     ),
+                  // Period reminder: date range
+                  if (isPeriod) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.date_range, color: Colors.teal, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          _formatPeriodRange(item['date'] as int?, item['period_to'] as int?),
+                          style: TextStyle(
+                            fontSize: fsMedium,
+                            color: Colors.teal,
+                            fontWeight: fwBold,
+                          ),
+                        ),
+                        if (hasTime && formattedTime != null) ...[
+                          SizedBox(width: 8),
+                          Icon(Icons.access_time, color: Colors.teal, size: 16),
+                          SizedBox(width: 2),
+                          Text(
+                            formattedTime,
+                            style: TextStyle(
+                              fontSize: fsMedium,
+                              color: Colors.teal,
+                              fontWeight: fwBold,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today, color: Colors.teal, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          getDaysCompact((item['period_days'] as int?) ?? dayAllDays),
+                          style: TextStyle(
+                            fontSize: fsMedium,
+                            color: Colors.teal,
+                            fontWeight: fwBold,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
               tileColor: _selectedItemId == item['id']

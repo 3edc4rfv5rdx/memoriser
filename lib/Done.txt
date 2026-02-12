@@ -1,3 +1,29 @@
+  + Period reminders: new reminder type with date range + weekday filter:
+    - DB migration v15: added period (0/1), period_to (INT), period_days (INT bitmask) to items
+    - Reminder type toggle: changed from 2 horizontal to 3 vertical buttons (One-time, Daily, Period)
+    - Period UI section: From/To text fields with calendar icons, time picker, weekday selector
+    - Smart format: first field determines second field format (day-of-month 1-31 or full date YYYYMMDD)
+    - Validation: both dates must be same format, both required, time required, at least one day
+    - Scheduling: Flutter calculates all valid dates, schedules each via platform channel
+    - Monthly periods (values 1-31): schedules current month + next month
+    - One-time periods (full dates): schedules all days in range
+    - requestCode = itemId * 100 + dayOfMonth for unique alarm IDs
+    - PERIOD_REMINDER action in NotificationSystem.kt with full handler
+    - BootReceiver support: reschedules period reminders after reboot
+    - rescheduleAllReminders includes period reminders
+    - Cancel period reminders on item delete (all 3 delete paths)
+    - CSV backup/restore: added period fields to integer parsing
+    - Localization: added Period, From, To, day, validation messages (ru, ua)
+    - Periods virtual folder on main screen (ID: -6, teal color, date_range icon)
+    - Period items filtered from main list and notes folder
+    - Period folder sorting: by date (from) ASC, then time ASC
+    - Period item subtitle: date range (From — To), time, weekday compact string
+    - Standard date/time row hidden for period items (replaced by period-specific display)
+    - Toggle active: reschedules/cancels period reminders via updatePeriodReminders
+    - Back button, title bar, empty state text support for period folder
+    - All folder enter methods reset _isInPeriodFolder (mutual exclusion)
+    - Localization: "No period reminders yet." (ru, ua)
+
   + Fullscreen alert: "Postpone 1 day" button (not shown for daily reminders):
     - Added "day" locale key (ru: "день", ua: "день") in locales.json
     - Added postpone_1day button in activity_fullscreen_alert.xml (150dp wide, between snooze row 2 and OK)

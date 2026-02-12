@@ -612,10 +612,19 @@ Future<String> restoreFromCSV() async {
               case 'created':
               case 'remove':
               case 'hidden':
+              case 'yearly':
+              case 'monthly':
+              case 'daily':
+              case 'daily_days':
+              case 'fullscreen':
+              case 'active':
+              case 'period':
+              case 'period_days':
                 row[columnName] = int.tryParse(value) ?? 0;
                 break;
               case 'date':
               case 'time':
+              case 'period_to':
                 row[columnName] = int.tryParse(value); // Может быть null
                 break;
               default:

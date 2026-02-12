@@ -61,6 +61,13 @@ class _EditItemPageState extends State<EditItemPage> {
   String? _dailySound; // For daily reminders
   List<Map<String, String>> _systemSounds = [];
 
+  // Period reminder fields
+  bool _period = false;
+  int? _periodTo; // Day of month (1-31) or full date (YYYYMMDD)
+  int _periodDays = dayAllDays; // 127 = all days by default
+  TextEditingController periodFromController = TextEditingController();
+  TextEditingController periodToController = TextEditingController();
+
   // Fullscreen alert field
   bool _fullscreen = false;
 
@@ -195,6 +202,20 @@ class _EditItemPageState extends State<EditItemPage> {
         // Load fullscreen field
         _fullscreen = item['fullscreen'] == 1;
 
+        // Load period fields
+        _period = item['period'] == 1;
+        _periodTo = item['period_to'] as int?;
+        _periodDays = item['period_days'] ?? dayAllDays;
+        if (_period) {
+          final dateInt = item['date'] as int?;
+          if (dateInt != null) {
+            periodFromController.text = dateInt <= 31 ? dateInt.toString() : dateIntToStr(dateInt);
+          }
+          if (_periodTo != null) {
+            periodToController.text = _periodTo! <= 31 ? _periodTo.toString() : dateIntToStr(_periodTo!);
+          }
+        }
+
         // If daily sound is empty and daily is enabled, get default from settings
         if (_dailySound == null && _daily) {
           _dailySound = await SimpleNotifications.getDefaultDailySound();
@@ -303,6 +324,38 @@ class _EditItemPageState extends State<EditItemPage> {
       }
     }
 
+    // Validation for period reminder
+    if (_period) {
+      final fromText = periodFromController.text.trim();
+      final toText = periodToController.text.trim();
+      if (fromText.isEmpty || toText.isEmpty) {
+        okInfoBarRed(lw('Set both dates for the period'), duration: Duration(seconds: 4));
+        return;
+      }
+      if (_time == null) {
+        okInfoBarRed(lw('Set a time for the reminder'), duration: Duration(seconds: 4));
+        return;
+      }
+      if (_periodDays == 0) {
+        okInfoBarRed(lw('Select at least one day'), duration: Duration(seconds: 4));
+        return;
+      }
+      // Parse and validate period dates
+      final fromVal = _parsePeriodValue(fromText);
+      final toVal = _parsePeriodValue(toText);
+      if (fromVal == null || toVal == null) {
+        okInfoBarRed(lw('Invalid date format'), duration: Duration(seconds: 4));
+        return;
+      }
+      // Check both are same type
+      final fromIsDayOfMonth = fromVal >= 1 && fromVal <= 31;
+      final toIsDayOfMonth = toVal >= 1 && toVal <= 31;
+      if (fromIsDayOfMonth != toIsDayOfMonth) {
+        okInfoBarRed(lw('Both dates must be the same format'), duration: Duration(seconds: 4));
+        return;
+      }
+    }
+
     // Check time conflicts with other items
     if (_remind && _time != null) {
       final timeStr = timeIntToString(_time);
@@ -318,14 +371,25 @@ class _EditItemPageState extends State<EditItemPage> {
     }
 
     // Convert date to YYYYMMDD format for storage
-    final dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
+    int? dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
     final remindValue = _remind ? 1 : 0;
     final activeValue = _active ? 1 : 0;
     final hiddenValue = _hidden ? 1 : 0;
     final removeValue = _removeAfterReminder ? 1 : 0;
-    final yearlyValue = _yearly ? 1 : 0; // NEW: Yearly field
-    final monthlyValue = _monthly ? 1 : 0; // NEW: Monthly field
-    final fullscreenValue = _fullscreen ? 1 : 0; // Fullscreen field
+    final yearlyValue = _yearly ? 1 : 0;
+    final monthlyValue = _monthly ? 1 : 0;
+    final fullscreenValue = _fullscreen ? 1 : 0;
+
+    // Period reminder fields
+    final periodValue = _period ? 1 : 0;
+    int? periodToValue;
+    final periodDaysValue = _periodDays;
+    if (_period) {
+      final fromVal = _parsePeriodValue(periodFromController.text.trim());
+      final toVal = _parsePeriodValue(periodToController.text.trim());
+      dateValue = fromVal; // Store period start in date field
+      periodToValue = toVal;
+    }
 
     // Daily reminder fields
     final dailyValue = _daily ? 1 : 0;
@@ -375,6 +439,9 @@ class _EditItemPageState extends State<EditItemPage> {
             'sound': _sound,
             'daily_sound': _dailySound,
             'fullscreen': fullscreenValue,
+            'period': periodValue,
+            'period_to': periodToValue,
+            'period_days': periodDaysValue,
             'photo': photoData,
           },
           where: 'id = ?',
@@ -400,6 +467,17 @@ class _EditItemPageState extends State<EditItemPage> {
           titleText,
         );
 
+        // Update period reminders for this item
+        await SimpleNotifications.updatePeriodReminders(
+          widget.itemId!,
+          _period && _active,
+          dateValue,
+          periodToValue,
+          timeValue,
+          periodDaysValue,
+          titleText,
+        );
+
       } else {
         // Insert new item first to get the ID
         final insertedId = await mainDb.insert('items', {
@@ -421,6 +499,9 @@ class _EditItemPageState extends State<EditItemPage> {
           'sound': _sound,
           'daily_sound': _dailySound,
           'fullscreen': fullscreenValue,
+          'period': periodValue,
+          'period_to': periodToValue,
+          'period_days': periodDaysValue,
           'photo': null, // Will update after moving photos
           'created': dateTimeToYYYYMMDD(DateTime.now()),
         }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -458,6 +539,18 @@ class _EditItemPageState extends State<EditItemPage> {
             insertedId,
             _dailyTimes,
             _dailyDays,
+            titleText,
+          );
+        }
+
+        // Schedule period reminders for new item if needed
+        if (_period && _active && dateValue != null && periodToValue != null) {
+          await SimpleNotifications.schedulePeriodReminders(
+            insertedId,
+            dateValue!,
+            periodToValue!,
+            timeValue,
+            periodDaysValue,
             titleText,
           );
         }
@@ -794,7 +887,7 @@ class _EditItemPageState extends State<EditItemPage> {
 // Complete reminder section with header, checkbox, and type selector
   Widget _buildReminderSection() {
     // Check if any reminder is enabled
-    final bool reminderEnabled = _remind || _daily;
+    final bool reminderEnabled = _remind || _daily || _period;
 
     return GestureDetector(
       onLongPress: () => showHelp(35),
@@ -821,6 +914,7 @@ class _EditItemPageState extends State<EditItemPage> {
                         // Enable one-time reminder by default
                         _remind = true;
                         _daily = false;
+                        _period = false;
                         // Set default time
                         _selectedTimeOption = 0;
                         _time = timeMorning;
@@ -829,6 +923,7 @@ class _EditItemPageState extends State<EditItemPage> {
                         // Disable all reminders
                         _remind = false;
                         _daily = false;
+                        _period = false;
                         timeController.clear();
                         _time = null;
                         _selectedTimeOption = null;
@@ -905,6 +1000,19 @@ class _EditItemPageState extends State<EditItemPage> {
                 SizedBox(height: 10),
                 _buildFullscreenSelector(),
               ],
+
+              // Period reminder options
+              if (_period) ...[
+                _buildPeriodDatesSection(),
+                SizedBox(height: 12),
+                _buildTimeField(),
+                SizedBox(height: 10),
+                _buildTimeOptions(),
+                SizedBox(height: 10),
+                _buildPeriodDaysSection(),
+                SizedBox(height: 12),
+                _buildFullscreenSelector(),
+              ],
             ],
           ],
         ),
@@ -912,92 +1020,110 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  // One-time / Daily toggle buttons
+  // Reminder type radio button helper
+  Widget _buildTypeRadioButton({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+    BorderRadius? borderRadius,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? clUpBar : Colors.transparent,
+          borderRadius: borderRadius ?? BorderRadius.zero,
+          border: Border.all(color: selected ? clUpBar : clText.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: clText, size: 18),
+            SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: clText,
+                fontSize: fsNormal,
+                fontWeight: selected ? fwBold : fwNormal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // One-time / Daily / Period toggle buttons (vertical)
   Widget _buildReminderTypeToggle() {
-    return Row(
+    return Column(
       children: [
-        // One-time toggle
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _remind = true;
-                _daily = false;
+        // One-time
+        _buildTypeRadioButton(
+          label: lw('One-time'),
+          icon: Icons.event,
+          selected: _remind,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
+          onTap: () {
+            setState(() {
+              _remind = true;
+              _daily = false;
+              _period = false;
+              _selectedTimeOption = 0;
+              _time = timeMorning;
+              timeController.text = '09:30';
+            });
+          },
+        ),
+        // Daily
+        _buildTypeRadioButton(
+          label: lw('Daily'),
+          icon: Icons.repeat,
+          selected: _daily,
+          onTap: () async {
+            final defaultSound = _dailySound ?? await SimpleNotifications.getDefaultDailySound();
+            setState(() {
+              _daily = true;
+              _remind = false;
+              _period = false;
+              timeController.clear();
+              _time = null;
+              _selectedTimeOption = null;
+              _yearly = false;
+              _monthly = false;
+              _removeAfterReminder = false;
+              _dailySound = defaultSound;
+              if (_dailyTimes.isEmpty) {
+                _dailyTimes = ['09:00'];
+              }
+            });
+          },
+        ),
+        // Period
+        _buildTypeRadioButton(
+          label: lw('Period'),
+          icon: Icons.date_range,
+          selected: _period,
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(6)),
+          onTap: () {
+            setState(() {
+              _period = true;
+              _remind = false;
+              _daily = false;
+              _yearly = false;
+              _monthly = false;
+              _removeAfterReminder = false;
+              // Clear main date - Period uses its own From/To fields
+              _date = null;
+              dateController.clear();
+              if (_time == null) {
                 _selectedTimeOption = 0;
                 _time = timeMorning;
                 timeController.text = '09:30';
-              });
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-              decoration: BoxDecoration(
-                color: _remind ? clUpBar : Colors.transparent,
-                borderRadius: BorderRadius.horizontal(left: Radius.circular(6)),
-                border: Border.all(color: _remind ? clUpBar : clText.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.event, color: clText, size: 18),
-                  SizedBox(width: 6),
-                  Text(
-                    lw('One-time'),
-                    style: TextStyle(
-                      color: clText,
-                      fontSize: fsNormal,
-                      fontWeight: _remind ? fwBold : fwNormal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Daily toggle
-        Expanded(
-          child: GestureDetector(
-            onTap: () async {
-              // Load default daily sound if not set
-              final defaultSound = _dailySound ?? await SimpleNotifications.getDefaultDailySound();
-              setState(() {
-                _daily = true;
-                _remind = false;
-                timeController.clear();
-                _time = null;
-                _selectedTimeOption = null;
-                _yearly = false;
-                _monthly = false;
-                _removeAfterReminder = false;
-                _dailySound = defaultSound;
-                if (_dailyTimes.isEmpty) {
-                  _dailyTimes = ['09:00'];
-                }
-              });
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-              decoration: BoxDecoration(
-                color: _daily ? clUpBar : Colors.transparent,
-                borderRadius: BorderRadius.horizontal(right: Radius.circular(6)),
-                border: Border.all(color: _daily ? clUpBar : clText.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.repeat, color: clText, size: 18),
-                  SizedBox(width: 6),
-                  Text(
-                    lw('Daily'),
-                    style: TextStyle(
-                      color: clText,
-                      fontSize: fsNormal,
-                      fontWeight: _daily ? fwBold : fwNormal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+              }
+            });
+          },
         ),
       ],
     );
@@ -1034,7 +1160,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
   // Widget for fullscreen alert selector
   Widget _buildFullscreenSelector() {
-    final bool reminderActive = _remind || _daily;
+    final bool reminderActive = _remind || _daily || _period;
     return GestureDetector(
       onLongPress: () => showHelp(44),
       child: Row(
@@ -1195,6 +1321,16 @@ class _EditItemPageState extends State<EditItemPage> {
           ),
       ],
     );
+  }
+
+  // Parse period date value: day of month (1-31) or full date string (yyyy-MM-dd -> YYYYMMDD)
+  int? _parsePeriodValue(String text) {
+    if (text.isEmpty) return null;
+    // Try as day of month (1-31)
+    final dayNum = int.tryParse(text);
+    if (dayNum != null && dayNum >= 1 && dayNum <= 31) return dayNum;
+    // Try as full date (yyyy-MM-dd -> YYYYMMDD)
+    return dateStrToInt(text);
   }
 
   // Check if a time "HH:MM" conflicts with reminders in other items
@@ -1471,6 +1607,251 @@ class _EditItemPageState extends State<EditItemPage> {
                       fontSize: fsSmall,
                       fontWeight: isEnabled ? fwBold : fwNormal,
                     ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  // Build period date fields (From / To) with calendar icons
+  Widget _buildPeriodDatesSection() {
+    return Column(
+      children: [
+        // From date
+        _buildPeriodDateField(
+          label: lw('From'),
+          controller: periodFromController,
+          onDatePicked: (value) {
+            periodFromController.text = value;
+            _syncPeriodFieldFormat(value, isFrom: true);
+          },
+        ),
+        SizedBox(height: 8),
+        // To date
+        _buildPeriodDateField(
+          label: lw('To'),
+          controller: periodToController,
+          onDatePicked: (value) {
+            periodToController.text = value;
+          },
+        ),
+      ],
+    );
+  }
+
+  // Single period date field with label, text input, and calendar icon
+  Widget _buildPeriodDateField({
+    required String label,
+    required TextEditingController controller,
+    required Function(String) onDatePicked,
+  }) {
+    // Determine if first field has a full date (disables calendar on second or vice versa)
+    final fromText = periodFromController.text.trim();
+    final isFromDayOfMonth = fromText.isNotEmpty && (int.tryParse(fromText) ?? 0) >= 1 && (int.tryParse(fromText) ?? 0) <= 31;
+    final bool calendarEnabled = fromText.isEmpty || !isFromDayOfMonth;
+
+    return Row(
+      children: [
+        SizedBox(width: 16),
+        SizedBox(
+          width: 40,
+          child: Text(
+            '$label:',
+            style: TextStyle(color: clText, fontSize: fsNormal, fontWeight: fwBold),
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            style: TextStyle(color: clText, fontSize: fsNormal),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              hintText: calendarEnabled ? 'dd / yyyy-mm-dd' : '1-31',
+              hintStyle: TextStyle(color: clText.withValues(alpha: 0.3)),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: clText.withValues(alpha: 0.3)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: clUpBar),
+              ),
+            ),
+            onChanged: (value) {
+              // If this is the From field, sync format hint for To field
+              if (controller == periodFromController) {
+                setState(() {}); // Rebuild to update hints
+              }
+            },
+          ),
+        ),
+        SizedBox(width: 4),
+        IconButton(
+          icon: Icon(Icons.calendar_today, color: calendarEnabled ? clText : clText.withValues(alpha: 0.3), size: 20),
+          onPressed: calendarEnabled ? () => _pickPeriodDate(controller, onDatePicked) : null,
+          padding: EdgeInsets.zero,
+          constraints: BoxConstraints(minWidth: 36, minHeight: 36),
+        ),
+      ],
+    );
+  }
+
+  // When From field is filled, adapt To field format
+  void _syncPeriodFieldFormat(String value, {required bool isFrom}) {
+    if (!isFrom) return;
+    // If From is a day number, clear To if it was a full date (and vice versa)
+    final parsed = int.tryParse(value.trim());
+    final isDayOfMonth = parsed != null && parsed >= 1 && parsed <= 31;
+    final toText = periodToController.text.trim();
+    if (toText.isNotEmpty) {
+      final toParsed = int.tryParse(toText);
+      final toIsDayOfMonth = toParsed != null && toParsed >= 1 && toParsed <= 31;
+      if (isDayOfMonth != toIsDayOfMonth) {
+        periodToController.clear(); // Clear mismatched format
+      }
+    }
+    setState(() {});
+  }
+
+  // Pick date for period field using DatePicker
+  Future<void> _pickPeriodDate(TextEditingController controller, Function(String) onDatePicked) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2099),
+      locale: Locale(getLocaleCode(currentLocale)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: clUpBar,
+              onPrimary: clText,
+              onSurface: clText,
+            ),
+            dialogTheme: DialogThemeData(backgroundColor: clFill),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                backgroundColor: clUpBar,
+                foregroundColor: clText,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      final dateStr = DateFormat(ymdDateFormat).format(picked);
+      onDatePicked(dateStr);
+    }
+  }
+
+  // Build period days of week section (reuses daily days pattern with _periodDays)
+  Widget _buildPeriodDaysSection() {
+    final bool allDaysOn = _periodDays == dayAllDays;
+    final bool weekdaysOn = (_periodDays & dayWeekdays) == dayWeekdays;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header with toggle buttons
+        Row(
+          children: [
+            SizedBox(width: 40),
+            Icon(Icons.calendar_today, color: clText, size: 16),
+            SizedBox(width: 8),
+            Text(
+              lw('Days'),
+              style: TextStyle(color: clText, fontSize: fsNormal, fontWeight: fwBold),
+            ),
+            Spacer(),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _periodDays = allDaysOn ? 0 : dayAllDays;
+                });
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                margin: EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: allDaysOn ? clUpBar : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: allDaysOn ? clUpBar : clText.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  lw('All'),
+                  style: TextStyle(fontSize: fsSmall, color: clText, fontWeight: allDaysOn ? fwBold : fwNormal),
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (weekdaysOn) {
+                    _periodDays = _periodDays & dayWeekend;
+                  } else {
+                    _periodDays = _periodDays | dayWeekdays;
+                  }
+                });
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: weekdaysOn ? clUpBar : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: weekdaysOn ? clUpBar : clText.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  lw('Weekdays'),
+                  style: TextStyle(fontSize: fsSmall, color: clText, fontWeight: weekdaysOn ? fwBold : fwNormal),
+                ),
+              ),
+            ),
+            SizedBox(width: 40),
+          ],
+        ),
+        SizedBox(height: 12),
+        // Day checkboxes
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(7, (index) {
+            final isEnabled = isDayEnabled(_periodDays, index);
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _periodDays = setDayEnabled(_periodDays, index, !isEnabled);
+                });
+              },
+              child: Column(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isEnabled ? clUpBar : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: isEnabled ? clUpBar : clText.withValues(alpha: 0.3)),
+                    ),
+                    child: isEnabled ? Icon(Icons.done, color: clText, size: 22, weight: 700) : null,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    getDayName(index),
+                    style: TextStyle(color: clText, fontSize: fsSmall, fontWeight: isEnabled ? fwBold : fwNormal),
                   ),
                 ],
               ),
@@ -1856,7 +2237,7 @@ class _EditItemPageState extends State<EditItemPage> {
         controller: timeController,
         style: TextStyle(color: clText),
         readOnly: false, // Разрешаем ручной ввод
-        enabled: _remind, // Активно только если включено напоминание
+        enabled: _remind || _period, // Active for one-time and period reminders
         onChanged: (value) {
           if (value.isEmpty) {
             setState(() {
@@ -1883,7 +2264,7 @@ class _EditItemPageState extends State<EditItemPage> {
         },
         decoration: InputDecoration(
           labelText: lw('Time (HH:MM)'),
-          labelStyle: TextStyle(color: _remind ? clText : clText.withValues(alpha: 0.5)),
+          labelStyle: TextStyle(color: (_remind || _period) ? clText : clText.withValues(alpha: 0.5)),
           fillColor: clFill,
           filled: true,
           border: OutlineInputBorder(),
@@ -1891,12 +2272,12 @@ class _EditItemPageState extends State<EditItemPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                icon: Icon(Icons.access_time, color: _remind ? clText : clText.withValues(alpha: 0.5)),
-                onPressed: _remind ? () => _selectTime(context) : null,
+                icon: Icon(Icons.access_time, color: (_remind || _period) ? clText : clText.withValues(alpha: 0.5)),
+                onPressed: (_remind || _period) ? () => _selectTime(context) : null,
               ),
               IconButton(
-                icon: Icon(Icons.clear, color: _remind ? clText : clText.withValues(alpha: 0.5)),
-                onPressed: _remind ? () {
+                icon: Icon(Icons.clear, color: (_remind || _period) ? clText : clText.withValues(alpha: 0.5)),
+                onPressed: (_remind || _period) ? () {
                   setState(() {
                     timeController.clear();
                     _time = null;
@@ -1913,24 +2294,21 @@ class _EditItemPageState extends State<EditItemPage> {
 
 // Виджет для выбора предустановленных вариантов времени (радио-кнопки)
   Widget _buildTimeOptions() {
+    final bool timeEnabled = _remind || _period;
     return GestureDetector(
-      onLongPress: () => showHelp(41), // ID 41 для радио-кнопок времени
+      onLongPress: () => showHelp(41),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Утро
           Row(
             children: [
-              // ignore: deprecated_member_use
               Radio<int>(
                 value: 0,
-                // ignore: deprecated_member_use
                 groupValue: _selectedTimeOption,
-                // ignore: deprecated_member_use
-                onChanged: _remind ? (int? value) {
+                onChanged: timeEnabled ? (int? value) {
                   setState(() {
                     _selectedTimeOption = value;
-                    _time = timeMorning; // 09:30
+                    _time = timeMorning;
                     timeController.text = '09:30';
                   });
                 } : null,
@@ -1938,24 +2316,20 @@ class _EditItemPageState extends State<EditItemPage> {
               Text(
                 lw('Morning'),
                 style: TextStyle(
-                  color: _remind ? clText : clText.withValues(alpha: 0.5),
+                  color: timeEnabled ? clText : clText.withValues(alpha: 0.5),
                 ),
               ),
             ],
           ),
-          // День
           Row(
             children: [
-              // ignore: deprecated_member_use
               Radio<int>(
                 value: 1,
-                // ignore: deprecated_member_use
                 groupValue: _selectedTimeOption,
-                // ignore: deprecated_member_use
-                onChanged: _remind ? (int? value) {
+                onChanged: timeEnabled ? (int? value) {
                   setState(() {
                     _selectedTimeOption = value;
-                    _time = timeDay; // 12:30
+                    _time = timeDay;
                     timeController.text = '12:30';
                   });
                 } : null,
@@ -1963,24 +2337,20 @@ class _EditItemPageState extends State<EditItemPage> {
               Text(
                 lw('Day'),
                 style: TextStyle(
-                  color: _remind ? clText : clText.withValues(alpha: 0.5),
+                  color: timeEnabled ? clText : clText.withValues(alpha: 0.5),
                 ),
               ),
             ],
           ),
-          // Вечер
           Row(
             children: [
-              // ignore: deprecated_member_use
               Radio<int>(
                 value: 2,
-                // ignore: deprecated_member_use
                 groupValue: _selectedTimeOption,
-                // ignore: deprecated_member_use
-                onChanged: _remind ? (int? value) {
+                onChanged: timeEnabled ? (int? value) {
                   setState(() {
                     _selectedTimeOption = value;
-                    _time = timeEvening; // 18:30
+                    _time = timeEvening;
                     timeController.text = '18:30';
                   });
                 } : null,
@@ -1988,7 +2358,7 @@ class _EditItemPageState extends State<EditItemPage> {
               Text(
                 lw('Evening'),
                 style: TextStyle(
-                  color: _remind ? clText : clText.withValues(alpha: 0.5),
+                  color: timeEnabled ? clText : clText.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -2458,9 +2828,11 @@ class _EditItemPageState extends State<EditItemPage> {
             _buildPrioritySelector(),
             SizedBox(height: 10),
 
-            // Date field (always visible)
-            _buildDateField(),
-            SizedBox(height: 10),
+            // Date field (hidden when Period mode is active - Period has its own From/To)
+            if (!_period) ...[
+              _buildDateField(),
+              SizedBox(height: 10),
+            ],
 
             // Reminder section with header and checkbox
             _buildReminderSection(),
