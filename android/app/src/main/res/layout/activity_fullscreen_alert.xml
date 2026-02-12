@@ -156,7 +156,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center"
-                android:layout_marginBottom="20dp">
+                android:layout_marginBottom="4dp">
 
                 <Button
                     android:id="@+id/snooze_1hour"
@@ -179,6 +179,17 @@
                     android:layout_marginHorizontal="3dp"/>
 
             </LinearLayout>
+
+            <!-- Postpone 1 day button (hidden for daily reminders) -->
+            <Button
+                android:id="@+id/postpone_1day"
+                android:layout_width="150dp"
+                android:layout_height="40dp"
+                android:text="1 day"
+                android:textSize="12sp"
+                android:background="@drawable/rounded_button"
+                android:textColor="#FFFFFF"
+                android:layout_marginBottom="16dp"/>
 
             <!-- OK Button with rounded corners -->
             <Button

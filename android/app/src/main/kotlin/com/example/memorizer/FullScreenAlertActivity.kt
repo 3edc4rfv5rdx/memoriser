@@ -57,6 +57,8 @@ class FullScreenAlertActivity : Activity() {
         val labelMin = intent.getStringExtra("label_min") ?: "min"
         val labelHour = intent.getStringExtra("label_hour") ?: "hour"
         val labelHours = intent.getStringExtra("label_hours") ?: "hours"
+        val labelDay = intent.getStringExtra("label_day") ?: "day"
+        val isDaily = intent.getBooleanExtra("isDaily", false)
 
         Log.d("MemorizerApp", "FullScreenAlert - itemId: $itemId, title: $title, sound: $soundValue")
         Log.d("MemorizerApp", "Labels - reminder: $labelReminder, postpone: $labelPostpone")
@@ -113,6 +115,17 @@ class FullScreenAlertActivity : Activity() {
         }
         findViewById<Button>(R.id.snooze_3hours).setOnClickListener {
             snoozeReminder(itemId, title, content, soundValue, 180)
+        }
+
+        // Setup postpone 1 day button (hidden for daily reminders)
+        val postpone1day = findViewById<Button>(R.id.postpone_1day)
+        if (isDaily) {
+            postpone1day.visibility = View.GONE
+        } else {
+            postpone1day.text = "1 $labelDay"
+            postpone1day.setOnClickListener {
+                snoozeReminder(itemId, title, content, soundValue, 1440)
+            }
         }
 
         // Setup barrier overlay and draggable circle

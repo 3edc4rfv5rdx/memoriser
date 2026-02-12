@@ -801,7 +801,7 @@ class NotificationReceiver : BroadcastReceiver() {
             // Check if fullscreen alert is enabled
             if (itemData.fullscreen == 1) {
                 Log.d("MemorizerApp", "Fullscreen is ENABLED for daily reminder $itemId, launching fullscreen alert")
-                launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound)
+                launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound, isDaily = true)
             } else {
                 Log.d("MemorizerApp", "Fullscreen is DISABLED for daily reminder $itemId, showing notification")
                 wakeScreen(context)
@@ -1595,7 +1595,7 @@ class NotificationReceiver : BroadcastReceiver() {
     }
 
     // Launch fullscreen alert activity using full-screen intent notification
-    private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?) {
+    private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?, isDaily: Boolean = false) {
         try {
             // Check if we can use full-screen intents (Android 10+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1617,6 +1617,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 putExtra("label_min", translate(context, "min"))
                 putExtra("label_hour", translate(context, "hour"))
                 putExtra("label_hours", translate(context, "hours"))
+                putExtra("label_day", translate(context, "day"))
+                putExtra("isDaily", isDaily)
             }
 
             val fullScreenPendingIntent = PendingIntent.getActivity(

@@ -1,3 +1,13 @@
+  + Fullscreen alert: "Postpone 1 day" button (not shown for daily reminders):
+    - Added "day" locale key (ru: "день", ua: "день") in locales.json
+    - Added postpone_1day button in activity_fullscreen_alert.xml (150dp wide, between snooze row 2 and OK)
+    - FullScreenAlertActivity reads isDaily flag from intent; hides button when isDaily=true
+    - Button text set to "1 {day}" using translated label
+    - OnClick: calls snoozeReminder with 1440 minutes (24 hours)
+    - launchFullscreenAlert() in NotificationSystem.kt: added isDaily parameter (default false)
+    - Passes label_day and isDaily extras to the fullscreen intent
+    - handleDailyReminder passes isDaily=true; specific and snoozed reminders use default false
+
   + Wake screen on reminder trigger (non-fullscreen):
     - Added wakeScreen() in NotificationReceiver using PowerManager
     - SCREEN_BRIGHT_WAKE_LOCK + ACQUIRE_CAUSES_WAKEUP + ON_AFTER_RELEASE
