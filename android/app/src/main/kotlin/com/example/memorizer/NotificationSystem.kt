@@ -197,6 +197,10 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 val sounds = getSystemSounds()
                 result.success(sounds)
             }
+            "getDefaultSound" -> {
+                val sound = getDefaultSound(context)
+                result.success(sound)
+            }
             "getDefaultDailySound" -> {
                 val sound = getDefaultDailySound(context)
                 result.success(sound)
@@ -232,6 +236,56 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 mediaPlayer = null
             } catch (e: Exception) {
                 Log.e("MemorizerApp", "Error stopping sound (static): ${e.message}")
+            }
+        }
+
+        /**
+         * Complete a period reminder: cancel remaining alarms, optionally deactivate.
+         * Called from FullScreenAlertActivity when user presses "Done".
+         */
+        fun completePeriodReminder(context: Context, itemId: Int, isMonthlyPeriod: Boolean) {
+            try {
+                Log.d("MemorizerApp", "completePeriodReminder: itemId=$itemId, isMonthly=$isMonthlyPeriod")
+
+                // Cancel all period alarms for this item
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                for (month in 1..12) {
+                    for (day in 1..31) {
+                        val intent = Intent(context, NotificationReceiver::class.java).apply {
+                            action = "com.example.memorizer.PERIOD_REMINDER"
+                        }
+                        val requestCode = itemId * 10000 + month * 100 + day
+                        val pendingIntent = PendingIntent.getBroadcast(
+                            context,
+                            requestCode,
+                            intent,
+                            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                        )
+                        pendingIntent?.let {
+                            alarmManager.cancel(it)
+                            it.cancel()
+                        }
+                    }
+                }
+                Log.d("MemorizerApp", "Cancelled all period alarms for item $itemId")
+
+                // For date-based (non-monthly) periods, set active=0 in DB
+                if (!isMonthlyPeriod) {
+                    val dbPath = context.getDatabasePath("memorizer.db")
+                    if (dbPath.exists()) {
+                        val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READWRITE)
+                        val values = ContentValues().apply {
+                            put("active", 0)
+                        }
+                        db.update("items", values, "id = ?", arrayOf(itemId.toString()))
+                        db.close()
+                        Log.d("MemorizerApp", "Set active=0 for date-based period item $itemId")
+                    }
+                } else {
+                    Log.d("MemorizerApp", "Monthly period - keeping active=1 for item $itemId (will reschedule next month)")
+                }
+            } catch (e: Exception) {
+                Log.e("MemorizerApp", "Error completing period reminder: ${e.message}")
             }
         }
     }
@@ -314,6 +368,33 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
     // Stop currently playing sound
     private fun stopSound() {
         stopSoundStatic()
+    }
+
+    // Get default one-time/period sound from settings
+    private fun getDefaultSound(context: Context): String? {
+        try {
+            val dbPath = context.getDatabasePath("settings.db")
+            if (dbPath.exists()) {
+                val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+                val cursor = db.rawQuery(
+                    "SELECT value FROM settings WHERE key = ?",
+                    arrayOf("Default sound")
+                )
+                val result = if (cursor.moveToFirst()) {
+                    val value = cursor.getString(0)
+                    if (value.isNullOrEmpty()) null else value
+                } else {
+                    null
+                }
+                cursor.close()
+                db.close()
+                if (result != null) return result
+            }
+            return null
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error getting default sound: ${e.message}")
+            return null
+        }
     }
 
     // Get default daily sound from settings (or system default if not set)
@@ -1615,7 +1696,9 @@ class NotificationReceiver : BroadcastReceiver() {
 
                 if (itemData.fullscreen == 1) {
                     Log.d("MemorizerApp", "Fullscreen is ENABLED for period reminder $itemId")
-                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound)
+                    // Determine if monthly period (dateFrom 1-31 = monthly)
+                    val isMonthlyPeriod = itemData.date != null && itemData.date in 1..31
+                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound, isPeriod = true, isMonthlyPeriod = isMonthlyPeriod)
                 } else {
                     Log.d("MemorizerApp", "Showing notification for period reminder $itemId")
                     wakeScreen(context)
@@ -1741,7 +1824,7 @@ class NotificationReceiver : BroadcastReceiver() {
     }
 
     // Launch fullscreen alert activity using full-screen intent notification
-    private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?, isDaily: Boolean = false) {
+    private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?, isDaily: Boolean = false, isPeriod: Boolean = false, isMonthlyPeriod: Boolean = false) {
         try {
             // Check if we can use full-screen intents (Android 10+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1765,6 +1848,10 @@ class NotificationReceiver : BroadcastReceiver() {
                 putExtra("label_hours", translate(context, "hours"))
                 putExtra("label_day", translate(context, "day"))
                 putExtra("isDaily", isDaily)
+                putExtra("isPeriod", isPeriod)
+                putExtra("isMonthlyPeriod", isMonthlyPeriod)
+                putExtra("label_continue", translate(context, "Continue"))
+                putExtra("label_done", translate(context, "Done"))
             }
 
             val fullScreenPendingIntent = PendingIntent.getActivity(

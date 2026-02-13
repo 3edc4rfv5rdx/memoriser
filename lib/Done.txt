@@ -1,3 +1,15 @@
+  + Fix period sound: load default sound from settings into form when selecting Period type
+    - Added getDefaultSound() method to Flutter (reminders.dart) and Android (NotificationService)
+    - Period onTap now loads default sound via SimpleNotifications.getDefaultSound()
+  + Period fullscreen alert: "Continue" / "Done" buttons for period reminders:
+    - Auto-set fullscreen=true when user selects Period type in additem.dart
+    - New layout: period_section with Continue (200dp) and Done (120dp) buttons, hidden by default
+    - handlePeriodReminder passes isPeriod + isMonthlyPeriod flags to launchFullscreenAlert
+    - launchFullscreenAlert forwards isPeriod/isMonthlyPeriod + translated labels via intent extras
+    - FullScreenAlertActivity: if isPeriod, hides snooze_section, shows period_section
+    - "Continue" dismisses alert (alarms continue next day)
+    - "Done" calls completePeriodReminder: cancels all period alarms for item; date-based periods set active=0, monthly periods keep active=1
+    - Added "Continue"/"Done" to locales.json (ru, ua)
   + Fix period reminders not firing:
     - isItemStillActive() checked only remind==1, now also checks period==1
     - requestCode collision: same day in different months (e.g. Feb 13 & Mar 13) overwrote each other. Changed from itemId*100+day to itemId*10000+month*100+day

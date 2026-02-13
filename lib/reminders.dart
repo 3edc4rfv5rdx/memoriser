@@ -582,6 +582,17 @@ class SimpleNotifications {
     }
   }
 
+  // Get default one-time/period sound from settings
+  static Future<String?> getDefaultSound() async {
+    try {
+      final result = await platform.invokeMethod('getDefaultSound');
+      return result as String?;
+    } catch (e) {
+      myPrint('Error getting default sound: $e');
+      return null;
+    }
+  }
+
   // Get default daily sound from settings (or system default if not set)
   static Future<String?> getDefaultDailySound() async {
     try {

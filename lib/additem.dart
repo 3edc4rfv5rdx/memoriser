@@ -1108,7 +1108,8 @@ class _EditItemPageState extends State<EditItemPage> {
           icon: Icons.date_range,
           selected: _period,
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(6)),
-          onTap: () {
+          onTap: () async {
+            final defaultSound = _sound ?? await SimpleNotifications.getDefaultSound();
             setState(() {
               _period = true;
               _remind = false;
@@ -1116,6 +1117,8 @@ class _EditItemPageState extends State<EditItemPage> {
               _yearly = false;
               _monthly = false;
               _removeAfterReminder = false;
+              _fullscreen = true;
+              _sound = defaultSound;
               // Clear main date - Period uses its own From/To fields
               _date = null;
               dateController.clear();

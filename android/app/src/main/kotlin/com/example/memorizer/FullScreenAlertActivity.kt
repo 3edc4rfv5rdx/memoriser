@@ -59,8 +59,12 @@ class FullScreenAlertActivity : Activity() {
         val labelHours = intent.getStringExtra("label_hours") ?: "hours"
         val labelDay = intent.getStringExtra("label_day") ?: "day"
         val isDaily = intent.getBooleanExtra("isDaily", false)
+        val isPeriod = intent.getBooleanExtra("isPeriod", false)
+        val isMonthlyPeriod = intent.getBooleanExtra("isMonthlyPeriod", false)
+        val labelContinue = intent.getStringExtra("label_continue") ?: "Continue"
+        val labelDone = intent.getStringExtra("label_done") ?: "Done"
 
-        Log.d("MemorizerApp", "FullScreenAlert - itemId: $itemId, title: $title, sound: $soundValue")
+        Log.d("MemorizerApp", "FullScreenAlert - itemId: $itemId, title: $title, sound: $soundValue, isPeriod: $isPeriod")
         Log.d("MemorizerApp", "Labels - reminder: $labelReminder, postpone: $labelPostpone")
 
         // Cancel the notification now that fullscreen is shown
@@ -125,6 +129,30 @@ class FullScreenAlertActivity : Activity() {
             postpone1day.text = "1 $labelDay"
             postpone1day.setOnClickListener {
                 snoozeReminder(itemId, title, content, soundValue, 1440)
+            }
+        }
+
+        // Period mode: hide snooze section, show period buttons
+        if (isPeriod) {
+            findViewById<View>(R.id.snooze_section).visibility = View.GONE
+            val periodSection = findViewById<View>(R.id.period_section)
+            periodSection.visibility = View.VISIBLE
+
+            val continueButton = findViewById<Button>(R.id.period_continue_button)
+            val doneButton = findViewById<Button>(R.id.period_done_button)
+
+            continueButton.text = labelContinue
+            doneButton.text = labelDone
+
+            // Continue = just dismiss (alarms continue tomorrow)
+            continueButton.setOnClickListener {
+                dismissAlert()
+            }
+
+            // Done = cancel remaining period alarms, optionally deactivate
+            doneButton.setOnClickListener {
+                NotificationService.completePeriodReminder(this, itemId, isMonthlyPeriod)
+                dismissAlert()
             }
         }
 
