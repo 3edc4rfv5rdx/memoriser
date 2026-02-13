@@ -1,3 +1,11 @@
+  + Fix period reminders not firing:
+    - isItemStillActive() checked only remind==1, now also checks period==1
+    - requestCode collision: same day in different months (e.g. Feb 13 & Mar 13) overwrote each other. Changed from itemId*100+day to itemId*10000+month*100+day
+    - Samsung Freecess blocks setExactAndAllowWhileIdle: switched to setAlarmClock (same as daily reminders)
+    - handlePeriodReminder used getDefaultSound instead of itemData.sound: now uses item's custom sound with fallback to default
+  + Add sound selector to Period reminder form (uses 'sound' field, same as one-time reminders)
+  + Fix notes sorting: sort by date field (if present) with "Newest first" setting, no-date items go to bottom sorted alphabetically by title
+  + Move Periods folder to 3rd position in folder list (Notes → Daily → Periods → Monthly → Yearly)
   + Period reminders: new reminder type with date range + weekday filter:
     - DB migration v15: added period (0/1), period_to (INT), period_days (INT bitmask) to items
     - Reminder type toggle: changed from 2 horizontal to 3 vertical buttons (One-time, Daily, Period)

@@ -1011,6 +1011,8 @@ class _EditItemPageState extends State<EditItemPage> {
                 SizedBox(height: 10),
                 _buildPeriodDaysSection(),
                 SizedBox(height: 12),
+                _buildSoundSelector(isDaily: false),
+                SizedBox(height: 10),
                 _buildFullscreenSelector(),
               ],
             ],

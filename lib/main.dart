@@ -1670,11 +1670,31 @@ class _HomePageState extends State<HomePage> {
         item['time'] == null && item['yearly'] != 1 && item['daily'] != 1 && item['monthly'] != 1 && item['period'] != 1).toList();
         final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
         notesItems.sort((a, b) {
-          final createdA = a['created'] as int? ?? 0;
-          final createdB = b['created'] as int? ?? 0;
-          return newestFirst == "true"
-              ? createdB.compareTo(createdA)
-              : createdA.compareTo(createdB);
+          final dateA = a['date'] as int?;
+          final dateB = b['date'] as int?;
+          final hasDateA = dateA != null && dateA > 0;
+          final hasDateB = dateB != null && dateB > 0;
+          // Items with date come first, items without date go to the bottom
+          if (hasDateA && !hasDateB) return -1;
+          if (!hasDateA && hasDateB) return 1;
+          if (hasDateA && hasDateB) {
+            // Both have dates: sort by date (respect "Newest first" setting)
+            if (dateA != dateB) {
+              return newestFirst == "true"
+                  ? dateB!.compareTo(dateA!)
+                  : dateA!.compareTo(dateB!);
+            }
+          }
+          if (!hasDateA && !hasDateB) {
+            // Both without date: sort alphabetically by title
+            final titleA = (a['title'] as String?) ?? '';
+            final titleB = (b['title'] as String?) ?? '';
+            return titleA.toLowerCase().compareTo(titleB.toLowerCase());
+          }
+          // Same date: sort alphabetically by title
+          final titleA = (a['title'] as String?) ?? '';
+          final titleB = (b['title'] as String?) ?? '';
+          return titleA.toLowerCase().compareTo(titleB.toLowerCase());
         });
         finalItems.addAll(notesItems);
 
@@ -1722,8 +1742,8 @@ class _HomePageState extends State<HomePage> {
         item['yearly'] != 1 && item['daily'] != 1 && item['monthly'] != 1 && item['period'] != 1 && item['time'] != null).toList();
         finalItems.addAll(normalItems);
 
-        // Виртуальные папки в КОНЦЕ списка
-        // Order: Notes → Daily → Monthly → Yearly
+        // Virtual folders at the END of the list
+        // Order: Notes → Daily → Periods → Monthly → Yearly
         final notesCount = await _getNotesItemsCount();
         if (notesCount > 0) {
           finalItems.add(_createNotesFolderItem());
@@ -1734,14 +1754,14 @@ class _HomePageState extends State<HomePage> {
           finalItems.add(_createDailyFolderItem());
         }
 
-        final monthlyCount = await _getMonthlyItemsCount();
-        if (monthlyCount > 0) {
-          finalItems.add(_createMonthlyFolderItem());
-        }
-
         final periodCount = await _getPeriodItemsCount();
         if (periodCount > 0) {
           finalItems.add(_createPeriodFolderItem());
+        }
+
+        final monthlyCount = await _getMonthlyItemsCount();
+        if (monthlyCount > 0) {
+          finalItems.add(_createMonthlyFolderItem());
         }
 
         final yearlyCount = await _getYearlyItemsCount();

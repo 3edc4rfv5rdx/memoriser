@@ -554,8 +554,8 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 putExtra("body", body)
             }
 
-            // requestCode = itemId * 100 + dayOfMonth (unique per day within a period)
-            val requestCode = itemId * 100 + day
+            // requestCode must be unique per item + month + day
+            val requestCode = itemId * 10000 + month * 100 + day
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 requestCode,
@@ -574,19 +574,12 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             }
 
             if (calendar.timeInMillis > System.currentTimeMillis()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                }
+                // Use setAlarmClock for guaranteed delivery on Samsung (Freecess blocks setExactAndAllowWhileIdle)
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
                 Log.d("MemorizerApp", "Period reminder scheduled for item $itemId at ${calendar.time}")
             } else {
                 Log.d("MemorizerApp", "Period reminder time is in the past for item $itemId day $day")
@@ -596,26 +589,28 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
         }
     }
 
-    // Cancel all period reminders for an item (days 1-31)
+    // Cancel all period reminders for an item (all months x days)
     private fun cancelPeriodReminders(itemId: Int) {
         try {
             Log.d("MemorizerApp", "Cancelling all period reminders for item $itemId")
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-            for (day in 1..31) {
-                val intent = Intent(context, NotificationReceiver::class.java).apply {
-                    action = "com.example.memorizer.PERIOD_REMINDER"
-                }
-                val requestCode = itemId * 100 + day
-                val pendingIntent = PendingIntent.getBroadcast(
-                    context,
-                    requestCode,
-                    intent,
-                    PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-                )
-                pendingIntent?.let {
-                    alarmManager.cancel(it)
-                    it.cancel()
+            for (month in 1..12) {
+                for (day in 1..31) {
+                    val intent = Intent(context, NotificationReceiver::class.java).apply {
+                        action = "com.example.memorizer.PERIOD_REMINDER"
+                    }
+                    val requestCode = itemId * 10000 + month * 100 + day
+                    val pendingIntent = PendingIntent.getBroadcast(
+                        context,
+                        requestCode,
+                        intent,
+                        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    pendingIntent?.let {
+                        alarmManager.cancel(it)
+                        it.cancel()
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -1612,15 +1607,19 @@ class NotificationReceiver : BroadcastReceiver() {
 
                 val itemTitle = if (itemData.title.isNotEmpty()) itemData.title else "Reminder"
                 val itemContent = itemData.content
-                val defaultSound = getDefaultSound(context)
+                // Use item's custom sound, or fall back to default sound from settings
+                val itemSound = itemData.sound ?: getDefaultSound(context)
+
+                Log.d("MemorizerApp", "Period reminder - itemId: $itemId, fullscreen: ${itemData.fullscreen}")
+                Log.d("MemorizerApp", "Sound: item=${itemData.sound}, final=$itemSound")
 
                 if (itemData.fullscreen == 1) {
                     Log.d("MemorizerApp", "Fullscreen is ENABLED for period reminder $itemId")
-                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, defaultSound)
+                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound)
                 } else {
                     Log.d("MemorizerApp", "Showing notification for period reminder $itemId")
                     wakeScreen(context)
-                    val channelId = createReminderNotificationChannel(context, defaultSound)
+                    val channelId = createReminderNotificationChannel(context, itemSound)
                     showEventNotification(context, itemId, itemTitle, itemContent, itemId, channelId)
                 }
             } else {
@@ -1722,12 +1721,12 @@ class NotificationReceiver : BroadcastReceiver() {
             val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
 
             val cursor = db.rawQuery(
-                "SELECT remind FROM items WHERE id = ?",
+                "SELECT remind, period FROM items WHERE id = ?",
                 arrayOf(itemId.toString())
             )
 
             val isActive = if (cursor.moveToFirst()) {
-                cursor.getInt(0) == 1 // remind must be enabled
+                cursor.getInt(0) == 1 || cursor.getInt(1) == 1 // remind or period must be enabled
             } else {
                 false // item not found
             }
@@ -2445,7 +2444,7 @@ class BootReceiver : BroadcastReceiver() {
                 putExtra("body", "")
             }
 
-            val requestCode = itemId * 100 + day
+            val requestCode = itemId * 10000 + month * 100 + day
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
                 requestCode,
@@ -2466,19 +2465,12 @@ class BootReceiver : BroadcastReceiver() {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
             if (calendar.timeInMillis > System.currentTimeMillis()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                }
+                // Use setAlarmClock for guaranteed delivery on Samsung
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
             }
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error scheduling period reminder in boot: ${e.message}")
