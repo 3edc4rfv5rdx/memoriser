@@ -1,3 +1,7 @@
+  + Full backup: include settings.db in backup/restore
+    - Backup saves settings-{date}.db alongside memorizer-{date}.db
+    - Restore finds settings DB in backup dir, closes settDb, copies, reopens
+    - Preserves default sounds, theme, language and all other settings
   + Fix period sound: load default sound from settings into form when selecting Period type
     - Added getDefaultSound() method to Flutter (reminders.dart) and Android (NotificationService)
     - Period onTap now loads default sound via SimpleNotifications.getDefaultSound()

@@ -75,6 +75,9 @@ Future<String> createBackup() async {
       return lw('Error: backup file was not created');
     }
 
+    // Backup settings database
+    await _backupSettingsDb(databasesPath, backupDirPath, dateStr);
+
     // Backup Photo folder
     await _backupPhotoFolder(backupDirPath);
 
@@ -120,6 +123,59 @@ Future<int> _copyDirectoryRecursive(Directory source, Directory target, {bool sk
     }
   }
   return copiedFiles;
+}
+
+// Backup settings database
+Future<void> _backupSettingsDb(String databasesPath, String backupDirPath, String dateStr) async {
+  try {
+    final settDbPath = path.join(databasesPath, settDbFile);
+    final settFile = File(settDbPath);
+
+    if (!await settFile.exists()) {
+      myPrint('Settings DB not found, skipping');
+      return;
+    }
+
+    final backupPath = '$backupDirPath/settings-$dateStr.db';
+    final backupFile = await settFile.copy(backupPath);
+    myPrint('Settings DB backed up: ${await backupFile.length()} bytes');
+  } catch (e) {
+    myPrint('Error backing up settings DB: $e');
+  }
+}
+
+// Restore settings database from backup directory
+Future<void> _restoreSettingsDb(String backupDirPath) async {
+  try {
+    // Find settings DB file in backup dir
+    final backupDir = Directory(backupDirPath);
+    if (!await backupDir.exists()) return;
+
+    final entities = await backupDir.list().toList();
+    final settingsFile = entities.whereType<File>().where(
+      (f) => path.basename(f.path).startsWith('settings-') && f.path.endsWith('.db')
+    ).toList();
+
+    if (settingsFile.isEmpty) {
+      myPrint('No settings DB in backup');
+      return;
+    }
+
+    final databasesPath = await getDatabasesPath();
+    final settDbPath = path.join(databasesPath, settDbFile);
+
+    // Close settings DB before overwriting
+    await settDb.close();
+
+    await settingsFile.first.copy(settDbPath);
+    myPrint('Settings DB restored from backup');
+
+    // Reopen settings DB
+    settDb = await openDatabase(settDbPath);
+    myPrint('Settings DB reopened');
+  } catch (e) {
+    myPrint('Error restoring settings DB: $e');
+  }
 }
 
 // Backup Photo folder to backup directory
@@ -466,6 +522,7 @@ Future<String> restoreBackup() async {
       }
     }
 
+    await _restoreSettingsDb(backupDirPath);
     await _restorePhotoFolder(backupDirPath);
     await _restoreSoundsFolder(backupDirPath);
 
