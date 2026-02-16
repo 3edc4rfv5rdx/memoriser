@@ -1,3 +1,8 @@
+  + Sound system review and fixes
+    - Deduplicated getDefaultSound/getDefaultDailySound: shared companion functions in NotificationService
+    - Removed ~120 lines of duplicate code (save/get functions in NotificationReceiver)
+    - Added system fallback for one-time default sound (was returning null, now falls back to TYPE_ALARM)
+    - Fixed "Sound:" in locales.json: removed colon from locale string, added programmatically in code
   + Request battery optimization exemption on app start (soft dialog)
     - Shows friendly AlertDialog explaining why background work is needed
     - Localized title/message/buttons via locales.json (ru, ua)

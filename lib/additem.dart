@@ -1877,7 +1877,7 @@ class _EditItemPageState extends State<EditItemPage> {
         if (!isDaily) ...[
           SizedBox(width: 16),
           Text(
-            lw('Sound:'),
+            lw('Sound') + ':',
             style: TextStyle(color: clText, fontSize: fsNormal),
           ),
           SizedBox(width: 8),
