@@ -282,6 +282,14 @@ class FullScreenAlertActivity : Activity() {
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
+                // Force playback through built-in speaker (bypass Bluetooth)
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                val speaker = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+                    .firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                if (speaker != null) {
+                    setPreferredDevice(speaker)
+                    Log.d("MemorizerApp", "Forced audio output to built-in speaker")
+                }
                 setDataSource(applicationContext, soundUri)
                 prepare()
                 start()

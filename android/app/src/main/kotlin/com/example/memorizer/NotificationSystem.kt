@@ -77,8 +77,83 @@ class MainActivity : FlutterActivity() {
                     startActivity(intent)
                 }
             }
+            // Request battery optimization exemption (prevents system from killing alarms)
+            requestBatteryOptimization()
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error requesting permissions: ${e.message}")
+        }
+    }
+
+    // Show friendly dialog explaining battery optimization, then request system permission
+    private fun requestBatteryOptimization() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+
+        try {
+            val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+            if (powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                Log.d("MemorizerApp", "Battery optimization already disabled")
+                return
+            }
+
+            // Check if user already declined
+            val prefs = getSharedPreferences("memorizer_prefs", MODE_PRIVATE)
+            if (prefs.getBoolean("battery_opt_declined", false)) {
+                Log.d("MemorizerApp", "Battery optimization dialog was declined by user")
+                return
+            }
+
+            val title = translateKey("Allow background work")
+            val message = translateKey("Battery optimization info")
+            val allowBtn = translateKey("Allow")
+            val notNowBtn = translateKey("Not now")
+
+            android.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(allowBtn) { _, _ ->
+                    try {
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Log.e("MemorizerApp", "Error opening battery settings: ${e.message}")
+                    }
+                }
+                .setNegativeButton(notNowBtn) { _, _ ->
+                    prefs.edit().putBoolean("battery_opt_declined", true).apply()
+                }
+                .setCancelable(true)
+                .show()
+
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error requesting battery optimization: ${e.message}")
+        }
+    }
+
+    // Translate a key using locales.json (same logic as NotificationReceiver.translate)
+    private fun translateKey(key: String): String {
+        return try {
+            val dbPath = getDatabasePath("settings.db")
+            val lang = if (dbPath.exists()) {
+                val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+                val cursor = db.rawQuery("SELECT value FROM settings WHERE key = ?", arrayOf("Language"))
+                val l = if (cursor.moveToFirst()) cursor.getString(0) ?: "en" else "en"
+                cursor.close()
+                db.close()
+                l
+            } else "en"
+
+            if (lang == "en") return key
+
+            val json = assets.open("flutter_assets/assets/locales.json").bufferedReader().use { it.readText() }
+            val jsonObject = org.json.JSONObject(json)
+            if (jsonObject.has(key)) {
+                val translations = jsonObject.getJSONObject(key)
+                if (translations.has(lang)) translations.getString(lang) else key
+            } else key
+        } catch (e: Exception) {
+            key
         }
     }
 
@@ -1276,20 +1351,8 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Convert sound path/uri to proper Uri for notification channel
-    private fun getSoundUri(soundValue: String?): Uri? {
-        if (soundValue == null) return null
+    // Create notification channel for one-time reminders (silent - sound played manually through speaker)
 
-        return if (soundValue.startsWith("/")) {
-            // File path - convert to file:// URI
-            Uri.fromFile(java.io.File(soundValue))
-        } else {
-            // Already a URI (content://, etc.)
-            Uri.parse(soundValue)
-        }
-    }
-
-    // Create notification channel for one-time reminders with sound from Settings
     private fun createReminderNotificationChannel(context: Context, soundValue: String?): String {
         // Always use hash-based channel ID (0 for null/system default)
         val channelId = "memorizer_reminder_${soundValue?.hashCode() ?: 0}"
@@ -1305,16 +1368,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 enableLights(true)
                 enableVibration(true)
                 setShowBadge(true)
-                // Set custom sound for channel (null = system default)
-                val soundUri = getSoundUri(soundValue)
-                if (soundUri != null) {
-                    val audioAttributes = android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                    setSound(soundUri, audioAttributes)
-                }
-                Log.d("MemorizerApp", "Created reminder channel $channelId with sound: $soundValue")
+                // Disable channel sound - sound is played manually through speaker
+                setSound(null, null)
+                Log.d("MemorizerApp", "Created reminder channel $channelId (sound played manually)")
             }
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
@@ -1332,8 +1388,6 @@ class NotificationReceiver : BroadcastReceiver() {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // For file paths, sound is played manually (not via channel)
-            val isFilePath = soundValue?.startsWith("/") == true
             val channelName = if (soundValue != null) "Daily Reminders (Custom)" else "Daily Reminders"
             val channel = NotificationChannel(
                 channelId,
@@ -1344,22 +1398,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 enableLights(true)
                 enableVibration(true)
                 setShowBadge(true)
-                // Only set channel sound for content:// URIs (not file paths)
-                if (!isFilePath) {
-                    val soundUri = getSoundUri(soundValue)
-                    if (soundUri != null) {
-                        val audioAttributes = android.media.AudioAttributes.Builder()
-                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                        setSound(soundUri, audioAttributes)
-                        Log.d("MemorizerApp", "Created channel $channelId with sound URI: $soundValue")
-                    }
-                } else {
-                    // Disable default sound for file paths (will be played manually)
-                    setSound(null, null)
-                    Log.d("MemorizerApp", "Created channel $channelId for file sound: $soundValue (played manually)")
-                }
+                // Disable channel sound - sound is played manually through speaker
+                setSound(null, null)
+                Log.d("MemorizerApp", "Created daily channel $channelId (sound played manually)")
             }
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
@@ -1419,25 +1460,17 @@ class NotificationReceiver : BroadcastReceiver() {
                 .setDeleteIntent(stopPendingIntent)
                 .addAction(R.drawable.notification_icon, "Stop", stopPendingIntent)
 
-            // For Android < 8, set sound directly on notification
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                if (soundUri != null) {
-                    builder.setSound(Uri.parse(soundUri))
-                    builder.setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
-                } else {
-                    builder.setDefaults(NotificationCompat.DEFAULT_ALL)
-                }
-            }
+            // Disable notification sound - played manually through speaker
+            builder.setSound(null)
+            builder.setDefaults(NotificationCompat.DEFAULT_VIBRATE or NotificationCompat.DEFAULT_LIGHTS)
 
             try {
                 val notificationManager = NotificationManagerCompat.from(context)
                 notificationManager.notify(notificationId, builder.build())
                 Log.d("MemorizerApp", "Daily notification shown with ID: $notificationId, channel: $channelId")
 
-                // For file paths, play sound manually (channel sounds don't work with file:// URIs)
-                if (soundUri != null && soundUri.startsWith("/")) {
-                    playSoundFile(context, soundUri)
-                }
+                // Play sound manually through built-in speaker (bypass Bluetooth)
+                playSoundThroughSpeaker(context, soundUri)
             } catch (se: SecurityException) {
                 Log.e("MemorizerApp", "Security exception showing daily notification: ${se.message}")
             }
@@ -1447,19 +1480,38 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    // Play sound file manually for notifications (workaround for file:// URI restrictions)
-    private fun playSoundFile(context: Context, filePath: String) {
+    // Play sound through built-in speaker (bypass Bluetooth)
+    // Handles both file paths (/path/to/file) and content:// URIs
+    private fun playSoundThroughSpeaker(context: Context, soundValue: String?) {
         try {
             // Stop any currently playing sound first
             NotificationService.stopSoundStatic()
+
+            val uri = when {
+                soundValue == null || soundValue.isEmpty() || soundValue == "default" -> {
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                }
+                soundValue.startsWith("/") -> Uri.fromFile(java.io.File(soundValue))
+                else -> Uri.parse(soundValue)
+            }
+
             NotificationService.mediaPlayer = android.media.MediaPlayer().apply {
-                setDataSource(filePath)
+                setDataSource(context, uri)
                 setAudioAttributes(
                     android.media.AudioAttributes.Builder()
                         .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
+                // Force playback through built-in speaker (bypass Bluetooth)
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+                val speaker = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
+                    .firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                if (speaker != null) {
+                    setPreferredDevice(speaker)
+                    Log.d("MemorizerApp", "Forced audio output to built-in speaker")
+                }
                 prepare()
                 start()
                 setOnCompletionListener {
@@ -1467,9 +1519,9 @@ class NotificationReceiver : BroadcastReceiver() {
                     NotificationService.mediaPlayer = null
                 }
             }
-            Log.d("MemorizerApp", "Playing sound file: $filePath")
+            Log.d("MemorizerApp", "Playing sound through speaker: $soundValue")
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error playing sound file: ${e.message}")
+            Log.e("MemorizerApp", "Error playing sound: ${e.message}")
         }
     }
 
@@ -1625,8 +1677,8 @@ class NotificationReceiver : BroadcastReceiver() {
                     // Create notification channel with sound from settings
                     val channelId = createReminderNotificationChannel(context, defaultSound)
 
-                    // Show notification with the channel
-                    showEventNotification(context, itemId, itemTitle, itemContent, itemId, channelId)
+                    // Show notification with manual sound through speaker
+                    showEventNotification(context, itemId, itemTitle, itemContent, itemId, channelId, defaultSound)
 
                     Log.d("MemorizerApp", "Specific reminder shown for item $itemId with channel $channelId, sound: $defaultSound")
                 }
@@ -1703,7 +1755,7 @@ class NotificationReceiver : BroadcastReceiver() {
                     Log.d("MemorizerApp", "Showing notification for period reminder $itemId")
                     wakeScreen(context)
                     val channelId = createReminderNotificationChannel(context, itemSound)
-                    showEventNotification(context, itemId, itemTitle, itemContent, itemId, channelId)
+                    showEventNotification(context, itemId, itemTitle, itemContent, itemId, channelId, itemSound)
                 }
             } else {
                 Log.d("MemorizerApp", "Item $itemId no longer exists, skipping period reminder")
@@ -1904,7 +1956,7 @@ class NotificationReceiver : BroadcastReceiver() {
             // Fallback to notification if fullscreen launch fails
             try {
                 val channelId = createReminderNotificationChannel(context, soundValue)
-                showEventNotification(context, itemId, title, content, itemId, channelId)
+                showEventNotification(context, itemId, title, content, itemId, channelId, soundValue)
                 Log.d("MemorizerApp", "Fallback: Showed notification instead of fullscreen alert")
             } catch (fallbackException: Exception) {
                 Log.e("MemorizerApp", "Fallback notification also failed: ${fallbackException.message}")
@@ -1912,7 +1964,7 @@ class NotificationReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showEventNotification(context: Context, itemId: Int, title: String, content: String, notificationId: Int, channelId: String) {
+    private fun showEventNotification(context: Context, itemId: Int, title: String, content: String, notificationId: Int, channelId: String, soundValue: String? = null) {
         try {
             // Create notification intent that opens the app
             val notificationIntent = Intent(context, MainActivity::class.java).apply {
@@ -1968,6 +2020,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 val notificationManager = NotificationManagerCompat.from(context)
                 notificationManager.notify(notificationId, builder.build())
                 Log.d("MemorizerApp", "Notification shown with ID: $notificationId")
+
+                // Play sound manually through built-in speaker (bypass Bluetooth)
+                playSoundThroughSpeaker(context, soundValue)
             } catch (se: SecurityException) {
                 Log.e("MemorizerApp", "Security exception showing notification: ${se.message}")
             }

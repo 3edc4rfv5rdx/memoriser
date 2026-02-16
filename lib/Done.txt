@@ -1,3 +1,19 @@
+  + Request battery optimization exemption on app start (soft dialog)
+    - Shows friendly AlertDialog explaining why background work is needed
+    - Localized title/message/buttons via locales.json (ru, ua)
+    - "Allow" button opens system ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+    - "Not now" button saves decline to SharedPreferences (won't ask again)
+    - Skips dialog if already exempted or previously declined
+    - Added REQUEST_IGNORE_BATTERY_OPTIMIZATIONS permission to AndroidManifest.xml
+    - Added translateKey() helper in MainActivity for locales.json access
+  + Force alarm sound through built-in speaker when Bluetooth is connected
+    - Used MediaPlayer.setPreferredDevice(TYPE_BUILTIN_SPEAKER) in all alarm sound playback
+    - FullScreenAlertActivity.playSound(): added setPreferredDevice to force speaker
+    - NotificationSystem.playSoundFile() → playSoundThroughSpeaker(): universal function for files and URIs
+    - Disabled notification channel sounds (setSound(null,null)) on all channels
+    - All notification sounds now played manually via playSoundThroughSpeaker() with forced speaker
+    - Affects: fullscreen alerts, daily notifications, one-time reminders, period reminders
+    - Removed getSoundUri() (no longer needed)
   + Full backup: include settings.db in backup/restore
     - Backup saves settings-{date}.db alongside memorizer-{date}.db
     - Restore finds settings DB in backup dir, closes settDb, copies, reopens
