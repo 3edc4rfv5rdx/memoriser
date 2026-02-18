@@ -1,0 +1,120 @@
+===TODO:
+# v0.9.260216+110 (2026-02-16 13:44:39)
++ Request battery optimization exemption on app start
+# v0.9.260213+105 (2026-02-13 15:29:42)
++ Review and fix sound system (default sounds, sound picker, sound playback issues)
++ Period fullscreen alert: "Continue"/"Done" buttons instead of snooze for period reminders
++ Period reminders: date range (day-of-month or full dates) + weekday mask + time
++ Fullscreen alert: "Postpone 1 day" button (hidden for daily reminders)
+# v0.9.260210+97 (2026-02-10 15:32:49)
++ Reminder sound always through speaker (FLAG_AUDIBILITY_ENFORCED) even when headphones connected
++ Wake screen on daily reminder trigger (PowerManager.ACQUIRE_CAUSES_WAKEUP) without fullscreen alert
++ Settings: "Reschedule Reminders" button not needed - restore already reschedules, BootReceiver handles reboot
++ Daily times: edit time by tapping chip, increase font size and chip size
+# v0.9.260209+87 (2026-02-09 11:03:18)
++ Daily folder: show compact weekdays string above times (e.g., "пвсчп--") with localized day letters
++ Notification stop sound: Stop button + swipe dismiss stops file sound playback
++ Daily reminders: spread conflicting times by 3 seconds based on itemId
++ Time conflict: warn only (no save block), check date for one-time reminders
++ Time conflict: softer warning text "Same time as" instead of "Time conflict with"
+# v0.9.260206+84 (2026-02-06 15:24:30)
++ Daily sound picker: remove speaker icon, shift field left, add stop player button
++ Fullscreen alert: snooze buttons (10min, 20min, 30min, 1 hour, 3 hours) - reschedule and close
++ Fullscreen alert: localization support - labels and button texts translated via locales.json
++ Monthly reminders: fix month overflow (30 Jan -> 28 Feb, not 2 Mar)
+# v0.9.260130+78 (2026-01-30 15:21:40)
++ Auto-reschedule monthly/yearly reminders after trigger
++ UI compact: inline buttons in Tags/Date/Time fields
++ Priority redesign: single line, no stars
++ Active checkbox in reminder section
++ Reorder reminder checkboxes, reduce spacing
++ Daily reminders: compact layout, centered elements
++ Translations: Priority, Active
+# v0.9.260129+74 (2026-01-29 15:25:40)
++ Active flag: checkbox on main screen for quick reminder enable/disable
++ Fullscreen alert: draggable circle barrier (200dp) with lock icon and wide arrow, must drag 400px down
++ Fullscreen alert: text split into 3 lines (Reminder:18sp / Title:26sp bold / Content:30sp)
++ Fullscreen alert: semi-transparent overlay blocks OK button until circle dismissed
++ Settings: custom sounds section and Choose file option in sound picker
++ Camera/gallery: storage permission fallback to app-specific directory
++ Copy item (to create similar)
++ Hide photo frame (activate by [+] button)
+# v0.9.260128+71 (2026-01-28 15:15:37)
++ Implement monthly repeating reminders
++ Custom sound files support (file picker)
++ Default sound settings for one-time and daily reminders
++ Sound selection for reminders (system sounds)
++ Daily reminders virtual folder
++ Daily reminders: UI, DB, scheduling - basic version (notifications)
++ Multi-photo support (up to 10 photos per item)
+
+===TOFIX:
+# v0.9.260216+110 (2026-02-16 13:44:39)
++ Force alarm sound through built-in speaker when Bluetooth is connected
++ Sound system: deduplicate default sound functions, add fallback for one-time sound
++ Period reminders: "Done" in fullscreen did not cancel all period alarms (fixed 2026-02-18)
+# v0.9.260213+105 (2026-02-13 15:29:42)
++ Backup does not include settings.db (default sounds, theme, language etc. lost on restore)
++ Fix period sound: default sound from settings not loaded into form when creating new period item
++ Move Periods folder to 3rd position in folder list (after Notes and Daily)
++ Add sound selector to Period reminder form
++ Fix notes sorting: sort by date (if present), no-date items to bottom alphabetically
+# v0.9.260210+97 (2026-02-10 15:32:49)
++ Date-only items: reviewed, no change needed - date alone is enough for today's event
++ Fix speaker sound: replace FLAG_AUDIBILITY_ENFORCED with USAGE_ALARM for volume-regulated speaker output
++ Photo backup: copy loose files in Photo/ dir (not only item_X/ subdirectories)
++ Request MANAGE_EXTERNAL_STORAGE permission on Android 11+ for photo access after reinstall
+# v0.9.260209+87 (2026-02-09 11:03:18)
++ Monthly folder: fix sorting - sort by date ASC (nearest first) instead of priority+time
++ Fix playSoundFile: save MediaPlayer reference for external stop control
+# v0.9.260206+84 (2026-02-06 15:24:30)
++ Settings: fix sound selector overlap - change label/widget ratio from 60/40 to 50/50
++ Raise fullscreen alert buttons to 2/8 position (layout weights 1/3/4)
++ Sort reminders in folders (Daily by time, Yearly by date, Monthly by priority+time, Notes by created)
++ Check for duplicate times when adding reminders (cross-item conflict detection)
++ Daily reminder sound: fallback to settings default if empty
+# v0.9.260130+78 (2026-01-30 15:21:40)
++ Display daily reminder times on main screen (in folder)
+# v0.9.260129+74 (2026-01-29 15:25:40)
++ Fullscreen alert layout: text section 6/8 (raised), draggable circle higher, 400px drag threshold
++ Draggable circle with lock icon and wide arrow instead of swipe barrier
++ Text split into 3 lines: "Reminder:" (18sp), Title (26sp bold), Content (30sp)
++ Semi-transparent barrier overlay blocks OK button until circle dragged down
+# v0.9.260128+71 (2026-01-28 15:15:37)
++ Move icons inline before subtitle text (no separate line)
++ Move 'active' checkbox to left side above priority indicator
++ Add line breaks support in fullscreen alert
++ Redesign fullscreen: black text, "Memorizer" at top 4/5, show current time, "Reminder:" title centered, content centered
++ Move OK button to bottom 2/5 with rounded corners (black bg, white text)
++ Add lock icon and down arrow on transparent barrier overlay (centered, white)
++ Remove icons after 'Monthly repeat' and 'Yearly repeat' checkboxes
++ Shorten "Yearly Events" folder name to just "Yearly"
++ Remove "Sound:" label from daily reminder UI, extend input field left
++ Style time picker dialog buttons with background (not pale text)
+
+===ERRORS:
+# v0.9.260216+110 (2026-02-16 13:44:39)
+# v0.9.260213+105 (2026-02-13 15:29:42)
+# v0.9.260210+97 (2026-02-10 15:32:49)
++ Photo/sounds restore: FilePicker returns cached file, find actual backup dir by date in filename
+# v0.9.260209+87 (2026-02-09 11:03:18)
+# v0.9.260206+84 (2026-02-06 15:24:30)
++ Cancel all alarms (one-time + daily) when deleting an item - daily alarms were not cancelled
++ Backup sounds (already implemented, verified working)
++ Daily reminders not rescheduling after reboot: JSON array parsing bug in BootReceiver (["06:33"] vs "06:33")
++ One-time reminders after reboot show wrong text: hardcoded "Memorizer"/"Reminder" instead of actual title/body
++ Reminders not firing: Samsung Freecess blocking alarms - add to "Never sleeping apps" or disable battery optimization
++ Snooze: memory-based, rounds to minutes, setAlarmClock, drag 600px
++ Fullscreen localization: locales.json via assets, punctuation programmatically
++ Daily reminders after reboot: BootReceiver checks "Enable daily reminders"
++ Copied items: active=0, fullscreen copied
+# v0.9.260130+78 (2026-01-30 15:21:40)
++ Daily reminders not firing: scheduleDailyReminder doesn't check daysMask - fixed with daysMask validation loop
++ Daily reminders scheduled on copy: copied items should not auto-schedule - removed scheduling from copy function
++ BootReceiver only rescheduled specific reminders, not daily/monthly/yearly - added all types to boot handler
+# v0.9.260129+74 (2026-01-29 15:25:40)
++ Missing custom sound file picker in settings - added Choose file option and custom sounds section
++ Fullscreen alert OK button accessible without dragging circle - fixed with barrier overlay
++ Camera/gallery photo capture: Permission denied - fixed with storage fallback to app-specific dir
+# v0.9.260128+71 (2026-01-28 15:15:37)
++ Decode hidden items in notifications (base64)

@@ -371,25 +371,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 Log.d("MemorizerApp", "completePeriodReminder: itemId=$itemId, isMonthly=$isMonthlyPeriod")
 
                 // Cancel all period alarms for this item
-                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                for (month in 1..12) {
-                    for (day in 1..31) {
-                        val intent = Intent(context, NotificationReceiver::class.java).apply {
-                            action = "com.example.memorizer.PERIOD_REMINDER"
-                        }
-                        val requestCode = itemId * 10000 + month * 100 + day
-                        val pendingIntent = PendingIntent.getBroadcast(
-                            context,
-                            requestCode,
-                            intent,
-                            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-                        )
-                        pendingIntent?.let {
-                            alarmManager.cancel(it)
-                            it.cancel()
-                        }
-                    }
-                }
+                cancelAllPeriodAlarmsForItem(context, itemId)
                 Log.d("MemorizerApp", "Cancelled all period alarms for item $itemId")
 
                 // For date-based (non-monthly) periods, set active=0 in DB
@@ -409,6 +391,27 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 }
             } catch (e: Exception) {
                 Log.e("MemorizerApp", "Error completing period reminder: ${e.message}")
+            }
+        }
+
+        private fun cancelAllPeriodAlarmsForItem(context: Context, itemId: Int) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            for (month in 1..12) {
+                for (day in 1..31) {
+                    val intent = Intent(context, NotificationReceiver::class.java).apply {
+                        action = "com.example.memorizer.PERIOD_REMINDER"
+                        putExtra("itemId", itemId)
+                    }
+                    val requestCode = itemId * 10000 + month * 100 + day
+                    val pendingIntent = PendingIntent.getBroadcast(
+                        context,
+                        requestCode,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    alarmManager.cancel(pendingIntent)
+                    pendingIntent.cancel()
+                }
             }
         }
     }
@@ -704,26 +707,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
     private fun cancelPeriodReminders(itemId: Int) {
         try {
             Log.d("MemorizerApp", "Cancelling all period reminders for item $itemId")
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-            for (month in 1..12) {
-                for (day in 1..31) {
-                    val intent = Intent(context, NotificationReceiver::class.java).apply {
-                        action = "com.example.memorizer.PERIOD_REMINDER"
-                    }
-                    val requestCode = itemId * 10000 + month * 100 + day
-                    val pendingIntent = PendingIntent.getBroadcast(
-                        context,
-                        requestCode,
-                        intent,
-                        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-                    )
-                    pendingIntent?.let {
-                        alarmManager.cancel(it)
-                        it.cancel()
-                    }
-                }
-            }
+            cancelAllPeriodAlarmsForItem(context, itemId)
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error cancelling period reminders: ${e.message}")
         }
@@ -2577,4 +2561,3 @@ class BootReceiver : BroadcastReceiver() {
         }
     }
 }
-
