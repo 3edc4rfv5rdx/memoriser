@@ -1,3 +1,12 @@
+  + Loop sound for fullscreen alert
+    - DB v15→v16: added loop_sound INTEGER DEFAULT 1 column to items table
+    - Per-item "Repeat sound" checkbox in additem.dart (enabled when fullscreen is on)
+    - "Sound repeats" number setting in settings.dart (default 25)
+    - NotificationSystem.kt: added loopSound to ItemData, getSettingValue() helper,
+      pass loopSound + repeatCount as intent extras to FullScreenAlertActivity
+    - FullScreenAlertActivity.kt: playSoundUri() uses seekTo(0)+start() on completion
+      to repeat up to repeatCount times; stops immediately on dismissAlert()
+    - Locale keys: "Repeat sound", "Sound repeats" (ru, ua)
   + Reduce APK size: arm64 18M→9M, universal 52M→24M
     - Added isShrinkResources=true (removes unused Android resources)
     - Added packaging.jniLibs.useLegacyPackaging=true — native libs (.so) stored

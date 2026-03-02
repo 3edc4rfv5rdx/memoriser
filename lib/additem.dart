@@ -70,6 +70,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
   // Fullscreen alert field
   bool _fullscreen = false;
+  bool _loopSound = true;
 
   // List of tags for dropdown
   List<Map<String, dynamic>> _tagsWithCounts = [];
@@ -201,6 +202,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
         // Load fullscreen field
         _fullscreen = item['fullscreen'] == 1;
+        _loopSound = (item['loop_sound'] ?? 1) == 1;
 
         // Load period fields
         _period = item['period'] == 1;
@@ -439,6 +441,7 @@ class _EditItemPageState extends State<EditItemPage> {
             'sound': _sound,
             'daily_sound': _dailySound,
             'fullscreen': fullscreenValue,
+            'loop_sound': _loopSound ? 1 : 0,
             'period': periodValue,
             'period_to': periodToValue,
             'period_days': periodDaysValue,
@@ -499,6 +502,7 @@ class _EditItemPageState extends State<EditItemPage> {
           'sound': _sound,
           'daily_sound': _dailySound,
           'fullscreen': fullscreenValue,
+          'loop_sound': _loopSound ? 1 : 0,
           'period': periodValue,
           'period_to': periodToValue,
           'period_days': periodDaysValue,
@@ -983,6 +987,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildTimeOptions(),
                 SizedBox(height: 10),
                 _buildFullscreenSelector(),
+                _buildLoopSoundSelector(),
                 SizedBox(height: 4),
                 _buildRepeatSelector(),
                 SizedBox(height: 4),
@@ -999,6 +1004,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildSoundSelector(isDaily: true),
                 SizedBox(height: 10),
                 _buildFullscreenSelector(),
+                _buildLoopSoundSelector(),
               ],
 
               // Period reminder options
@@ -1014,6 +1020,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildSoundSelector(isDaily: false),
                 SizedBox(height: 10),
                 _buildFullscreenSelector(),
+                _buildLoopSoundSelector(),
               ],
             ],
           ],
@@ -1189,6 +1196,32 @@ class _EditItemPageState extends State<EditItemPage> {
           ),
         ],
       ),
+    );
+  }
+
+  // Widget for loop sound selector
+  Widget _buildLoopSoundSelector() {
+    final bool enabled = (_remind || _daily || _period) && _fullscreen;
+    return Row(
+      children: [
+        Checkbox(
+          value: _loopSound,
+          activeColor: Colors.deepOrange,
+          checkColor: clText,
+          onChanged: enabled ? (value) {
+            setState(() {
+              _loopSound = value ?? true;
+            });
+          } : null,
+        ),
+        Text(
+          lw('Repeat sound'),
+          style: TextStyle(
+            color: enabled ? clText : clText.withValues(alpha: 0.5),
+            fontSize: fsMedium,
+          ),
+        ),
+      ],
     );
   }
 

@@ -23,7 +23,7 @@ Future<void> initDatabases() async {
 
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 15, // Increased from 14 to 15 for period reminder fields
+    version: 16, // Increased from 15 to 16 for loop_sound field
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -50,7 +50,8 @@ Future<void> initDatabases() async {
           active INTEGER DEFAULT 1,
           period INTEGER DEFAULT 0,
           period_to INTEGER DEFAULT NULL,
-          period_days INTEGER DEFAULT 127
+          period_days INTEGER DEFAULT 127,
+          loop_sound INTEGER DEFAULT 1
         )
       ''');
     },
@@ -165,6 +166,12 @@ Future<void> initDatabases() async {
         await db.execute('ALTER TABLE items ADD COLUMN period_to INTEGER DEFAULT NULL');
         await db.execute('ALTER TABLE items ADD COLUMN period_days INTEGER DEFAULT 127');
         myPrint("Database upgraded to version 15: Added period reminder fields");
+      }
+
+      if (oldVersion < 16) {
+        // Migration for version 16 - add loop_sound field for repeating sound on fullscreen alerts
+        await db.execute('ALTER TABLE items ADD COLUMN loop_sound INTEGER DEFAULT 1');
+        myPrint("Database upgraded to version 16: Added 'loop_sound' field");
       }
     },
   );

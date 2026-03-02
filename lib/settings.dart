@@ -44,10 +44,12 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   bool? _newDebugLogs;
   String? _newDefaultSound;
   String? _newDefaultDailySound;
+  String? _newSoundRepeats;
   bool _hasChanges = false;
 
   // Controller for Last items input field
   late TextEditingController _lastItemsController;
+  late TextEditingController _soundRepeatsController;
 
   @override
   void initState() {
@@ -58,6 +60,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   @override
   void dispose() {
     _lastItemsController.dispose();
+    _soundRepeatsController.dispose();
     super.dispose();
   }
 
@@ -98,11 +101,13 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     // Load default sound settings
     final defaultSoundValue = await getSetting("Default sound");
     final defaultDailySoundValue = await getSetting("Default daily sound");
+    final soundRepeatsValue = await getSetting("Sound repeats") ?? "25";
 
     // Load system sounds
     final systemSounds = await SimpleNotifications.getSystemSounds();
 
     _lastItemsController = TextEditingController(text: lastItems.toString());
+    _soundRepeatsController = TextEditingController(text: soundRepeatsValue);
 
     if (mounted) {
       setState(() {
@@ -225,6 +230,12 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         await saveSetting("Default daily sound", "");
       }
       savedSettings.add('default daily sound');
+    }
+
+    // Save sound repeats setting if changed
+    if (_newSoundRepeats != null) {
+      await saveSetting("Sound repeats", _newSoundRepeats!);
+      savedSettings.add('sound repeats');
     }
 
     // Update current values
@@ -502,6 +513,14 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
               SizedBox(height: 10),
 
+              // Sound repeats count for fullscreen alerts
+              _buildSettingsRow(
+                label: lw('Sound repeats'),
+                child: _buildSoundRepeatsField(),
+              ),
+
+              SizedBox(height: 10),
+
               // Debug logs checkbox row
               _buildSettingsRow(
                 label: lw('Debug logs'),
@@ -765,6 +784,35 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           constraints: BoxConstraints(),
         ),
       ],
+    );
+  }
+
+  // Build sound repeats input field
+  Widget _buildSoundRepeatsField() {
+    return SizedBox(
+      width: 80,
+      child: TextField(
+        controller: _soundRepeatsController,
+        keyboardType: TextInputType.number,
+        style: TextStyle(color: clText, fontSize: fsMedium),
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: clUpBar),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          filled: true,
+          fillColor: clFill,
+        ),
+        onChanged: (value) {
+          final intVal = int.tryParse(value);
+          if (intVal != null && intVal > 0) {
+            _newSoundRepeats = value;
+            setState(() { _hasChanges = true; });
+          }
+        },
+      ),
     );
   }
 

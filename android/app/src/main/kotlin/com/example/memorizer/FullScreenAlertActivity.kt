@@ -34,6 +34,9 @@ class FullScreenAlertActivity : Activity() {
     private lateinit var barrierOverlay: View
     private var dragStartY = 0f
     private var initialY = 0f
+    private var loopSound = true
+    private var repeatCount = 25
+    private var currentRepeat = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -161,11 +164,16 @@ class FullScreenAlertActivity : Activity() {
         draggableCircle = findViewById(R.id.draggable_circle)
         setupDragGesture()
 
+        // Read loop sound settings from intent
+        loopSound = intent.getBooleanExtra("loopSound", true)
+        repeatCount = intent.getIntExtra("repeatCount", 25)
+        currentRepeat = 0
+
         // Stop any sound already playing from the receiver (in case the system auto-launched
         // this Activity while receiver's sound was already playing).
         NotificationService.stopSoundStatic()
 
-        // Play sound once
+        // Play sound (loops if loopSound enabled)
         playSound(soundValue)
 
         Log.d("MemorizerApp", "FullScreenAlertActivity created for item $itemId")
@@ -310,10 +318,23 @@ class FullScreenAlertActivity : Activity() {
                 val duration = this.duration
                 Log.d("MemorizerApp", "Sound started playing, duration: $duration ms")
 
-                setOnCompletionListener {
-                    Log.d("MemorizerApp", "Sound playback completed")
-                    release()
-                    mediaPlayer = null
+                setOnCompletionListener { mp ->
+                    currentRepeat++
+                    if (loopSound && currentRepeat < repeatCount) {
+                        Log.d("MemorizerApp", "Sound repeat $currentRepeat/$repeatCount")
+                        try {
+                            mp.seekTo(0)
+                            mp.start()
+                        } catch (e: Exception) {
+                            Log.e("MemorizerApp", "Error restarting sound: ${e.message}")
+                            mp.release()
+                            mediaPlayer = null
+                        }
+                    } else {
+                        Log.d("MemorizerApp", "Sound playback completed (repeats: $currentRepeat)")
+                        mp.release()
+                        mediaPlayer = null
+                    }
                 }
 
                 setOnErrorListener { _, what, extra ->

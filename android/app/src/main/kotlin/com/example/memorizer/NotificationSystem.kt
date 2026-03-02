@@ -992,7 +992,9 @@ class NotificationReceiver : BroadcastReceiver() {
             // Check if fullscreen alert is enabled
             if (itemData.fullscreen == 1) {
                 Log.d("MemorizerApp", "Fullscreen is ENABLED for daily reminder $itemId, launching fullscreen alert")
-                launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound, isDaily = true)
+                val loopSound = itemData.loopSound == 1
+                val repeatCount = getSettingValue(context, "Sound repeats", "25").toIntOrNull() ?: 25
+                launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound, isDaily = true, loopSound = loopSound, repeatCount = repeatCount)
             } else {
                 Log.d("MemorizerApp", "Fullscreen is DISABLED for daily reminder $itemId, showing notification")
                 wakeScreen(context)
@@ -1477,7 +1479,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 // Check if fullscreen alert is enabled
                 if (itemData.fullscreen == 1) {
                     Log.d("MemorizerApp", "Fullscreen is ENABLED for specific reminder $itemId, launching fullscreen alert")
-                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, defaultSound)
+                    val loopSound = itemData.loopSound == 1
+                    val repeatCount = getSettingValue(context, "Sound repeats", "25").toIntOrNull() ?: 25
+                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, defaultSound, loopSound = loopSound, repeatCount = repeatCount)
                 } else {
                     Log.d("MemorizerApp", "Fullscreen is DISABLED for specific reminder $itemId, showing notification")
                     wakeScreen(context)
@@ -1516,8 +1520,12 @@ class NotificationReceiver : BroadcastReceiver() {
             Log.d("MemorizerApp", "Snooze fired at: ${java.util.Date()}")
             Log.d("MemorizerApp", "Data: itemId=$itemId, title=$title")
 
+            // Read loop_sound from DB and repeat count from settings
+            val itemData = getItemData(context, itemId)
+            val loopSound = itemData.loopSound == 1
+            val repeatCount = getSettingValue(context, "Sound repeats", "25").toIntOrNull() ?: 25
             // Always show fullscreen alert with data from intent (no DB check)
-            launchFullscreenAlert(context, itemId, title, content, soundValue)
+            launchFullscreenAlert(context, itemId, title, content, soundValue, loopSound = loopSound, repeatCount = repeatCount)
 
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error handling snoozed reminder: ${e.message}")
@@ -1557,7 +1565,9 @@ class NotificationReceiver : BroadcastReceiver() {
                     Log.d("MemorizerApp", "Fullscreen is ENABLED for period reminder $itemId")
                     // Determine if monthly period (dateFrom 1-31 = monthly)
                     val isMonthlyPeriod = itemData.date != null && itemData.date in 1..31
-                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound, isPeriod = true, isMonthlyPeriod = isMonthlyPeriod)
+                    val loopSound = itemData.loopSound == 1
+                    val repeatCount = getSettingValue(context, "Sound repeats", "25").toIntOrNull() ?: 25
+                    launchFullscreenAlert(context, itemId, itemTitle, itemContent, itemSound, isPeriod = true, isMonthlyPeriod = isMonthlyPeriod, loopSound = loopSound, repeatCount = repeatCount)
                 } else {
                     Log.d("MemorizerApp", "Showing notification for period reminder $itemId")
                     wakeScreen(context)
@@ -1584,7 +1594,8 @@ class NotificationReceiver : BroadcastReceiver() {
         val yearly: Int,
         val monthly: Int,
         val date: Int?,
-        val time: Int?
+        val time: Int?,
+        val loopSound: Int
     )
 
     // Decode Base64 obfuscated text (same logic as Flutter's deobfuscateText)
@@ -1609,12 +1620,12 @@ class NotificationReceiver : BroadcastReceiver() {
     private fun getItemData(context: Context, itemId: Int): ItemData {
         return try {
             val dbPath = context.getDatabasePath("memorizer.db")
-            if (!dbPath.exists()) return ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null)
+            if (!dbPath.exists()) return ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null, 1)
 
             val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
 
             val cursor = db.rawQuery(
-                "SELECT title, content, sound, daily_sound, hidden, fullscreen, active, yearly, monthly, date, time FROM items WHERE id = ?",
+                "SELECT title, content, sound, daily_sound, hidden, fullscreen, active, yearly, monthly, date, time, loop_sound FROM items WHERE id = ?",
                 arrayOf(itemId.toString())
             )
 
@@ -1630,8 +1641,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 val monthly = cursor.getInt(8)
                 val date = if (cursor.isNull(9)) null else cursor.getInt(9)
                 val time = if (cursor.isNull(10)) null else cursor.getInt(10)
+                val loopSound = if (cursor.isNull(11)) 1 else cursor.getInt(11)
 
-                Log.d("MemorizerApp", "getItemData($itemId): fullscreen=$fullscreen, active=$active, yearly=$yearly, monthly=$monthly, title=$title")
+                Log.d("MemorizerApp", "getItemData($itemId): fullscreen=$fullscreen, active=$active, yearly=$yearly, monthly=$monthly, loopSound=$loopSound, title=$title")
 
                 // Decode hidden items for notifications (always show readable text in notifications)
                 if (hidden == 1) {
@@ -1639,10 +1651,10 @@ class NotificationReceiver : BroadcastReceiver() {
                     content = deobfuscateText(content)
                 }
 
-                ItemData(title, content, sound, dailySound, hidden, fullscreen, active, yearly, monthly, date, time)
+                ItemData(title, content, sound, dailySound, hidden, fullscreen, active, yearly, monthly, date, time, loopSound)
             } else {
                 Log.d("MemorizerApp", "getItemData($itemId): Item not found in database")
-                ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null)
+                ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null, 1)
             }
 
             cursor.close()
@@ -1650,7 +1662,25 @@ class NotificationReceiver : BroadcastReceiver() {
             result
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error getting item data: ${e.message}")
-            ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null)
+            ItemData("", "", null, null, 0, 0, 1, 0, 0, null, null, 1)
+        }
+    }
+
+    // Read a setting value from settings.db
+    private fun getSettingValue(context: Context, key: String, defaultValue: String): String {
+        return try {
+            val dbPath = context.getDatabasePath("settings.db")
+            if (!dbPath.exists()) return defaultValue
+
+            val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+            val cursor = db.rawQuery("SELECT value FROM settings WHERE key = ?", arrayOf(key))
+            val result = if (cursor.moveToFirst()) cursor.getString(0) ?: defaultValue else defaultValue
+            cursor.close()
+            db.close()
+            result
+        } catch (e: Exception) {
+            Log.e("MemorizerApp", "Error reading setting '$key': ${e.message}")
+            defaultValue
         }
     }
 
@@ -1683,7 +1713,7 @@ class NotificationReceiver : BroadcastReceiver() {
     }
 
     // Launch fullscreen alert activity using full-screen intent notification
-    private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?, isDaily: Boolean = false, isPeriod: Boolean = false, isMonthlyPeriod: Boolean = false) {
+    private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?, isDaily: Boolean = false, isPeriod: Boolean = false, isMonthlyPeriod: Boolean = false, loopSound: Boolean = true, repeatCount: Int = 25) {
         try {
             // Build intent with all data for FullScreenAlertActivity
             val fullScreenIntent = Intent(context, FullScreenAlertActivity::class.java).apply {
@@ -1702,6 +1732,8 @@ class NotificationReceiver : BroadcastReceiver() {
                 putExtra("isDaily", isDaily)
                 putExtra("isPeriod", isPeriod)
                 putExtra("isMonthlyPeriod", isMonthlyPeriod)
+                putExtra("loopSound", loopSound)
+                putExtra("repeatCount", repeatCount)
                 putExtra("label_continue", translate(context, "Continue"))
                 putExtra("label_done", translate(context, "Done"))
             }
