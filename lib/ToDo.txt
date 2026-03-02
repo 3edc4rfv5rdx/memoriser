@@ -49,8 +49,7 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
-# vNext (next tag/release)
-+ Period reminders: "Done" in fullscreen did not cancel all period alarms (fixed 2026-02-18)
++ Period reminders: "Done" in fullscreen did not cancel all period alarms
 # v0.9.260216+110 (2026-02-16 13:44:39)
 + Force alarm sound through built-in speaker when Bluetooth is connected
 + Sound system: deduplicate default sound functions, add fallback for one-time sound

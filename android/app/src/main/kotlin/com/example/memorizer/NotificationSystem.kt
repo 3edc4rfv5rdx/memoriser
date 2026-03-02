@@ -1281,19 +1281,41 @@ class NotificationReceiver : BroadcastReceiver() {
     // Play sound through built-in speaker (bypass Bluetooth)
     // Handles both file paths (/path/to/file) and content:// URIs
     private fun playSoundThroughSpeaker(context: Context, soundValue: String?) {
-        try {
-            // Stop any currently playing sound first
-            NotificationService.stopSoundStatic()
+        // Stop any currently playing sound first
+        NotificationService.stopSoundStatic()
 
-            val uri = when {
-                soundValue == null || soundValue.isEmpty() || soundValue == "default" -> {
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                }
-                soundValue.startsWith("/") -> Uri.fromFile(java.io.File(soundValue))
-                else -> Uri.parse(soundValue)
+        val primaryUri = when {
+            soundValue == null || soundValue.isEmpty() || soundValue == "default" -> {
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             }
+            soundValue.startsWith("/") -> Uri.fromFile(java.io.File(soundValue))
+            else -> Uri.parse(soundValue)
+        }
+        val fallbackUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
+        if (playSoundUriThroughSpeaker(context, primaryUri, soundValue)) {
+            return
+        }
+
+        if (fallbackUri != null && fallbackUri != primaryUri) {
+            Log.w("MemorizerApp", "Primary sound failed, trying fallback alarm/notification sound")
+            if (playSoundUriThroughSpeaker(context, fallbackUri, "fallback_default")) {
+                return
+            }
+        }
+
+        Log.e("MemorizerApp", "Unable to play reminder sound (primary and fallback failed)")
+    }
+
+    private fun playSoundUriThroughSpeaker(context: Context, uri: Uri?, sourceTag: String?): Boolean {
+        if (uri == null) {
+            Log.e("MemorizerApp", "Cannot play sound: URI is null for source=$sourceTag")
+            return false
+        }
+
+        return try {
             NotificationService.mediaPlayer = android.media.MediaPlayer().apply {
                 setDataSource(context, uri)
                 setAudioAttributes(
@@ -1317,9 +1339,12 @@ class NotificationReceiver : BroadcastReceiver() {
                     NotificationService.mediaPlayer = null
                 }
             }
-            Log.d("MemorizerApp", "Playing sound through speaker: $soundValue")
+            Log.d("MemorizerApp", "Playing sound through speaker: source=$sourceTag, uri=$uri")
+            true
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error playing sound: ${e.message}")
+            Log.e("MemorizerApp", "Error playing sound source=$sourceTag uri=$uri: ${e.message}")
+            NotificationService.stopSoundStatic()
+            false
         }
     }
 

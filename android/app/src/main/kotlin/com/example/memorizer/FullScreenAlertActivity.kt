@@ -252,28 +252,40 @@ class FullScreenAlertActivity : Activity() {
      * Play sound once using MediaPlayer with USAGE_ALARM
      */
     private fun playSound(soundValue: String?) {
-        try {
-            val soundUri = when {
-                soundValue.isNullOrEmpty() || soundValue == "default" -> {
-                    // Use default alarm sound
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                }
-                soundValue.startsWith("content://") -> {
-                    // System sound URI
-                    Uri.parse(soundValue)
-                }
-                soundValue.startsWith("/") -> {
-                    // File path
-                    Uri.parse("file://$soundValue")
-                }
-                else -> {
-                    // Default fallback
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                }
+        val primaryUri = when {
+            soundValue.isNullOrEmpty() || soundValue == "default" -> {
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             }
+            soundValue.startsWith("content://") -> Uri.parse(soundValue)
+            soundValue.startsWith("/") -> Uri.fromFile(java.io.File(soundValue))
+            else -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        }
+        val fallbackUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
-            Log.d("MemorizerApp", "Starting to play sound: $soundValue, URI: $soundUri")
+        if (playSoundUri(primaryUri, soundValue)) {
+            return
+        }
+
+        if (fallbackUri != null && fallbackUri != primaryUri) {
+            Log.w("MemorizerApp", "Primary fullscreen sound failed, trying fallback sound")
+            if (playSoundUri(fallbackUri, "fallback_default")) {
+                return
+            }
+        }
+
+        Log.e("MemorizerApp", "Unable to play fullscreen reminder sound (primary and fallback failed)")
+    }
+
+    private fun playSoundUri(soundUri: Uri?, sourceTag: String?): Boolean {
+        if (soundUri == null) {
+            Log.e("MemorizerApp", "Cannot play fullscreen sound: URI is null for source=$sourceTag")
+            return false
+        }
+
+        return try {
+            Log.d("MemorizerApp", "Starting to play sound: source=$sourceTag, URI=$soundUri")
 
             mediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(
@@ -303,16 +315,22 @@ class FullScreenAlertActivity : Activity() {
                     mediaPlayer = null
                 }
 
-                setOnErrorListener { mp, what, extra ->
+                setOnErrorListener { _, what, extra ->
                     Log.e("MemorizerApp", "MediaPlayer error: what=$what, extra=$extra")
                     false
                 }
             }
 
             Log.d("MemorizerApp", "MediaPlayer created and started")
+            true
         } catch (e: Exception) {
-            Log.e("MemorizerApp", "Error playing sound: ${e.message}")
-            // Continue without sound if error occurs
+            Log.e("MemorizerApp", "Error playing fullscreen sound source=$sourceTag uri=$soundUri: ${e.message}")
+            try {
+                mediaPlayer?.release()
+            } catch (_: Exception) {
+            }
+            mediaPlayer = null
+            false
         }
     }
 
