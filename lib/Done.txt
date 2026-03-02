@@ -1,3 +1,21 @@
+  + Reduce APK size: arm64 18M→9M, universal 52M→24M
+    - Added isShrinkResources=true (removes unused Android resources)
+    - Added packaging.jniLibs.useLegacyPackaging=true — native libs (.so) stored
+      compressed in APK; libflutter.so (11 MB) compresses ~2x, key fix for size reduction
+  + Fix fullscreen activity not opening immediately for one-time reminders
+    - Root cause 1: one-time reminders used setExactAndAllowWhileIdle → changed to setAlarmClock
+      (same as daily reminders) in all 3 scheduleSpecificReminder variants.
+    - Root cause 2: startActivity() from BroadcastReceiver is silently ignored by Android when
+      screen is on, unless canDrawOverlays() is true. No exception is thrown so the code
+      incorrectly treated it as success and skipped playing sound → silent notification.
+    - Root cause 3: SYSTEM_ALERT_WINDOW ("Draw over other apps") was never requested from user.
+    - Fix 1: requestRequiredPermissions() now requests SYSTEM_ALERT_WINDOW if not granted,
+      redirecting to system settings (same pattern as MANAGE_EXTERNAL_STORAGE).
+    - Fix 2: launchFullscreenAlert() now checks canDrawOverlays() before startActivity().
+      If false — skips direct launch (avoids silent-fail), relies on setFullScreenIntent.
+    - Fix 3: sound (playSoundThroughSpeaker) and wakeScreen() are now ALWAYS called after
+      notify(), unconditionally. If Activity opens it stops receiver sound via stopSoundStatic().
+    - Fix 4 (FullScreenAlertActivity.kt): stopSoundStatic() before playSound() — no double sound.
   + Sound system review and fixes
     - Deduplicated getDefaultSound/getDefaultDailySound: shared companion functions in NotificationService
     - Removed ~120 lines of duplicate code (save/get functions in NotificationReceiver)

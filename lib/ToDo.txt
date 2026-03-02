@@ -1,4 +1,5 @@
 ===TODO:
++ Reduce APK size: arm64 18M→9M, universal 52M→24M (useLegacyPackaging=true, shrinkResources=true)
 # v0.9.260216+110 (2026-02-16 13:44:39)
 + Request battery optimization exemption on app start
 # v0.9.260213+105 (2026-02-13 15:29:42)
