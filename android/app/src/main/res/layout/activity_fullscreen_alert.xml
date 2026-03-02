@@ -259,8 +259,8 @@
         android:layout_gravity="center_horizontal|top"
         android:layout_marginTop="150dp"
         android:background="@drawable/draggable_circle"
-        android:clickable="false"
-        android:focusable="false">
+        android:clickable="true"
+        android:focusable="true">
 
         <!-- Lock icon and arrow inside circle -->
         <LinearLayout

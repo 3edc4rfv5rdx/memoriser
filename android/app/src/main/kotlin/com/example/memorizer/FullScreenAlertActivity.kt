@@ -161,6 +161,10 @@ class FullScreenAlertActivity : Activity() {
         draggableCircle = findViewById(R.id.draggable_circle)
         setupDragGesture()
 
+        // Stop any sound already playing from the receiver (in case the system auto-launched
+        // this Activity while receiver's sound was already playing).
+        NotificationService.stopSoundStatic()
+
         // Play sound once
         playSound(soundValue)
 
@@ -171,19 +175,16 @@ class FullScreenAlertActivity : Activity() {
      * Setup window flags to show on lock screen and turn screen on
      */
     private fun setupWindowFlags() {
+        @Suppress("DEPRECATION")
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        )
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            )
         }
     }
 

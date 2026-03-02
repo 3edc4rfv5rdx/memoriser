@@ -77,6 +77,17 @@ class MainActivity : FlutterActivity() {
                     startActivity(intent)
                 }
             }
+            // Request SYSTEM_ALERT_WINDOW (Draw over other apps) — required to launch
+            // FullScreenAlertActivity immediately from a BroadcastReceiver when screen is ON.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!android.provider.Settings.canDrawOverlays(this)) {
+                    Log.d("MemorizerApp", "Requesting SYSTEM_ALERT_WINDOW permission")
+                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                }
+            }
             // Request battery optimization exemption (prevents system from killing alarms)
             requestBatteryOptimization()
         } catch (e: Exception) {
@@ -720,14 +731,6 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-            // Check permission on Android 12+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (!alarmManager.canScheduleExactAlarms()) {
-                    Log.e("MemorizerApp", "SCHEDULE_EXACT_ALARM permission not granted! Alarms may not fire.")
-                    Log.e("MemorizerApp", "User needs to enable 'Alarms & reminders' in Settings > Apps > Memorizer")
-                }
-            }
-
             // Create intent for specific reminder
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SPECIFIC_REMINDER"
@@ -755,21 +758,13 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 set(Calendar.MILLISECOND, 0)
             }
 
-            // Schedule exact reminder only if time is in the future
+            // Schedule exact reminder only if time is in the future.
+            // setAlarmClock is used (same as daily reminders) because it grants a background
+            // activity launch exemption, which is required for FullScreenAlertActivity to open
+            // immediately without user tapping the notification.
             if (calendar.timeInMillis > System.currentTimeMillis()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                }
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(calendar.timeInMillis, pendingIntent)
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
                 Log.d("MemorizerApp", "Specific reminder scheduled for item $itemId at ${calendar.time}")
             } else {
@@ -1416,19 +1411,8 @@ class NotificationReceiver : BroadcastReceiver() {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
             if (calendar.timeInMillis > System.currentTimeMillis()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                }
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(calendar.timeInMillis, pendingIntent)
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
             }
 
             // Update date in database for next occurrence
@@ -1701,14 +1685,7 @@ class NotificationReceiver : BroadcastReceiver() {
     // Launch fullscreen alert activity using full-screen intent notification
     private fun launchFullscreenAlert(context: Context, itemId: Int, title: String, content: String, soundValue: String?, isDaily: Boolean = false, isPeriod: Boolean = false, isMonthlyPeriod: Boolean = false) {
         try {
-            // Check if we can use full-screen intents (Android 10+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                if (!notificationManager.canUseFullScreenIntent()) {
-                    Log.w("MemorizerApp", "Cannot use full-screen intent - permission not granted")
-                }
-            }
-            // Create intent for the fullscreen activity
+            // Build intent with all data for FullScreenAlertActivity
             val fullScreenIntent = Intent(context, FullScreenAlertActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 putExtra("itemId", itemId)
@@ -1729,6 +1706,23 @@ class NotificationReceiver : BroadcastReceiver() {
                 putExtra("label_done", translate(context, "Done"))
             }
 
+            // Try direct startActivity only if "Draw over other apps" is granted.
+            // Without that permission startActivity() from a BroadcastReceiver is silently
+            // ignored by Android (no exception, but Activity never opens).
+            val canDrawOverlays = android.provider.Settings.canDrawOverlays(context)
+            if (canDrawOverlays) {
+                try {
+                    context.startActivity(fullScreenIntent)
+                    Log.d("MemorizerApp", "Direct startActivity succeeded for item $itemId")
+                } catch (e: Exception) {
+                    Log.w("MemorizerApp", "Direct startActivity failed: ${e.message}")
+                }
+            } else {
+                Log.d("MemorizerApp", "canDrawOverlays=false, skipping direct startActivity for item $itemId")
+            }
+
+            // Always post notification with setFullScreenIntent — Android launches the Activity
+            // automatically when the screen is OFF; shows heads-up banner when screen is ON.
             val fullScreenPendingIntent = PendingIntent.getActivity(
                 context,
                 itemId,
@@ -1736,7 +1730,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Create notification channel for fullscreen alerts (without sound - sound plays in Activity)
+            // Create notification channel for fullscreen alerts (without sound - Activity plays it)
             val channelId = "fullscreen_alerts"
             val channel = NotificationChannel(
                 channelId,
@@ -1754,7 +1748,6 @@ class NotificationReceiver : BroadcastReceiver() {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
 
-            // Build notification with full-screen intent (no sound - Activity plays it)
             val notification = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentTitle(title)
@@ -1770,10 +1763,15 @@ class NotificationReceiver : BroadcastReceiver() {
 
             notificationManager.notify(itemId, notification)
 
-            // Note: Notification will be cancelled by FullScreenAlertActivity when it opens
-            // Don't auto-cancel here to avoid interrupting Activity startup
+            // Always wake screen and play sound immediately.
+            // If Activity opens (either via startActivity or setFullScreenIntent), it will call
+            // stopSoundStatic() and then play its own sound — so no double sound.
+            // If only the heads-up notification shows (screen was on, no canDrawOverlays),
+            // the user still hears the alarm and can tap to open the fullscreen window.
+            wakeScreen(context)
+            playSoundThroughSpeaker(context, soundValue)
 
-            Log.d("MemorizerApp", "Launched fullscreen alert via notification for item $itemId")
+            Log.d("MemorizerApp", "Launched fullscreen alert for item $itemId (canDrawOverlays=$canDrawOverlays)")
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error launching fullscreen alert: ${e.message}")
             // Fallback to notification if fullscreen launch fails
@@ -2371,19 +2369,8 @@ class BootReceiver : BroadcastReceiver() {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
             if (calendar.timeInMillis > System.currentTimeMillis()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                }
+                val alarmClockInfo = AlarmManager.AlarmClockInfo(calendar.timeInMillis, pendingIntent)
+                alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
             }
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error scheduling reminder in boot receiver: ${e.message}")
