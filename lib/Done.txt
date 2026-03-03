@@ -1,3 +1,14 @@
+  + Audit Phase 1: FullScreenAlertActivity.kt + XML — second pass
+    - Removed unused import KeyguardManager (leftover from FLAG_DISMISS_KEYGUARD removal).
+    - dismissAlert(): mediaPlayer was not nulled if isPlaying threw an exception.
+      Moved `mediaPlayer = null` outside try-catch to guarantee cleanup. Also added
+      soundHandler.removeCallbacksAndMessages(null) in dismissAlert for defense-in-depth.
+  + Audit Phase 1: FullScreenAlertActivity.kt + XML — first pass
+    - BUG FIX: Handler leak in sound loop — postDelayed created new Handler each time, holding
+      activity reference after destroy. Extracted Handler to class field (soundHandler),
+      added removeCallbacksAndMessages(null) in onDestroy to cancel pending callbacks.
+    - Added @Suppress("DEPRECATION") on onBackPressed() override (deprecated since API 33).
+    - XML layout: clean, no issues found.
   + Audit Phase 1: Tags Cloud screen (tagscloud.dart) — first pass
     - BUG: `color: isSelected ? clText : clText` — both branches identical, simplified to just `clText`
     - Missing mounted checks in _loadAllTags() after async getTagsWithCounts() — added in both

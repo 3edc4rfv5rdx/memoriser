@@ -2,7 +2,6 @@ package com.example.memorizer
 
 import android.app.Activity
 import android.app.AlarmManager
-import android.app.KeyguardManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -37,6 +36,7 @@ class FullScreenAlertActivity : Activity() {
     private var loopSound = true
     private var repeatCount = 25
     private var currentRepeat = 0
+    private val soundHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -325,7 +325,7 @@ class FullScreenAlertActivity : Activity() {
                         Log.d("MemorizerApp", "Sound repeat $currentRepeat/$repeatCount, pausing 2s")
                         try {
                             mp.seekTo(0)
-                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            soundHandler.postDelayed({
                                 try {
                                     if (mediaPlayer != null) {
                                         mp.start()
@@ -444,6 +444,7 @@ class FullScreenAlertActivity : Activity() {
      */
     private fun dismissAlert() {
         Log.d("MemorizerApp", "dismissAlert() called")
+        soundHandler.removeCallbacksAndMessages(null)
         try {
             // Stop and release media player
             mediaPlayer?.let {
@@ -452,11 +453,11 @@ class FullScreenAlertActivity : Activity() {
                     it.stop()
                 }
                 it.release()
-                mediaPlayer = null
             }
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error stopping media player: ${e.message}")
         }
+        mediaPlayer = null
 
         finish()
         Log.d("MemorizerApp", "FullScreenAlertActivity finished")
@@ -465,12 +466,15 @@ class FullScreenAlertActivity : Activity() {
     /**
      * Disable back button - user must drag circle and tap OK
      */
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
         // Do nothing - user must use OK button
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        // Cancel any pending sound loop callbacks to prevent leaks
+        soundHandler.removeCallbacksAndMessages(null)
         // Clean up media player if still playing
         try {
             mediaPlayer?.release()
