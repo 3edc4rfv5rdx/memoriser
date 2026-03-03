@@ -313,7 +313,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
       whereConditions.add('(hidden = 0 OR hidden IS NULL)');
     }
 
-    // Обработка тег-фильтра
+    // Tag Cloud filter: AND logic (items must have ALL selected tags)
     if (xvTagFilter.isNotEmpty) {
       myPrint('Tag filter is active: $xvTagFilter');
 
@@ -321,35 +321,61 @@ Future<List<Map<String, dynamic>>> getItems() async {
       List<String> tagFilters = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
 
       if (xvHiddenMode) {
-        // В скрытом режиме обфусцируем теги перед поиском
         for (String tag in tagFilters) {
-          // Обфусцируем тег для поиска в базе данных
           String obfuscatedTag = obfuscateText(tag);
-          whereConditions.add('tags LIKE ?');
-          whereArgs.add('%$obfuscatedTag%');
+          // Exact tag match: wrap in commas, trim spaces around commas
+          whereConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
+          whereArgs.add('%,$obfuscatedTag,%');
         }
       } else {
-        // В обычном режиме ищем как есть
         for (String tag in tagFilters) {
-          whereConditions.add('tags LIKE ?');
-          whereArgs.add('%$tag%');
+          // Exact tag match: wrap in commas, trim spaces around commas
+          whereConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
+          whereArgs.add('%,$tag,%');
         }
       }
     }
 
-    // Обработка основного фильтра
-    if (xvFilter.isNotEmpty) {
+    // Virtual folder SQL filtering — filter by type directly in SQL
+    bool isVirtualFolder = false;
+    const virtualFolderFilters = {
+      'notes:true', 'yearly:true', 'daily:true', 'monthly:true', 'period:true'
+    };
+    if (virtualFolderFilters.contains(xvFilter)) {
+      isVirtualFolder = true;
+      switch (xvFilter) {
+        case 'yearly:true':
+          whereConditions.add('yearly = 1');
+          break;
+        case 'daily:true':
+          whereConditions.add('daily = 1');
+          break;
+        case 'monthly:true':
+          whereConditions.add('monthly = 1');
+          break;
+        case 'period:true':
+          whereConditions.add('period = 1');
+          break;
+        case 'notes:true':
+          whereConditions.add('time IS NULL AND yearly != 1 AND (daily != 1 OR daily IS NULL) AND (monthly != 1 OR monthly IS NULL) AND (period != 1 OR period IS NULL)');
+          break;
+      }
+    }
+
+    // Parse user-set filter string
+    if (xvFilter.isNotEmpty && !isVirtualFolder) {
       myPrint('Main filter is active: $xvFilter');
 
-      // Разбираем строку фильтра
+      // Split filter string into parts
       List<String> filterParts = xvFilter.split('|');
 
       for (String part in filterParts) {
-        List<String> keyValue = part.split(':');
-        if (keyValue.length != 2) continue;
+        // Split on first colon only to handle values containing colons
+        final colonIndex = part.indexOf(':');
+        if (colonIndex < 0) continue;
 
-        String key = keyValue[0];
-        String value = keyValue[1];
+        String key = part.substring(0, colonIndex);
+        String value = part.substring(colonIndex + 1);
 
         switch (key) {
           case 'dateFrom':
@@ -357,7 +383,9 @@ Future<List<Map<String, dynamic>>> getItems() async {
               try {
                 final date = DateFormat(ymdDateFormat).parse(value);
                 final dateValue = dateTimeToYYYYMMDD(date);
-                whereConditions.add('(date IS NOT NULL AND date >= ?)');
+                // Include period items where period_to >= dateFrom
+                whereConditions.add('(date IS NOT NULL AND (date >= ? OR (period_to IS NOT NULL AND period_to >= ?)))');
+                whereArgs.add(dateValue);
                 whereArgs.add(dateValue);
               } catch (e) {
                 myPrint('Error parsing dateFrom: $e');
@@ -392,9 +420,12 @@ Future<List<Map<String, dynamic>>> getItems() async {
 
           case 'hasReminder':
             if (value.isNotEmpty) {
-              final hasReminder = value.toLowerCase() == 'true' ? 1 : 0;
-              whereConditions.add('remind = ?');
-              whereArgs.add(hasReminder);
+              if (value.toLowerCase() == 'true') {
+                // Match any reminder type: one-time, daily, or period
+                whereConditions.add('(remind = 1 OR daily = 1 OR period = 1)');
+              } else {
+                whereConditions.add('(remind != 1 OR remind IS NULL) AND (daily != 1 OR daily IS NULL) AND (period != 1 OR period IS NULL)');
+              }
             }
             break;
 
@@ -407,18 +438,16 @@ Future<List<Map<String, dynamic>>> getItems() async {
               List<String> tagConditions = [];
               for (String tag in tagFilters) {
                 if (xvHiddenMode) {
-                  // In hidden mode, obfuscate tags before searching
                   String obfuscatedTag = obfuscateText(tag);
-                  tagConditions.add('tags LIKE ?');
-                  whereArgs.add('%$obfuscatedTag%');
+                  tagConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
+                  whereArgs.add('%,$obfuscatedTag,%');
                 } else {
-                  // In normal mode, search as-is
-                  tagConditions.add('tags LIKE ?');
-                  whereArgs.add('%$tag%');
+                  tagConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
+                  whereArgs.add('%,$tag,%');
                 }
               }
 
-              // Use OR between tag conditions if there are multiple tags
+              // Filters screen tags: OR logic (items with ANY of the tags)
               if (tagConditions.isNotEmpty) {
                 whereConditions.add('(${tagConditions.join(' OR ')})');
               }
@@ -445,8 +474,8 @@ Future<List<Map<String, dynamic>>> getItems() async {
     // Формируем полный SQL-запрос
     String sqlQuery = "SELECT * FROM items $whereClause ORDER BY $orderByClause";
 
-    // Добавляем LIMIT, если нужно
-    if (lastItems > 0) {
+    // Apply LIMIT only on main screen, not inside virtual folders
+    if (lastItems > 0 && !isVirtualFolder) {
       sqlQuery += " LIMIT $lastItems";
     }
 
@@ -750,6 +779,7 @@ class _HomePageState extends State<HomePage> {
   bool _isInDailyFolder = false;
   bool _isInMonthlyFolder = false;
   bool _isInPeriodFolder = false;
+  String _savedUserFilter = ''; // Preserve user filter when entering virtual folders
 
   @override
   void initState() {
@@ -764,111 +794,32 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  void _enterNotesFolder() {
+  void _enterVirtualFolder({
+    bool notes = false, bool yearly = false, bool daily = false,
+    bool monthly = false, bool period = false,
+  }) {
     setState(() {
-      _isInNotesFolder = true;
+      _savedUserFilter = xvFilter;
+      _isInNotesFolder = notes;
+      _isInYearlyFolder = yearly;
+      _isInDailyFolder = daily;
+      _isInMonthlyFolder = monthly;
+      _isInPeriodFolder = period;
+      xvFilter = notes ? 'notes:true' : yearly ? 'yearly:true' : daily ? 'daily:true' : monthly ? 'monthly:true' : 'period:true';
+    });
+    _refreshItems();
+    _updateFilterStatus();
+  }
+
+  void _exitVirtualFolder() {
+    setState(() {
+      _isInNotesFolder = false;
       _isInYearlyFolder = false;
       _isInDailyFolder = false;
       _isInMonthlyFolder = false;
       _isInPeriodFolder = false;
-      xvFilter = 'notes:true';
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _exitNotesFolder() {
-    setState(() {
-      _isInNotesFolder = false;
-      xvFilter = ''; // Очищаем фильтр
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _enterYearlyFolder() {
-    setState(() {
-      _isInYearlyFolder = true;
-      _isInNotesFolder = false;
-      _isInDailyFolder = false;
-      _isInMonthlyFolder = false;
-      _isInPeriodFolder = false;
-      xvFilter = 'yearly:true';
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _exitYearlyFolder() {
-    setState(() {
-      _isInYearlyFolder = false;
-      xvFilter = ''; // Очищаем фильтр
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _enterDailyFolder() {
-    setState(() {
-      _isInDailyFolder = true;
-      _isInYearlyFolder = false;
-      _isInNotesFolder = false;
-      _isInMonthlyFolder = false;
-      _isInPeriodFolder = false;
-      xvFilter = 'daily:true';
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _exitDailyFolder() {
-    setState(() {
-      _isInDailyFolder = false;
-      xvFilter = '';
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _enterMonthlyFolder() {
-    setState(() {
-      _isInMonthlyFolder = true;
-      _isInYearlyFolder = false;
-      _isInNotesFolder = false;
-      _isInDailyFolder = false;
-      _isInPeriodFolder = false;
-      xvFilter = 'monthly:true';
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _exitMonthlyFolder() {
-    setState(() {
-      _isInMonthlyFolder = false;
-      xvFilter = '';
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _enterPeriodFolder() {
-    setState(() {
-      _isInPeriodFolder = true;
-      _isInYearlyFolder = false;
-      _isInNotesFolder = false;
-      _isInDailyFolder = false;
-      _isInMonthlyFolder = false;
-      xvFilter = 'period:true';
-    });
-    _refreshItems();
-    _updateFilterStatus();
-  }
-
-  void _exitPeriodFolder() {
-    setState(() {
-      _isInPeriodFolder = false;
-      xvFilter = '';
+      xvFilter = _savedUserFilter; // Restore user filter
+      _savedUserFilter = '';
     });
     _refreshItems();
     _updateFilterStatus();
@@ -947,61 +898,38 @@ class _HomePageState extends State<HomePage> {
     };
   }
 
-  Future<int> _getYearlyItemsCount() async {
+  // Count items matching type condition, respecting active tag filter
+  Future<int> _getFolderItemsCount(String typeCondition) async {
     try {
-      // Подсчитываем количество ежегодных записей
-      final count = await mainDb.rawQuery(
-        'SELECT COUNT(*) as count FROM items WHERE yearly = 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
-      );
+      String hiddenCond = xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)';
+      String where = '$typeCondition AND $hiddenCond';
+      List<dynamic> args = [];
 
+      // Apply active tag filter to folder counts
+      if (xvTagFilter.isNotEmpty) {
+        List<String> tags = xvTagFilter.split(',').map((t) => t.trim()).toList();
+        for (String tag in tags) {
+          String searchTag = xvHiddenMode ? obfuscateText(tag) : tag;
+          where += " AND (',' || REPLACE(tags, ', ', ',') || ',') LIKE ?";
+          args.add('%,$searchTag,%');
+        }
+      }
+
+      final count = await mainDb.rawQuery(
+        'SELECT COUNT(*) as count FROM items WHERE $where', args,
+      );
       return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
     } catch (e) {
-      myPrint('Error counting yearly items: $e');
+      myPrint('Error counting items ($typeCondition): $e');
       return 0;
     }
   }
 
-  Future<int> _getNotesItemsCount() async {
-    try {
-      // Подсчитываем количество записей без времени, не ежегодных и не daily
-      final count = await mainDb.rawQuery(
-        'SELECT COUNT(*) as count FROM items WHERE time IS NULL AND yearly != 1 AND (daily != 1 OR daily IS NULL) AND (monthly != 1 OR monthly IS NULL) AND (period != 1 OR period IS NULL) AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
-      );
-
-      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
-    } catch (e) {
-      myPrint('Error counting notes items: $e');
-      return 0;
-    }
-  }
-
-  Future<int> _getDailyItemsCount() async {
-    try {
-      // Подсчитываем количество записей с ежедневными напоминаниями
-      final count = await mainDb.rawQuery(
-        'SELECT COUNT(*) as count FROM items WHERE daily = 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
-      );
-
-      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
-    } catch (e) {
-      myPrint('Error counting daily items: $e');
-      return 0;
-    }
-  }
-
-  Future<int> _getMonthlyItemsCount() async {
-    try {
-      // Count monthly reminder records
-      final count = await mainDb.rawQuery(
-        'SELECT COUNT(*) as count FROM items WHERE monthly = 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
-      );
-
-      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
-    } catch (e) {
-      myPrint('Error counting monthly items: $e');
-      return 0;
-    }
-  }
+  Future<int> _getYearlyItemsCount() => _getFolderItemsCount('yearly = 1');
+  Future<int> _getNotesItemsCount() => _getFolderItemsCount(
+    'time IS NULL AND yearly != 1 AND (daily != 1 OR daily IS NULL) AND (monthly != 1 OR monthly IS NULL) AND (period != 1 OR period IS NULL)');
+  Future<int> _getDailyItemsCount() => _getFolderItemsCount('daily = 1');
+  Future<int> _getMonthlyItemsCount() => _getFolderItemsCount('monthly = 1');
 
   Map<String, dynamic> _createPeriodFolderItem() {
     return {
@@ -1022,17 +950,7 @@ class _HomePageState extends State<HomePage> {
     };
   }
 
-  Future<int> _getPeriodItemsCount() async {
-    try {
-      final count = await mainDb.rawQuery(
-        'SELECT COUNT(*) as count FROM items WHERE period = 1 AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
-      );
-      return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
-    } catch (e) {
-      myPrint('Error counting period items: $e');
-      return 0;
-    }
-  }
+  Future<int> _getPeriodItemsCount() => _getFolderItemsCount('period = 1');
 
   // Format period date range for display (e.g. "15 - 20" or "2026-02-15 - 2026-02-20")
   String _formatPeriodRange(int? dateFrom, int? dateTo) {
@@ -1427,6 +1345,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       xvTagFilter = '';
       xvFilter = '';
+      _savedUserFilter = '';
       _isInYearlyFolder = false;
       _isInNotesFolder = false;
       _isInDailyFolder = false;
@@ -1481,7 +1400,7 @@ class _HomePageState extends State<HomePage> {
           trailing: Icon(Icons.folder_open, color: Colors.green),
           tileColor: clFill,
           onTap: () {
-            _enterYearlyFolder();
+            _enterVirtualFolder(yearly: true);
 
             if (xvHiddenMode) {
               resetHiddenModeTimer();
@@ -1523,7 +1442,7 @@ class _HomePageState extends State<HomePage> {
           trailing: Icon(Icons.folder_open, color: Colors.blue),
           tileColor: clFill,
           onTap: () {
-            _enterNotesFolder();
+            _enterVirtualFolder(notes: true);
 
             if (xvHiddenMode) {
               resetHiddenModeTimer();
@@ -1565,7 +1484,7 @@ class _HomePageState extends State<HomePage> {
           trailing: Icon(Icons.folder_open, color: Colors.orange),
           tileColor: clFill,
           onTap: () {
-            _enterDailyFolder();
+            _enterVirtualFolder(daily: true);
 
             if (xvHiddenMode) {
               resetHiddenModeTimer();
@@ -1607,7 +1526,7 @@ class _HomePageState extends State<HomePage> {
           trailing: Icon(Icons.folder_open, color: Colors.purple),
           tileColor: clFill,
           onTap: () {
-            _enterMonthlyFolder();
+            _enterVirtualFolder(monthly: true);
 
             if (xvHiddenMode) {
               resetHiddenModeTimer();
@@ -1649,7 +1568,7 @@ class _HomePageState extends State<HomePage> {
           trailing: Icon(Icons.folder_open, color: Colors.teal),
           tileColor: clFill,
           onTap: () {
-            _enterPeriodFolder();
+            _enterVirtualFolder(period: true);
 
             if (xvHiddenMode) {
               resetHiddenModeTimer();
@@ -1675,7 +1594,8 @@ class _HomePageState extends State<HomePage> {
 
       if (_isInYearlyFolder) {
         // Yearly folder - sort by date/time ASC (nearest first)
-        final yearlyItems = items.where((item) => item['yearly'] == 1).toList();
+        // SQL already filters by yearly=1
+        final yearlyItems = items.toList();
         yearlyItems.sort((a, b) {
           final dateA = a['date'] as int? ?? 99999999;
           final dateB = b['date'] as int? ?? 99999999;
@@ -1688,8 +1608,8 @@ class _HomePageState extends State<HomePage> {
 
       } else if (_isInNotesFolder) {
         // Notes folder - sort by created date (respect "Newest first" setting)
-        final notesItems = items.where((item) =>
-        item['time'] == null && item['yearly'] != 1 && item['daily'] != 1 && item['monthly'] != 1 && item['period'] != 1).toList();
+        // SQL already filters notes type
+        final notesItems = items.toList();
         final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
         notesItems.sort((a, b) {
           final dateA = a['date'] as int?;
@@ -1722,7 +1642,7 @@ class _HomePageState extends State<HomePage> {
 
       } else if (_isInDailyFolder) {
         // Daily folder - sort by first daily time ASC
-        final dailyItems = items.where((item) => item['daily'] == 1).toList();
+        final dailyItems = items.toList();
         dailyItems.sort((a, b) {
           final timesA = parseDailyTimes(a['daily_times']);
           final timesB = parseDailyTimes(b['daily_times']);
@@ -1734,7 +1654,7 @@ class _HomePageState extends State<HomePage> {
 
       } else if (_isInMonthlyFolder) {
         // Monthly folder - sort by date ASC (nearest first), then time ASC
-        final monthlyItems = items.where((item) => item['monthly'] == 1).toList();
+        final monthlyItems = items.toList();
         monthlyItems.sort((a, b) {
           final dateA = a['date'] as int? ?? 99999999;
           final dateB = b['date'] as int? ?? 99999999;
@@ -1747,7 +1667,7 @@ class _HomePageState extends State<HomePage> {
 
       } else if (_isInPeriodFolder) {
         // Period folder - sort by date (from) ASC, then time ASC
-        final periodItems = items.where((item) => item['period'] == 1).toList();
+        final periodItems = items.toList();
         periodItems.sort((a, b) {
           final dateA = a['date'] as int? ?? 99999999;
           final dateB = b['date'] as int? ?? 99999999;
@@ -2092,16 +2012,8 @@ class _HomePageState extends State<HomePage> {
           child: IconButton(
             icon: Icon((_isInYearlyFolder || _isInNotesFolder || _isInDailyFolder || _isInMonthlyFolder || _isInPeriodFolder) ? Icons.arrow_back : Icons.close),
             onPressed: () async {
-              if (_isInYearlyFolder) {
-                _exitYearlyFolder();
-              } else if (_isInNotesFolder) {
-                _exitNotesFolder();
-              } else if (_isInDailyFolder) {
-                _exitDailyFolder();
-              } else if (_isInMonthlyFolder) {
-                _exitMonthlyFolder();
-              } else if (_isInPeriodFolder) {
-                _exitPeriodFolder();
+              if (_isInYearlyFolder || _isInNotesFolder || _isInDailyFolder || _isInMonthlyFolder || _isInPeriodFolder) {
+                _exitVirtualFolder();
               } else {
                 await vacuumDatabases();
                 if (!mounted) return;
@@ -2162,6 +2074,11 @@ class _HomePageState extends State<HomePage> {
                 } else if (result == 'clear_filters') {
                   _clearAllFilters();
                 } else if (result == 'filters') {
+                  // Exit virtual folder before opening filters
+                  final wasInVirtualFolder = _isInYearlyFolder || _isInNotesFolder || _isInDailyFolder || _isInMonthlyFolder || _isInPeriodFolder;
+                  if (wasInVirtualFolder) {
+                    _exitVirtualFolder();
+                  }
                   Navigator.push<bool>(
                     context,
                     MaterialPageRoute(builder: (context) => FiltersScreen()),
@@ -2171,6 +2088,10 @@ class _HomePageState extends State<HomePage> {
                     }
                   });
                 } else if (result == 'tag_filter') {
+                  // Exit virtual folder before opening tag filter
+                  if (_isInYearlyFolder || _isInNotesFolder || _isInDailyFolder || _isInMonthlyFolder || _isInPeriodFolder) {
+                    _exitVirtualFolder();
+                  }
                   Navigator.push<bool>(
                     context,
                     MaterialPageRoute(builder: (context) => TagsCloudScreen()),

@@ -1,3 +1,24 @@
+  + Audit Phase 2: Filter logic — second pass:
+    - Removed redundant Dart-side .where() filtering in _refreshItems() for virtual folders (SQL already filters)
+    - Added virtual folder exit for Tag Filter screen (was only done for Filters screen)
+    - Verified: REPLACE(tags, ', ', ',') handles standard tag format correctly
+    - Verified: dateFrom period_to condition safe for non-period items (NULL check protects)
+    - Verified: getFilterStatusText works correctly with _savedUserFilter pattern
+    - No new bugs found
+
+  + Audit Phase 2: Filter logic — 11 issues fixed:
+    1. Virtual folder SQL filtering: added type conditions directly to SQL query (was full table scan filtered in Dart)
+    2. Virtual folder preserves user filters: save/restore xvFilter via _savedUserFilter on enter/exit. Refactored 10 enter/exit methods into _enterVirtualFolder()/_exitVirtualFolder()
+    3. LIMIT not applied inside virtual folders (was truncating results before type filtering)
+    4. Colon parsing: use indexOf(':') instead of split(':') to handle values with colons
+    5. Tag LIKE false positives: use (',' || REPLACE(tags, ', ', ',') || ',') LIKE '%,tag,%' for exact tag matching
+    6. Hidden mode tag cloud: query only hidden=1 items (was showing all items' tags)
+    7. AND vs OR tag logic: documented as intentional (Tags Cloud=AND, Filters=OR)
+    8. Filters screen inside virtual folder: auto-exit folder before opening FiltersScreen
+    9. hasReminder filter: now checks remind=1 OR daily=1 OR period=1
+    10. Date filter: dateFrom also checks period_to for period items with overlapping ranges
+    11. Folder counts: respect active tag filter via shared _getFolderItemsCount() helper (replaces 5 duplicate count functions)
+
   + Audit Phase 2: Reminder scheduling logic — 7 bugs fixed:
     1. CRITICAL: cancelAllDailyReminders iterated only 0/15/30/45 minutes, orphaning non-quarter-hour alarms. Fixed: iterate 0..59. Removed per-cancel Log.d to avoid 1440 log entries.
     2. One-time reminder reactivation required time!=null, but time can be null (defaults to 9:30). Fixed: removed time!=null check.

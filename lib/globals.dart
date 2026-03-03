@@ -641,9 +641,8 @@ Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
 
     // В скрытом режиме нам нужны все записи
     if (xvHiddenMode) {
-      // Получаем все записи
-      final items = await mainDb.query('items');
-      // Обрабатываем каждую запись (деобфускация)
+      // Get only hidden items in hidden mode
+      final items = await mainDb.query('items', where: 'hidden = 1');
       allItems = items.map((item) => processItemForView(item)).toList();
     } else {
       // Обычный режим - получаем только нескрытые записи

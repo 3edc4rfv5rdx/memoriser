@@ -53,6 +53,16 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
++ Virtual folders: full table scan, no SQL filtering — all items loaded then filtered in Dart (main.dart getItems)
++ Entering virtual folder destroyed user-set filters — xvFilter overwritten (main.dart enter/exit methods)
++ "Last items" LIMIT applied before virtual folder filtering — incomplete results in folders (main.dart getItems)
++ Filter colon parsing: split(':') broke on tags containing colons (main.dart getItems)
++ Tag LIKE '%art%' false positives: matched "party", "smart" etc. (main.dart getItems)
++ Hidden mode tag cloud showed tags from non-hidden items (globals.dart getTagsWithCounts)
++ Filters screen accessible inside virtual folder — created inconsistent state (main.dart menu)
++ hasReminder filter missed daily and period reminders — only checked remind field (main.dart getItems)
++ Date filter ignored period_to for period items — only checked start date (main.dart getItems)
++ Folder badge counts ignored active tag filter (main.dart count functions)
 + cancelAllDailyReminders only cancelled 0/15/30/45 min — non-standard times became orphaned alarms (NotificationSystem.kt)
 + One-time reminder reactivation skipped when time=null — reminder not rescheduled (main.dart)
 + Monthly reminder day permanently lost after short month: day 31→28 in DB (NotificationSystem.kt, main.dart)
