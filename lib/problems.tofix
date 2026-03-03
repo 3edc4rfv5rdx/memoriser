@@ -25,3 +25,13 @@
    Problem: When user enters a virtual folder (Yearly, Daily, etc.), xvFilter is set
    to e.g. 'yearly:true', so getFilterStatusText() returns '(F)' which is misleading.
    Fix: Either suppress filter indicator inside virtual folders, or show folder-specific text.
+
+== Add/Edit screen (additem.dart) — unfixed issues from Audit Phase 1 ==
+
+5. _checkTimeConflict doesn't check weekday overlap for daily reminders
+   File: additem.dart, _checkTimeConflict() ~line 1401
+   Problem: When checking cross-item time conflicts for daily reminders, it only checks
+   if the time string matches but doesn't compare daily_days bitmasks. Two daily reminders
+   at 09:00 on Mon/Wed and Tue/Thu would trigger a false conflict warning.
+   Fix: Compare daily_days bitmasks — only warn if (daysA & daysB) != 0.
+   Severity: Low — it's just a warning, doesn't block save.

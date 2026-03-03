@@ -146,6 +146,8 @@ class _EditItemPageState extends State<EditItemPage> {
     contentController.dispose();
     tagsController.dispose();
     dateController.dispose();
+    periodFromController.dispose();
+    periodToController.dispose();
     super.dispose();
   }
 
@@ -292,19 +294,21 @@ class _EditItemPageState extends State<EditItemPage> {
         return;
       }
 
-      // Validate the reminder date is not in the past
-      final today = DateTime(
-        DateTime.now().year,
-        DateTime.now().month,
-        DateTime.now().day,
-      );
-
-      if (_date!.isBefore(today)) {
-        okInfoBarRed(
-          lw('Reminder date cannot be in the past'),
-          duration: Duration(seconds: 4),
+      // Validate the reminder date is not in the past (skip for yearly/monthly — they auto-advance)
+      if (!_yearly && !_monthly) {
+        final today = DateTime(
+          DateTime.now().year,
+          DateTime.now().month,
+          DateTime.now().day,
         );
-        return;
+
+        if (_date!.isBefore(today)) {
+          okInfoBarRed(
+            lw('Reminder date cannot be in the past'),
+            duration: Duration(seconds: 4),
+          );
+          return;
+        }
       }
     }
 
@@ -455,7 +459,7 @@ class _EditItemPageState extends State<EditItemPage> {
         // Update/cancel specific reminder for this item
         await SimpleNotifications.updateSpecificReminder(
           widget.itemId!,
-          _remind,
+          _remind && _active,
           _date,
           _time,
         );
@@ -464,7 +468,7 @@ class _EditItemPageState extends State<EditItemPage> {
         myPrint("Daily save: id=${widget.itemId}, daily=$_daily, active=$_active, times=$_dailyTimes, days=$_dailyDays");
         await SimpleNotifications.updateDailyReminders(
           widget.itemId!,
-          _daily,
+          _daily && _active,
           _dailyTimes,
           _dailyDays,
           titleText,
@@ -529,7 +533,7 @@ class _EditItemPageState extends State<EditItemPage> {
         }
 
         // Schedule specific reminder for new item if needed
-        if (_remind && _date != null) {
+        if (_remind && _active && _date != null) {
           await SimpleNotifications.scheduleSpecificReminder(
             insertedId,
             _date!,
@@ -538,7 +542,7 @@ class _EditItemPageState extends State<EditItemPage> {
         }
 
         // Schedule daily reminders for new item if needed
-        if (_daily && _dailyTimes.isNotEmpty) {
+        if (_daily && _active && _dailyTimes.isNotEmpty) {
           await SimpleNotifications.scheduleAllDailyReminders(
             insertedId,
             _dailyTimes,
@@ -987,7 +991,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildTimeOptions(),
                 SizedBox(height: 10),
                 _buildFullscreenSelector(),
-                _buildLoopSoundSelector(),
+                if (_fullscreen) _buildLoopSoundSelector(),
                 SizedBox(height: 4),
                 _buildRepeatSelector(),
                 SizedBox(height: 4),
@@ -1004,7 +1008,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildSoundSelector(isDaily: true),
                 SizedBox(height: 10),
                 _buildFullscreenSelector(),
-                _buildLoopSoundSelector(),
+                if (_fullscreen) _buildLoopSoundSelector(),
               ],
 
               // Period reminder options
@@ -1020,7 +1024,7 @@ class _EditItemPageState extends State<EditItemPage> {
                 _buildSoundSelector(isDaily: false),
                 SizedBox(height: 10),
                 _buildFullscreenSelector(),
-                _buildLoopSoundSelector(),
+                if (_fullscreen) _buildLoopSoundSelector(),
               ],
             ],
           ],

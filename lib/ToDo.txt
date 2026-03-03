@@ -53,6 +53,10 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
++ Loop sound checkbox visible when fullscreen is off (additem.dart)
++ periodFromController/periodToController not disposed (additem.dart)
++ Specific/daily reminders scheduled even when active=false (additem.dart)
++ Yearly/monthly items: past date rejected by validation (should allow — auto-advances)
 + _copyItem missing period/period_to/period_days/loop_sound fields
 + No empty state for Monthly folder
 + _getNotesItemsCount not excluding monthly/period items

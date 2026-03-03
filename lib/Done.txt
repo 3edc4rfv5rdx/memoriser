@@ -1,3 +1,12 @@
+  + Audit Phase 1: Add/Edit screen fixes (additem.dart)
+    - Loop sound checkbox hidden when fullscreen is off (was visible but disabled — confusing)
+    - periodFromController/periodToController: added dispose() — memory leak fix
+    - Reminder scheduling now checks _active flag: specific and daily reminders won't schedule
+      when active=false (was only checked for period reminders — inconsistent)
+    - Both update (existing) and insert (new) paths now pass _active to scheduling
+    - Past date validation now skipped for yearly/monthly items (they auto-advance on app start,
+      so user must be able to create e.g. a birthday that already passed this year)
+
   + Audit Phase 1: Main screen fixes
     - FullScreenAlertActivity.kt: added 2-second pause between loop sound cycles (postDelayed)
     - _copyItem(): added missing fields: period, period_to, period_days, loop_sound
