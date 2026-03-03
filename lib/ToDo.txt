@@ -53,6 +53,12 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
++ _copyItem missing period/period_to/period_days/loop_sound fields
++ No empty state for Monthly folder
++ _getNotesItemsCount not excluding monthly/period items
++ updateYearlyEvents/updateMonthlyEvents only advance 1 step (multi-year/month gap bug)
++ item['title'] null crash in ListView (title can be NULL in DB)
++ removeExpiredItems: yearly/monthly NULL check missing + period items incorrectly auto-deleted
 # v0.9.260303+121 (2026-03-03 09:46:53)
 # v0.9.260302+119 (2026-03-02 15:19:25)
 + Period reminders: "Done" in fullscreen did not cancel all period alarms

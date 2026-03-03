@@ -1,3 +1,14 @@
+  + Audit Phase 1: Main screen fixes
+    - FullScreenAlertActivity.kt: added 2-second pause between loop sound cycles (postDelayed)
+    - _copyItem(): added missing fields: period, period_to, period_days, loop_sound
+    - Added empty state text for Monthly folder ("No monthly events yet.")
+    - _getNotesItemsCount(): added monthly/period exclusion to match notes filter logic
+    - updateYearlyEvents(): advance year in loop until >= today (handles multi-year gaps)
+    - updateMonthlyEvents(): advance month in loop until >= today (handles multi-month gaps)
+    - Added localization for "No monthly events yet." (ru, ua)
+    - item['title'] null safety: added ?? '' in ListView title Text widget
+    - removeExpiredItems(): added NULL checks for yearly/monthly columns (ALTER TABLE leaves NULL for old rows); excluded period items from auto-deletion (period uses date as range start, not expiry)
+
   + Loop sound for fullscreen alert
     - DB v15→v16: added loop_sound INTEGER DEFAULT 1 column to items table
     - Per-item "Repeat sound" checkbox in additem.dart (enabled when fullscreen is on)

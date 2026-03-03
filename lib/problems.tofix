@@ -1,0 +1,27 @@
+== Main screen (main.dart) — unfixed issues from Audit Phase 1 ==
+
+1. _showPhotoGallery uses wrong item ID for photo removal
+   File: main.dart, _showPhotoGallery() ~line 1066
+   Problem: When all photos are missing and user confirms "Remove reference",
+   the code uses _selectedItemId to clear the photo field. But _selectedItemId
+   is set by onTap on ListTile, while photo icon is a separate IconButton in
+   trailing. User can tap photo icon without selecting that ListTile first,
+   so _selectedItemId may point to a different item.
+   Fix: Pass itemId as parameter to _showPhotoGallery() instead of relying on _selectedItemId.
+
+2. Context menu position is hardcoded
+   File: main.dart, _showContextMenu() ~line 2029
+   Problem: showMenu position is RelativeRect.fromLTRB(200, 200, 200, 200) — always
+   appears at same screen position regardless of which item was long-pressed.
+   Fix: Use the tap position or item widget position to place the menu near the item.
+
+3. Error widget has hardcoded English string
+   File: main.dart, _buildErrorWidget() ~line 2822
+   Problem: 'Error loading image:\n$error' — not wrapped in lw().
+   Fix: Use lw('Error loading image') + ':\n$error'
+
+4. Filter status shows (F) inside virtual folders
+   File: main.dart, getFilterStatusText() ~line 258
+   Problem: When user enters a virtual folder (Yearly, Daily, etc.), xvFilter is set
+   to e.g. 'yearly:true', so getFilterStatusText() returns '(F)' which is misleading.
+   Fix: Either suppress filter indicator inside virtual folders, or show folder-specific text.

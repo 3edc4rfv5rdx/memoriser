@@ -492,7 +492,7 @@ Future<void> removeExpiredItems() async {
     // THEN get expired records (NOT yearly, NOT monthly) with remove flag to delete their photos first
     final expiredItems = await mainDb.query(
       'items',
-      where: 'date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0 AND monthly = 0',
+      where: 'date IS NOT NULL AND date < ? AND remove = 1 AND (yearly = 0 OR yearly IS NULL) AND (monthly = 0 OR monthly IS NULL) AND (period = 0 OR period IS NULL)',
       whereArgs: [todayInt],
     );
 
@@ -515,7 +515,7 @@ Future<void> removeExpiredItems() async {
 
     // Now delete the expired records from database
     final count = await mainDb.rawDelete(
-        'DELETE FROM items WHERE date IS NOT NULL AND date < ? AND remove = 1 AND yearly = 0 AND monthly = 0',
+        'DELETE FROM items WHERE date IS NOT NULL AND date < ? AND remove = 1 AND (yearly = 0 OR yearly IS NULL) AND (monthly = 0 OR monthly IS NULL) AND (period = 0 OR period IS NULL)',
         [todayInt]
     );
 
@@ -553,8 +553,12 @@ Future<void> updateYearlyEvents(int today) async {
           continue;
         }
 
-        // Update year to next year
-        final newDate = DateTime(oldDate.year + 1, oldDate.month, oldDate.day);
+        // Advance year until date is >= today (handles multi-year gaps)
+        var newDate = oldDate;
+        final todayDate = yyyymmddToDateTime(today)!;
+        while (newDate.isBefore(todayDate)) {
+          newDate = DateTime(newDate.year + 1, newDate.month, newDate.day);
+        }
         final newDateInt = dateTimeToYYYYMMDD(newDate);
 
         if (newDateInt != null) {
@@ -603,22 +607,22 @@ Future<void> updateMonthlyEvents(int today) async {
           continue;
         }
 
-        // Calculate next month
+        // Advance month until date is >= today (handles multi-month gaps)
         int targetDay = oldDate.day;
         int newYear = oldDate.year;
-        int newMonth = oldDate.month + 1;
-
-        // Handle year rollover
-        if (newMonth > 12) {
-          newMonth = 1;
-          newYear++;
+        int newMonth = oldDate.month;
+        final todayDate = yyyymmddToDateTime(today)!;
+        DateTime newDate = oldDate;
+        while (newDate.isBefore(todayDate)) {
+          newMonth++;
+          if (newMonth > 12) {
+            newMonth = 1;
+            newYear++;
+          }
+          int daysInNewMonth = DateTime(newYear, newMonth + 1, 0).day;
+          int actualDay = targetDay > daysInNewMonth ? daysInNewMonth : targetDay;
+          newDate = DateTime(newYear, newMonth, actualDay);
         }
-
-        // Handle month-end edge cases (e.g., Jan 31 -> Feb 28/29)
-        int daysInNewMonth = DateTime(newYear, newMonth + 1, 0).day;
-        int actualDay = targetDay > daysInNewMonth ? daysInNewMonth : targetDay;
-
-        final newDate = DateTime(newYear, newMonth, actualDay);
         final newDateInt = dateTimeToYYYYMMDD(newDate);
 
         if (newDateInt != null) {
@@ -951,7 +955,7 @@ class _HomePageState extends State<HomePage> {
     try {
       // Подсчитываем количество записей без времени, не ежегодных и не daily
       final count = await mainDb.rawQuery(
-        'SELECT COUNT(*) as count FROM items WHERE time IS NULL AND yearly != 1 AND (daily != 1 OR daily IS NULL) AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
+        'SELECT COUNT(*) as count FROM items WHERE time IS NULL AND yearly != 1 AND (daily != 1 OR daily IS NULL) AND (monthly != 1 OR monthly IS NULL) AND (period != 1 OR period IS NULL) AND ${xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)'}',
       );
 
       return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
@@ -1907,6 +1911,10 @@ class _HomePageState extends State<HomePage> {
         'sound': originalItem['sound'],
         'active': 0, // Set inactive - user will activate manually
         'fullscreen': originalItem['fullscreen'], // Copy fullscreen flag
+        'period': originalItem['period'],
+        'period_to': originalItem['period_to'],
+        'period_days': originalItem['period_days'],
+        'loop_sound': originalItem['loop_sound'],
         'photo': null, // Don't copy photos
       });
 
@@ -2243,6 +2251,8 @@ class _HomePageState extends State<HomePage> {
               ? lw('No notes yet.')
               : _isInDailyFolder
               ? lw('No daily reminders yet.')
+              : _isInMonthlyFolder
+              ? lw('No monthly events yet.')
               : _isInPeriodFolder
               ? lw('No period reminders yet.')
               : xvHiddenMode
@@ -2417,7 +2427,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Expanded(
                     child: Text(
-                      item['title'],
+                      item['title'] ?? '',
                       style: TextStyle(
                         fontWeight: fwBold,
                         color: isToday ? clRed : clText,
