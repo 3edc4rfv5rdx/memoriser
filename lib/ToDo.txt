@@ -1,5 +1,5 @@
 ===TODO:
-+ Loop sound for fullscreen alert: per-item checkbox + global repeat count setting
++ Loop sound for fullscreen alert: per-item checkbox + global repeat count setting + 2s pause between loops
 # v0.9.260302+119 (2026-03-02 15:19:25)
 + Reduce APK size: arm64 18M→9M, universal 52M→24M (useLegacyPackaging=true, shrinkResources=true)
 # v0.9.260216+110 (2026-02-16 13:44:39)

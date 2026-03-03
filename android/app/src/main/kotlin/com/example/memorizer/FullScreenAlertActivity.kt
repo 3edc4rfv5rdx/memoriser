@@ -318,13 +318,24 @@ class FullScreenAlertActivity : Activity() {
                 val duration = this.duration
                 Log.d("MemorizerApp", "Sound started playing, duration: $duration ms")
 
+                // Loop sound: 2-second pause between repeat cycles
                 setOnCompletionListener { mp ->
                     currentRepeat++
                     if (loopSound && currentRepeat < repeatCount) {
-                        Log.d("MemorizerApp", "Sound repeat $currentRepeat/$repeatCount")
+                        Log.d("MemorizerApp", "Sound repeat $currentRepeat/$repeatCount, pausing 2s")
                         try {
                             mp.seekTo(0)
-                            mp.start()
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                try {
+                                    if (mediaPlayer != null) {
+                                        mp.start()
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("MemorizerApp", "Error restarting sound after delay: ${e.message}")
+                                    mp.release()
+                                    mediaPlayer = null
+                                }
+                            }, 2000)
                         } catch (e: Exception) {
                             Log.e("MemorizerApp", "Error restarting sound: ${e.message}")
                             mp.release()
