@@ -1,3 +1,18 @@
+  + Audit Phase 1: Filters screen (filters.dart) — second pass
+    - Missing mounted checks after showDatePicker in _selectDateFrom() and _selectDateTo().
+      Added if (picked != null && mounted) before setState.
+    - getFilterStatusText(): lastItemsStr was dynamic type from defSettings Map.
+      Added .toString() to ensure int.tryParse gets a String.
+  + Audit Phase 1: Filters screen (filters.dart) — first pass
+    - BUG FIX: Colon in tag names broke filter string parsing. Changed split(':') with length==2 check
+      to indexOf(':') + substring, so tags like "note:important" parse correctly.
+    - BUG FIX: Date field identification used localized string comparison (label == lw('Date from')).
+      Replaced with explicit isDateFrom boolean parameter — locale-independent.
+    - BUG FIX: Missing mounted checks after async operations in _loadTagsData() and _showSwapDatesDialog().
+      Added if (!mounted) return before setState calls.
+    - UX FIX: After swap dates dialog, _applyFilters returned early forcing user to tap Apply again.
+      Now continues to apply filter if dates are valid after swap, only returns if user cancelled.
+    - Translated all Russian comments to English.
   + Audit Phase 1: Settings screen — second pass
     - Russian comment "НОВОЕ:" → English
     - Localization: "Settings saved: " → "Settings saved" + punctuation in code (locales.json cleaned)

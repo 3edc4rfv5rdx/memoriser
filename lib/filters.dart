@@ -64,7 +64,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
   int _selectedPriority = -1; // -1 means "any priority"
   bool? _selectedHasReminder; // null means "any value"
 
-  // Список тегов для выпадающего списка
+  // Tags list for dropdown
   List<Map<String, dynamic>> _tagsWithCounts = [];
 
   @override
@@ -94,15 +94,15 @@ class _FiltersScreenState extends State<FiltersScreen> {
     _selectedPriority = _filterData.priority ?? -1;
     _selectedHasReminder = _filterData.hasReminder;
 
-    // Загружаем теги при инициализации
+    // Load tags on init
     _loadTagsData();
   }
 
-  // Функция для загрузки данных тегов
+  // Load tags data from database
   Future<void> _loadTagsData() async {
     try {
-      // Получаем отсортированные теги с их частотами
       List<Map<String, dynamic>> tags = await getTagsWithCounts();
+      if (!mounted) return;
       setState(() {
         _tagsWithCounts = tags;
       });
@@ -131,11 +131,11 @@ class _FiltersScreenState extends State<FiltersScreen> {
       final parts = xvFilter.split('|');
 
       for (final part in parts) {
-        final keyValue = part.split(':');
-        if (keyValue.length != 2) continue;
+        final colonIndex = part.indexOf(':');
+        if (colonIndex < 0) continue;
 
-        final key = keyValue[0];
-        final value = keyValue[1];
+        final key = part.substring(0, colonIndex);
+        final value = part.substring(colonIndex + 1);
 
         switch (key) {
           case 'dateFrom':
@@ -202,7 +202,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     return parts.join('|');
   }
 
-  // Функция для показа диалога обмена дат
+  // Show swap dates confirmation dialog
   Future<void> _showSwapDatesDialog() async {
     bool swapDates =
         await showDialog<bool>(
@@ -247,14 +247,13 @@ class _FiltersScreenState extends State<FiltersScreen> {
         ) ??
         false;
 
-    if (swapDates) {
+    if (swapDates && mounted) {
       setState(() {
-        // Меняем даты местами
         final tempDate = _filterData.dateFrom;
         _filterData.dateFrom = _filterData.dateTo;
         _filterData.dateTo = tempDate;
 
-        // Также обновляем текст в полях
+        // Also update text fields
         final tempText = _dateFromController.text;
         _dateFromController.text = _dateToController.text;
         _dateToController.text = tempText;
@@ -262,7 +261,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
   }
 
-  // В методе _applyFilters добавляем полную проверку
+  // Apply all filters and return to main screen
   void _applyFilters() async {
     if (_dateFromController.text.isNotEmpty) {
       if (!validateDateInput(_dateFromController.text)) {
@@ -278,14 +277,20 @@ class _FiltersScreenState extends State<FiltersScreen> {
         return;
       }
     }
-    // Проверка, что начальная дата не позже конечной & swap
+    // Check that dateFrom is not after dateTo, offer swap
     if (_filterData.dateFrom != null && _filterData.dateTo != null) {
       if (_filterData.dateFrom!.isAfter(_filterData.dateTo!)) {
         await _showSwapDatesDialog();
-        return; // Выходим без применения фильтра
+        if (!mounted) return;
+        // If still invalid after dialog (user cancelled swap), don't apply
+        if (_filterData.dateFrom != null &&
+            _filterData.dateTo != null &&
+            _filterData.dateFrom!.isAfter(_filterData.dateTo!)) {
+          return;
+        }
       }
     }
-    // Код применения фильтра выполнится только если даты корректны
+    // Apply filter values
     _filterData.priority = _selectedPriority >= 0 ? _selectedPriority : null;
     _filterData.hasReminder = _selectedHasReminder;
     _filterData.tags =
@@ -348,7 +353,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
       },
     );
 
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _filterData.dateFrom = picked;
         _dateFromController.text = DateFormat(ymdDateFormat).format(picked);
@@ -391,7 +396,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
       },
     );
 
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _filterData.dateTo = picked;
         _dateToController.text = DateFormat(ymdDateFormat).format(picked);
@@ -399,7 +404,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
   }
 
-  // Функция для показа диалога выбора тегов
+  // Show tag selection dialog
   void _showTagsDialog() {
     if (_tagsWithCounts.isEmpty) {
       okInfoBarBlue(lw('No tags found'));
@@ -448,16 +453,13 @@ class _FiltersScreenState extends State<FiltersScreen> {
     );
   }
 
-  // Функция для добавления тега в поле ввода
+  // Add tag to the tags text field
   void _addTagToField(String tag) {
-    // Получаем текущее значение поля
     String currentTags = _tagsController.text.trim();
 
-    // Если поле пустое, просто добавляем тег
     if (currentTags.isEmpty) {
       _tagsController.text = tag;
     } else {
-      // Проверяем, содержит ли уже тег
       List<String> existingTags =
           currentTags
               .split(',')
@@ -466,10 +468,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
               .toList();
 
       if (!existingTags.contains(tag)) {
-        // Добавляем тег с запятой
         _tagsController.text = '$currentTags, $tag';
       } else {
-        // Тег уже есть, показываем сообщение
         okInfoBarBlue(lw('Tag already added'));
       }
     }
@@ -610,8 +610,9 @@ class _FiltersScreenState extends State<FiltersScreen> {
   Widget _buildDateField(
     String label,
     TextEditingController controller,
-    Future<void> Function() onSelectDate,
-  ) {
+    Future<void> Function() onSelectDate, {
+    required bool isDateFrom,
+  }) {
     return Row(
       children: [
         Expanded(
@@ -619,21 +620,19 @@ class _FiltersScreenState extends State<FiltersScreen> {
             controller: controller,
             style: TextStyle(color: clText),
             readOnly: false,
-            // Разрешаем ручной ввод
             onChanged: (value) {
               if (value.isEmpty) {
-                // Если поле пустое, сбрасываем соответствующую дату
-                if (label == lw('Date from')) {
+                if (isDateFrom) {
                   _filterData.dateFrom = null;
                 } else {
                   _filterData.dateTo = null;
                 }
               } else {
-                // Проверяем формат и корректность даты
+                // Validate format and parse date
                 if (isValidDateFormat(value) && isValidDate(value)) {
                   try {
                     final date = DateFormat(ymdDateFormat).parse(value);
-                    if (label == lw('Date from')) {
+                    if (isDateFrom) {
                       _filterData.dateFrom = date;
                     } else {
                       _filterData.dateTo = date;
@@ -665,7 +664,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
           onPressed: () {
             setState(() {
               controller.clear();
-              if (label == lw('Date from')) {
+              if (isDateFrom) {
                 _filterData.dateFrom = null;
               } else {
                 _filterData.dateTo = null;
@@ -771,6 +770,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               lw('Date from'),
               _dateFromController,
               () => _selectDateFrom(context),
+              isDateFrom: true,
             ),
             SizedBox(height: 16),
 
@@ -779,6 +779,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               lw('Date to'),
               _dateToController,
               () => _selectDateTo(context),
+              isDateFrom: false,
             ),
             SizedBox(height: 16),
 
@@ -805,8 +806,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
     // Get "Last items" setting value
     final lastItemsStr =
-        await getSetting("Last items") ?? defSettings["Last items"];
-    final lastItems = int.tryParse(lastItemsStr) ?? 0;
+        await getSetting("Last items") ?? defSettings["Last items"]?.toString() ?? '0';
+    final lastItems = int.tryParse(lastItemsStr.toString()) ?? 0;
     bool hasLastItems = lastItems > 0;
 
     if (hasTagFilter && hasMainFilter) {
