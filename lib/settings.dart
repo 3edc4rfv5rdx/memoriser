@@ -32,6 +32,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   // Sound settings
   String? _defaultSound;
   String? _defaultDailySound;
+  String _soundRepeats = "25";
   List<Map<String, String>> _systemSounds = [];
 
   // Temporary values to track changes
@@ -120,6 +121,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _debugLogs = debugLogs;
         _defaultSound = defaultSoundValue;
         _defaultDailySound = defaultDailySoundValue;
+        _soundRepeats = soundRepeatsValue;
         _systemSounds = systemSounds;
 
         // Initialize temporary values
@@ -132,6 +134,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newDebugLogs = debugLogs;
         _newDefaultSound = defaultSoundValue;
         _newDefaultDailySound = defaultDailySoundValue;
+        _newSoundRepeats = soundRepeatsValue;
 
         _isLoading = false;
         _hasChanges = false;
@@ -151,7 +154,8 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
               _newEnableDailyReminders != _enableDailyReminders ||
               _newDebugLogs != _debugLogs ||
               _newDefaultSound != _defaultSound ||
-              _newDefaultDailySound != _defaultDailySound;
+              _newDefaultDailySound != _defaultDailySound ||
+              _newSoundRepeats != _soundRepeats;
     });
   }
 
@@ -204,12 +208,49 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newEnableDailyReminders != null) {
       await saveSetting("Enable daily reminders", _newEnableDailyReminders.toString());
       savedSettings.add('enable daily reminders');
-      // TODO: Handle daily reminders rescheduling when Kotlin part is implemented
+      reminderSettingsChanged = true;
+
+      if (_newEnableDailyReminders == false) {
+        // Cancel all daily reminders
+        try {
+          final dailyItems = await mainDb.query('items', where: 'daily = 1');
+          for (var item in dailyItems) {
+            final itemId = item['id'] as int;
+            await SimpleNotifications.cancelAllDailyReminders(itemId);
+          }
+          myPrint('All daily reminders cancelled - daily reminders disabled');
+          okInfoBarBlue(lw('Daily reminders disabled'));
+        } catch (e) {
+          myPrint('Error cancelling daily reminders: $e');
+          okInfoBarRed(lw('Error disabling reminders'));
+        }
+      } else {
+        // Reschedule all daily reminders
+        try {
+          final dailyItems = await mainDb.query('items', where: 'daily = 1 AND active = 1');
+          for (var item in dailyItems) {
+            final itemId = item['id'] as int;
+            final title = item['title'] as String? ?? '';
+            final dailyTimesStr = item['daily_times'] as String?;
+            final dailyDays = item['daily_days'] as int? ?? 127;
+            if (dailyTimesStr == null || dailyTimesStr.isEmpty) continue;
+            final dailyTimes = parseDailyTimes(dailyTimesStr);
+            if (dailyTimes.isEmpty) continue;
+            await SimpleNotifications.scheduleAllDailyReminders(itemId, dailyTimes, dailyDays, title);
+          }
+          myPrint('All daily reminders rescheduled - daily reminders enabled');
+          okInfoBarGreen(lw('Daily reminders enabled'));
+        } catch (e) {
+          myPrint('Error rescheduling daily reminders: $e');
+          okInfoBarRed(lw('Error enabling reminders'));
+        }
+      }
     }
 
     // Save debug logs setting if changed
     if (_newDebugLogs != _debugLogs && _newDebugLogs != null) {
       await saveSetting("Debug logs", _newDebugLogs.toString());
+      xvDebug = _newDebugLogs!;
       savedSettings.add('debug logs');
     }
 
@@ -233,7 +274,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     }
 
     // Save sound repeats setting if changed
-    if (_newSoundRepeats != null) {
+    if (_newSoundRepeats != null && _newSoundRepeats != _soundRepeats) {
       await saveSetting("Sound repeats", _newSoundRepeats!);
       savedSettings.add('sound repeats');
     }
@@ -249,6 +290,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _debugLogs = _newDebugLogs ?? _debugLogs;
       _defaultSound = _newDefaultSound;
       _defaultDailySound = _newDefaultDailySound;
+      _soundRepeats = _newSoundRepeats ?? _soundRepeats;
       _hasChanges = false;
     });
 
@@ -265,7 +307,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           okInfoBarRed(lw('Error disabling reminders'));
         }
       } else if (_newEnableReminders == true) {
-        // НОВОЕ: If reminders are enabled, reschedule all reminders
+        // If reminders are enabled, reschedule all reminders
         try {
           myPrint('Rescheduling all reminders - reminders enabled...');
           await SimpleNotifications.rescheduleAllReminders();
@@ -280,11 +322,11 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
     // Show one common notification for all saved settings (only if no reminder messages shown)
     if (savedSettings.isNotEmpty && !reminderSettingsChanged) {
-      okInfoBarGreen(lw('Settings saved: ') + savedSettings.join(', '));
+      okInfoBarGreen(lw('Settings saved') + ': ' + savedSettings.join(', '));
     } else if (savedSettings.isNotEmpty && reminderSettingsChanged) {
       // Give time for reminder message to be seen, then show general save message
       await Future.delayed(Duration(milliseconds: 2000));
-      okInfoBarGreen(lw('Settings saved: ') + savedSettings.join(', '));
+      okInfoBarGreen(lw('Settings saved') + ': ' + savedSettings.join(', '));
     }
 
     // Give time to see first notification
@@ -806,10 +848,17 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           fillColor: clFill,
         ),
         onChanged: (value) {
+          if (value.isEmpty) return;
           final intVal = int.tryParse(value);
-          if (intVal != null && intVal > 0) {
+          if (intVal != null && intVal > 0 && intVal <= 999) {
             _newSoundRepeats = value;
-            setState(() { _hasChanges = true; });
+            _checkForChanges();
+          } else {
+            // Revert to last valid value
+            _soundRepeatsController.text = _newSoundRepeats ?? _soundRepeats;
+            _soundRepeatsController.selection = TextSelection.fromPosition(
+              TextPosition(offset: _soundRepeatsController.text.length),
+            );
           }
         },
       ),

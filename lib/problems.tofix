@@ -35,3 +35,9 @@
    at 09:00 on Mon/Wed and Tue/Thu would trigger a false conflict warning.
    Fix: Compare daily_days bitmasks — only warn if (daysA & daysB) != 0.
    Severity: Low — it's just a warning, doesn't block save.
+
+== Settings screen (settings.dart) — unfixed issues from Audit Phase 1 ==
+
+6. FIXED: "Debug logs" toggle fully works — saved to DB, read on startup, updates xvDebug at runtime
+
+7. FIXED: "Enable daily reminders" toggle now cancels/reschedules daily reminders

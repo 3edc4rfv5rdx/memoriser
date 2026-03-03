@@ -1,3 +1,21 @@
+  + Audit Phase 1: Settings screen — second pass
+    - Russian comment "НОВОЕ:" → English
+    - Localization: "Settings saved: " → "Settings saved" + punctuation in code (locales.json cleaned)
+    - Sound repeats: added input validation (1-999), reverts invalid input to last valid value
+    - BUG FIX: "Enable daily reminders" toggle now actually cancels/reschedules daily alarms.
+      When disabled: iterates all daily=1 items, calls cancelAllDailyReminders for each.
+      When enabled: iterates active daily items, parses times, calls scheduleAllDailyReminders.
+      Added localization for "Daily reminders disabled"/"Daily reminders enabled".
+    - BUG FIX: "Debug logs" toggle fully works now. Added: read from DB on startup in main(),
+      update xvDebug immediately on save. Build script (00-Make.sh) sets initial hardcoded value
+      for first run; after that DB setting takes priority.
+
+  + Audit Phase 1: Settings screen fixes (settings.dart)
+    - Sound repeats field: _newSoundRepeats was not tracked in _checkForChanges(), could lose
+      changes when other fields toggle. Added _soundRepeats baseline + proper comparison.
+    - Sound repeats: now uses _checkForChanges() instead of direct _hasChanges=true
+    - Sound repeats save: added comparison check (_newSoundRepeats != _soundRepeats)
+
   + Audit Phase 1: Add/Edit screen fixes (additem.dart)
     - Loop sound checkbox hidden when fullscreen is off (was visible but disabled — confusing)
     - periodFromController/periodToController: added dispose() — memory leak fix

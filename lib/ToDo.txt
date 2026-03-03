@@ -53,6 +53,8 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
++ "Enable daily reminders" toggle didn't cancel/reschedule daily alarms (settings.dart)
++ Sound repeats: _checkForChanges() didn't include _newSoundRepeats (settings.dart)
 + Loop sound checkbox visible when fullscreen is off (additem.dart)
 + periodFromController/periodToController not disposed (additem.dart)
 + Specific/daily reminders scheduled even when active=false (additem.dart)

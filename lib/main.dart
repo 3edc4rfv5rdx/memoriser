@@ -674,6 +674,9 @@ void main() async {
   final languageSetting =
       await getSetting("Language") ?? defSettings["Language"];
   await readLocale(languageSetting.toLowerCase());
+  // Load debug logs setting from DB (overrides hardcoded default)
+  final debugLogsValue = await getSetting("Debug logs") ?? defSettings["Debug logs"];
+  xvDebug = debugLogsValue == "true";
   // Initialize notification system
   await SimpleNotifications.initNotifications();
 
