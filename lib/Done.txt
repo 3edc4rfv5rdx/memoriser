@@ -1,3 +1,11 @@
+  + Audit Phase 1: Tags Cloud screen (tagscloud.dart) — first pass
+    - BUG: `color: isSelected ? clText : clText` — both branches identical, simplified to just `clText`
+    - Missing mounted checks in _loadAllTags() after async getTagsWithCounts() — added in both
+      success and error paths
+    - Localization: `lw('Filter applied: ')` had colon+space in string — moved punctuation to code,
+      removed dirty entry from locales.json
+    - Removed unused params (index, totalTags) from _getTagFontSize(), simplified .asMap().entries to .map()
+    - Translated Russian comment in file header
   + Audit Phase 1: Filters screen (filters.dart) — second pass
     - Missing mounted checks after showDatePicker in _selectDateFrom() and _selectDateTo().
       Added if (picked != null && mounted) before setState.

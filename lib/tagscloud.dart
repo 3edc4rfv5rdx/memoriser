@@ -1,4 +1,4 @@
-// tagscloud.dart (упрощенная версия)
+// tagscloud.dart
 import 'package:flutter/material.dart';
 
 import 'globals.dart';
@@ -21,23 +21,22 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
     _loadAllTags();
   }
 
-  // Загрузка тегов с использованием общей функции
+  // Load tags using shared function
   Future<void> _loadAllTags() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Используем общую функцию для получения тегов с частотами
       final tagsWithCounts = await getTagsWithCounts();
+      if (!mounted) return;
 
-      // Преобразуем результат в объекты TagData
       final tags =
           tagsWithCounts
               .map((tag) => TagData(name: tag['name'], count: tag['count']))
               .toList();
 
-      // Инициализируем выбранные теги на основе текущего фильтра
+      // Initialize selected tags from current filter
       List<String> initialSelectedTags = [];
       if (xvTagFilter.isNotEmpty) {
         initialSelectedTags =
@@ -51,6 +50,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
       });
     } catch (e) {
       myPrint('Error loading tags: $e');
+      if (!mounted) return;
       setState(() {
         _tags = [];
         _isLoading = false;
@@ -69,7 +69,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
     if (_selectedTags.isEmpty) {
       okInfoBarBlue(lw('All tags shown'));
     } else {
-      okInfoBarGreen(lw('Filter applied: ') + xvTagFilter);
+      okInfoBarGreen('${lw('Filter applied')}: $xvTagFilter');
     }
 
     // Return to previous screen with refresh signal
@@ -94,8 +94,8 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
     });
   }
 
-  // Get font size based on tag count and position
-  double _getTagFontSize(int count, int maxCount, int index, int totalTags) {
+  // Get font size based on tag count frequency
+  double _getTagFontSize(int count, int maxCount) {
     // Calculate relative size (0.0 to 1.0) based on count
     double relativeSize = count / maxCount;
 
@@ -124,8 +124,8 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
       );
     }
 
-    // Calculate the maximum count for font size scaling
-    int maxCount = _tags.isNotEmpty ? _tags.first.count : 1;
+    // Maximum count for font size scaling (tags sorted by count descending)
+    int maxCount = _tags.first.count;
 
     // Top-aligned tag cloud with reduced vertical spacing
     return SingleChildScrollView(
@@ -134,15 +134,8 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
         spacing: 12.0, // Gap between tags horizontally
         runSpacing: 8.0, // Reduced gap between lines
         children:
-            _tags.asMap().entries.map((entry) {
-              final index = entry.key;
-              final tag = entry.value;
-              final fontSize = _getTagFontSize(
-                tag.count,
-                maxCount,
-                index,
-                _tags.length,
-              );
+            _tags.map((tag) {
+              final fontSize = _getTagFontSize(tag.count, maxCount);
               final isSelected = _selectedTags.contains(tag.name);
 
               return GestureDetector(
@@ -152,7 +145,7 @@ class _TagsCloudScreenState extends State<TagsCloudScreen> {
                   label: Text(
                     '${tag.name} (${tag.count})',
                     style: TextStyle(
-                      color: isSelected ? clText : clText,
+                      color: clText,
                       fontSize: fontSize,
                       fontWeight: isSelected ? fwBold : fwNormal,
                     ),
