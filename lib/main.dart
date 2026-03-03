@@ -258,17 +258,24 @@ Future<void> _migratePhotosToItemFolders(Database db) async {
 Future<String> getFilterStatusText() async {
   bool hasTagFilter = xvTagFilter.isNotEmpty;
 
-  // Получаем значение настройки Last items
+  // Virtual folder filters are not user-set filters, don't show (F)
+  const virtualFolderFilters = {
+    'notes:true', 'yearly:true', 'daily:true', 'monthly:true', 'period:true'
+  };
+  bool hasUserFilter = xvFilter.isNotEmpty &&
+      !virtualFolderFilters.contains(xvFilter);
+
+  // Get Last items setting
   final lastItemsStr =
       await getSetting("Last items") ?? defSettings["Last items"];
   final lastItems = int.tryParse(lastItemsStr) ?? 0;
   bool hasLastItems = lastItems > 0;
 
-  if (xvFilter.isNotEmpty && hasTagFilter) {
+  if (hasUserFilter && hasTagFilter) {
     return '(FT) ';
   } else if (hasTagFilter) {
     return '(T) ';
-  } else if (xvFilter.isNotEmpty) {
+  } else if (hasUserFilter) {
     return '(F) ';
   } else if (hasLastItems) {
     return '($lastItems) ';
@@ -1045,7 +1052,7 @@ class _HomePageState extends State<HomePage> {
     return '$fromStr — $toStr';
   }
 
-  void _showPhotoGallery(List<String> photoPaths) {
+  void _showPhotoGallery(List<String> photoPaths, {int? itemId}) {
     if (photoPaths.isEmpty) return;
 
     // Filter to only valid paths
@@ -1066,12 +1073,13 @@ class _HomePageState extends State<HomePage> {
             'value': true,
             'isDestructive': true,
             'onPressed': () async {
-              if (_selectedItemId != null) {
+              final targetId = itemId ?? _selectedItemId;
+              if (targetId != null) {
                 await mainDb.update(
                   'items',
                   {'photo': null},
                   where: 'id = ?',
-                  whereArgs: [_selectedItemId],
+                  whereArgs: [targetId],
                 );
                 _refreshItems();
                 okInfoBarBlue(lw('Photo reference removed'));
@@ -1932,9 +1940,10 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Offset _lastTapPosition = Offset.zero;
+
   void _showContextMenu(BuildContext context, Map<String, dynamic> item) {
     List<PopupMenuEntry> menuItems = [
-      // В методе _showContextMenu
       PopupMenuItem(
         child: ListTile(
           leading: Icon(Icons.edit, color: clText),
@@ -2037,7 +2046,12 @@ class _HomePageState extends State<HomePage> {
 
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(200, 200, 200, 200),
+      position: RelativeRect.fromLTRB(
+        _lastTapPosition.dx,
+        _lastTapPosition.dy,
+        _lastTapPosition.dx,
+        _lastTapPosition.dy,
+      ),
       color: clMenu,
       // Set the background color to clMenu to match the theme
       items: menuItems,
@@ -2408,7 +2422,11 @@ class _HomePageState extends State<HomePage> {
               }
               return false;
             },
-            child: ListTile(
+            child: Listener(
+              onPointerDown: (event) {
+                _lastTapPosition = event.position;
+              },
+              child: ListTile(
               // Leading: checkbox on title level (for reminders only)
               leading: hasAnyReminder
                   ? SizedBox(
@@ -2600,7 +2618,7 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         IconButton(
                           icon: Icon(Icons.photo, color: isToday ? clRed : clText),
-                          onPressed: () => _showPhotoGallery(photoPaths),
+                          onPressed: () => _showPhotoGallery(photoPaths, itemId: item['id']),
                         ),
                         if (photoCount > 1)
                           Positioned(
@@ -2646,6 +2664,7 @@ class _HomePageState extends State<HomePage> {
                   resetHiddenModeTimer();
                 }
               },
+            ),
             ),
           );
         },
@@ -2831,7 +2850,7 @@ class _PhotoGalleryDialogState extends State<_PhotoGalleryDialog> {
           Icon(Icons.error, size: 64, color: clRed),
           SizedBox(height: 16),
           Text(
-            'Error loading image:\n$error',
+            '${lw('Error loading image')}:\n$error',
             style: TextStyle(color: clText),
             textAlign: TextAlign.center,
           ),

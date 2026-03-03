@@ -1412,7 +1412,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
     final dailyItems = await mainDb.query(
       'items',
-      columns: ['id', 'title', 'daily_times'],
+      columns: ['id', 'title', 'daily_times', 'daily_days'],
       where: dailyWhere,
       whereArgs: dailyArgs,
     );
@@ -1420,6 +1420,9 @@ class _EditItemPageState extends State<EditItemPage> {
     for (var item in dailyItems) {
       final times = parseDailyTimes(item['daily_times']);
       if (times.contains(timeHHMM)) {
+        // Check weekday overlap — only warn if days actually intersect
+        final otherDays = (item['daily_days'] as int?) ?? dayAllDays;
+        if (_daily && (_dailyDays & otherDays) == 0) continue;
         return item['title'] as String?;
       }
     }

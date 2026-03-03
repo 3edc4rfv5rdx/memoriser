@@ -1,3 +1,10 @@
+  + Fixed 5 unfixed issues from Audit Phase 1 (problems.tofix):
+    1. _showPhotoGallery: pass itemId as parameter instead of relying on _selectedItemId
+    2. Context menu position: save tap position via GestureDetector onTapDown, use it in showMenu
+    3. Error loading image: localized hardcoded English string via lw()
+    4. Filter status (F): skip virtual folder filters (notes/yearly/daily/monthly/period) in getFilterStatusText
+    5. _checkTimeConflict: check weekday bitmask overlap for daily reminders (skip if days don't intersect)
+
   + Audit Phase 1: FullScreenAlertActivity.kt + XML — second pass
     - Removed unused import KeyguardManager (leftover from FLAG_DISMISS_KEYGUARD removal).
     - dismissAlert(): mediaPlayer was not nulled if isPlaying threw an exception.
