@@ -625,8 +625,6 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
     // Cancel a specific daily reminder
     private fun cancelDailyReminder(itemId: Int, hour: Int, minute: Int) {
         try {
-            Log.d("MemorizerApp", "Cancelling daily reminder for item $itemId at $hour:$minute")
-
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.DAILY_REMINDER"
             }
@@ -642,8 +640,6 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             alarmManager.cancel(pendingIntent)
-
-            Log.d("MemorizerApp", "Daily reminder cancelled for item $itemId at $hour:$minute")
         } catch (e: Exception) {
             Log.e("MemorizerApp", "Error cancelling daily reminder: ${e.message}")
         }
@@ -653,10 +649,9 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
     private fun cancelAllDailyReminders(itemId: Int) {
         try {
             Log.d("MemorizerApp", "Cancelling all daily reminders for item $itemId")
-            // Cancel all possible time combinations (this is a simplification)
-            // In a production app, you might want to track scheduled times
+            // Cancel all possible time combinations (any minute 0..59)
             for (hour in 0..23) {
-                for (minute in listOf(0, 15, 30, 45)) {
+                for (minute in 0..59) {
                     cancelDailyReminder(itemId, hour, minute)
                 }
             }
@@ -751,7 +746,9 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             val calendar = Calendar.getInstance().apply {
                 set(Calendar.YEAR, year)
                 set(Calendar.MONTH, month - 1) // Calendar months start from 0
-                set(Calendar.DAY_OF_MONTH, day)
+                // Clamp day to max day in target month (e.g. 31 -> 28 for Feb)
+                val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+                set(Calendar.DAY_OF_MONTH, if (day > maxDay) maxDay else day)
                 set(Calendar.HOUR_OF_DAY, hour)
                 set(Calendar.MINUTE, minute)
                 set(Calendar.SECOND, 0)
@@ -1369,7 +1366,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 // Yearly: same month and day, next year
                 calendar.set(Calendar.YEAR, calendar.get(Calendar.YEAR) + 1)
                 calendar.set(Calendar.MONTH, originalMonth - 1)
-                calendar.set(Calendar.DAY_OF_MONTH, originalDay)
+                // Clamp day (e.g. Feb 29 in non-leap year -> Feb 28)
+                val maxDay = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+                calendar.set(Calendar.DAY_OF_MONTH, if (originalDay > maxDay) maxDay else originalDay)
                 Log.d("MemorizerApp", "Rescheduling YEARLY reminder for item $itemId to next year")
             } else if (itemData.monthly == 1) {
                 // Monthly: same day, next month (handle month overflow)
@@ -1394,6 +1393,8 @@ class NotificationReceiver : BroadcastReceiver() {
             val nextYear = calendar.get(Calendar.YEAR)
             val nextMonth = calendar.get(Calendar.MONTH) + 1
             val nextDay = calendar.get(Calendar.DAY_OF_MONTH)
+            // For monthly: preserve original day in DB (e.g. 31) even if clamped for alarm
+            val dbDay = if (itemData.monthly == 1) originalDay else nextDay
 
             // Create intent for next reminder
             val intent = Intent(context, NotificationReceiver::class.java).apply {
@@ -1422,7 +1423,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 val dbPath = context.getDatabasePath("memorizer.db")
                 val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READWRITE)
 
-                val newDate = nextYear * 10000 + nextMonth * 100 + nextDay
+                val newDate = nextYear * 10000 + nextMonth * 100 + dbDay
                 val values = ContentValues().apply {
                     put("date", newDate)
                 }
@@ -1494,9 +1495,21 @@ class NotificationReceiver : BroadcastReceiver() {
                     Log.d("MemorizerApp", "Specific reminder shown for item $itemId with channel $channelId, sound: $defaultSound")
                 }
 
-                // Reschedule if yearly or monthly
+                // Reschedule if yearly or monthly, deactivate if one-time
                 if (itemData.yearly == 1 || itemData.monthly == 1) {
                     rescheduleRecurringReminder(context, itemId, itemData)
+                } else {
+                    // One-time non-recurring reminder: deactivate after firing
+                    try {
+                        val dbPath = context.getDatabasePath("memorizer.db")
+                        val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READWRITE)
+                        val values = ContentValues().apply { put("active", 0) }
+                        db.update("items", values, "id = ?", arrayOf(itemId.toString()))
+                        db.close()
+                        Log.d("MemorizerApp", "One-time reminder $itemId deactivated after firing")
+                    } catch (dbError: Exception) {
+                        Log.e("MemorizerApp", "Error deactivating one-time reminder: ${dbError.message}")
+                    }
                 }
             } else {
                 Log.d("MemorizerApp", "Item $itemId no longer exists or reminder disabled, skipping notification")
@@ -2391,7 +2404,9 @@ class BootReceiver : BroadcastReceiver() {
             val calendar = Calendar.getInstance().apply {
                 set(Calendar.YEAR, year)
                 set(Calendar.MONTH, month - 1)
-                set(Calendar.DAY_OF_MONTH, day)
+                // Clamp day to max day in target month (e.g. 31 -> 28 for Feb)
+                val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+                set(Calendar.DAY_OF_MONTH, if (day > maxDay) maxDay else day)
                 set(Calendar.HOUR_OF_DAY, hour)
                 set(Calendar.MINUTE, minute)
                 set(Calendar.SECOND, 0)
@@ -2491,7 +2506,8 @@ class BootReceiver : BroadcastReceiver() {
                     }
                     val nextCal = Calendar.getInstance()
                     nextCal.set(Calendar.YEAR, year)
-                    nextCal.set(Calendar.MONTH, month)
+                    nextCal.set(Calendar.MONTH, month - 1) // Convert 1-based to 0-based
+                    nextCal.add(Calendar.MONTH, 1)
                     nextCal.set(Calendar.DAY_OF_MONTH, 1)
                     val nextYear = nextCal.get(Calendar.YEAR)
                     val nextMonth = nextCal.get(Calendar.MONTH) + 1

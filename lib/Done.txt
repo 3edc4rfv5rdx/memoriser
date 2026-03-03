@@ -1,3 +1,12 @@
+  + Audit Phase 2: Reminder scheduling logic — 7 bugs fixed:
+    1. CRITICAL: cancelAllDailyReminders iterated only 0/15/30/45 minutes, orphaning non-quarter-hour alarms. Fixed: iterate 0..59. Removed per-cancel Log.d to avoid 1440 log entries.
+    2. One-time reminder reactivation required time!=null, but time can be null (defaults to 9:30). Fixed: removed time!=null check.
+    3. Monthly reminder day permanently corrupted after short month (day 31→28 in DB). Fixed: store original day in DB (both Kotlin rescheduleRecurringReminder and Flutter updateMonthlyEvents). Extract targetDay from YYYYMMDD integer, not from DateTime.
+    4. scheduleSpecificReminder (both main and BootReceiver versions) didn't clamp day to month max — Calendar auto-rolled (Feb 31→Mar 3). Fixed: clamp day in all 3 scheduleSpecificReminder functions + yearly in rescheduleRecurringReminder.
+    5. One-time non-recurring reminders stayed active=1 after firing. Fixed: set active=0 in DB in handleSpecificReminder for non-yearly/non-monthly reminders.
+    6. BootReceiver period wrap-around: 1-based month set directly to Calendar.MONTH (0-based), off by one month. Fixed: set month-1 then add(MONTH, 1).
+    7. rescheduleAllReminders() re-scheduled inactive one-time reminders (missing active=1 filter). Fixed: added AND active=1 to query.
+
   + Fixed 5 unfixed issues from Audit Phase 1 (problems.tofix):
     1. _showPhotoGallery: pass itemId as parameter instead of relying on _selectedItemId
     2. Context menu position: save tap position via GestureDetector onTapDown, use it in showMenu

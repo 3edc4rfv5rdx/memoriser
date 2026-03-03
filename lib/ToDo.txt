@@ -53,6 +53,13 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
++ cancelAllDailyReminders only cancelled 0/15/30/45 min — non-standard times became orphaned alarms (NotificationSystem.kt)
++ One-time reminder reactivation skipped when time=null — reminder not rescheduled (main.dart)
++ Monthly reminder day permanently lost after short month: day 31→28 in DB (NotificationSystem.kt, main.dart)
++ scheduleSpecificReminder: Calendar auto-rolled day 31 in Feb to Mar 3 — no day clamping (NotificationSystem.kt x3)
++ One-time non-recurring reminders stayed active=1 after firing (NotificationSystem.kt)
++ BootReceiver period wrap-around: 1-based month in 0-based Calendar.MONTH — off by 1 month (NotificationSystem.kt)
++ rescheduleAllReminders() re-scheduled inactive one-time reminders — missing active=1 filter (reminders.dart)
 + "Enable daily reminders" toggle didn't cancel/reschedule daily alarms (settings.dart)
 + Sound repeats: _checkForChanges() didn't include _newSoundRepeats (settings.dart)
 + Loop sound checkbox visible when fullscreen is off (additem.dart)

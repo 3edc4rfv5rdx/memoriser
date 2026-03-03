@@ -175,7 +175,7 @@ class SimpleNotifications {
       // Get all future reminders from database (including today)
       final futureReminders = await mainDb.query(
         'items',
-        where: 'remind = 1 AND date >= ?',
+        where: 'remind = 1 AND active = 1 AND date >= ?',
         whereArgs: [todayDate],
         orderBy: 'date ASC, time ASC',
       );

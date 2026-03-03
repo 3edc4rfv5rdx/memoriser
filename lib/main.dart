@@ -615,7 +615,8 @@ Future<void> updateMonthlyEvents(int today) async {
         }
 
         // Advance month until date is >= today (handles multi-month gaps)
-        int targetDay = oldDate.day;
+        // Extract original day directly from YYYYMMDD to preserve day 31 etc.
+        int targetDay = oldDateInt % 100;
         int newYear = oldDate.year;
         int newMonth = oldDate.month;
         final todayDate = yyyymmddToDateTime(today)!;
@@ -630,18 +631,17 @@ Future<void> updateMonthlyEvents(int today) async {
           int actualDay = targetDay > daysInNewMonth ? daysInNewMonth : targetDay;
           newDate = DateTime(newYear, newMonth, actualDay);
         }
-        final newDateInt = dateTimeToYYYYMMDD(newDate);
+        // Store with original target day to preserve intent (e.g. 31)
+        final newDateInt = newYear * 10000 + newMonth * 100 + targetDay;
 
-        if (newDateInt != null) {
-          await mainDb.update(
-            'items',
-            {'date': newDateInt},
-            where: 'id = ?',
-            whereArgs: [eventId],
-          );
+        await mainDb.update(
+          'items',
+          {'date': newDateInt},
+          where: 'id = ?',
+          whereArgs: [eventId],
+        );
 
-          myPrint('Updated monthly event $eventId: ${oldDate.toString().substring(0, 10)} -> ${newDate.toString().substring(0, 10)}');
-        }
+        myPrint('Updated monthly event $eventId: $oldDateInt -> $newDateInt');
       } catch (e) {
         myPrint('Error updating monthly event ${event['id']}: $e');
       }
@@ -1839,7 +1839,7 @@ class _HomePageState extends State<HomePage> {
 
       if (newActiveState) {
         // Activate: reschedule reminders
-        if (hasRemind && date != null && time != null) {
+        if (hasRemind && date != null) {
           await SimpleNotifications.updateSpecificReminder(itemId, true, date, time);
           myPrint('Reminder reactivated for item $itemId');
         }
