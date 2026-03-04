@@ -21,9 +21,12 @@ import 'tagscloud.dart';
 Future<void> initDatabases() async {
   final databasesPath = await getDatabasesPath();
 
+  // Store onUpgrade callback for reuse in backup restore
+  mainDbOnUpgrade = _mainDbOnUpgrade;
+
   mainDb = await openDatabase(
     join(databasesPath, mainDbFile),
-    version: 16, // Increased from 15 to 16 for loop_sound field
+    version: mainDbVersion,
     onCreate: (db, version) async {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS items(
@@ -55,7 +58,21 @@ Future<void> initDatabases() async {
         )
       ''');
     },
-    onUpgrade: (db, oldVersion, newVersion) async {
+    onUpgrade: _mainDbOnUpgrade,
+  );
+
+  settDb = await openDatabase(
+    join(databasesPath, settDbFile),
+    version: settDbVersion,
+    onCreate: (db, version) {
+      return db.execute(
+        'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)',
+      );
+    },
+  );
+}
+
+Future<void> _mainDbOnUpgrade(Database db, int oldVersion, int newVersion) async {
       if (oldVersion < 6) {
         // Migration for version 6 - recreate table with time field
         await db.execute('''
@@ -173,18 +190,6 @@ Future<void> initDatabases() async {
         await db.execute('ALTER TABLE items ADD COLUMN loop_sound INTEGER DEFAULT 1');
         myPrint("Database upgraded to version 16: Added 'loop_sound' field");
       }
-    },
-  );
-
-  settDb = await openDatabase(
-    join(databasesPath, settDbFile),
-    version: 2,
-    onCreate: (db, version) {
-      return db.execute(
-        'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)',
-      );
-    },
-  );
 }
 
 // Migration function to move photos to item folders

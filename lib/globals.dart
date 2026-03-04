@@ -21,8 +21,12 @@ const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
 const String helpFile = 'assets/help.json';
-const String mainDbFile = 'memorizer.db'; // Changed from mainDbFile
+const String mainDbFile = 'memorizer.db';
 const String settDbFile = 'settings.db';
+const int mainDbVersion = 16;
+const int settDbVersion = 2;
+// Set by initDatabases(), used by backup.dart for restore with migrations
+OnDatabaseVersionChangeFn? mainDbOnUpgrade;
 
 late Database mainDb;
 late Database settDb;

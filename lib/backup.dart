@@ -8,7 +8,7 @@ import 'package:sqflite/sqflite.dart';
 import 'globals.dart';
 import 'reminders.dart';
 
-// Создание резервной копии базы данных
+// Create database backup
 Future<String> createBackup() async {
   try {
     myPrint('Starting backup process...');
@@ -24,14 +24,14 @@ Future<String> createBackup() async {
       return lw('Error creating backup');
     }
 
-    // Получение пути к основной базе данных
+    // Get main database path
     final databasesPath = await getDatabasesPath();
     myPrint('Database path: $databasesPath');
 
     final mainDbPath = path.join(databasesPath, mainDbFile);
     myPrint('Main DB file path: $mainDbPath');
 
-    // Проверка существования файла
+    // Check file exists
     bool dbExists = await File(mainDbPath).exists();
     myPrint('Database file exists: $dbExists');
 
@@ -41,12 +41,20 @@ Future<String> createBackup() async {
       return lw('Error creating backup: database file not found');
     }
 
-    // Генерация имени файла с датой
+    // Generate filename with date
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
     final mainBackupPath = '$backupDirPath/memorizer-$dateStr.db';
     myPrint('Target backup file path: $mainBackupPath');
 
-    // Копирование файла с проверкой размера
+    // Flush WAL to main file before copying
+    try {
+      await mainDb.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+      myPrint('WAL checkpoint completed for mainDb');
+    } catch (e) {
+      myPrint('WAL checkpoint warning: $e');
+    }
+
+    // Copy database file with size verification
     final dbFile = File(mainDbPath);
     final dbSize = await dbFile.length();
     myPrint('Database file size: $dbSize bytes');
@@ -65,7 +73,7 @@ Future<String> createBackup() async {
       return lw('Error copying database file');
     }
 
-    // Проверка, что файл бэкапа создан
+    // Verify backup file was created
     bool backupExists = await File(mainBackupPath).exists();
     myPrint('Backup file created: $backupExists');
 
@@ -84,7 +92,7 @@ Future<String> createBackup() async {
     // Backup Sounds folder
     await _backupSoundsFolder(backupDirPath);
 
-    // Список всех файлов в директории бэкапа
+    // List all files in backup directory
     await listBackupFiles();
 
     myPrint('Backup created successfully at $mainBackupPath');
@@ -111,7 +119,7 @@ Future<int> _copyDirectoryRecursive(Directory source, Directory target, {bool sk
   final entities = await source.list().toList();
   myPrint('_copyDirectoryRecursive: found ${entities.length} entities in source');
   for (var entity in entities) {
-    final name = entity.path.split('/').last;
+    final name = path.basename(entity.path);
     if (skipTemp && name.startsWith('temp_')) continue;
     final isDir = await FileSystemEntity.isDirectory(entity.path);
     if (isDir) {
@@ -128,6 +136,11 @@ Future<int> _copyDirectoryRecursive(Directory source, Directory target, {bool sk
 // Backup settings database
 Future<void> _backupSettingsDb(String databasesPath, String backupDirPath, String dateStr) async {
   try {
+    // Flush WAL before copying
+    try {
+      await settDb.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+    } catch (_) {}
+
     final settDbPath = path.join(databasesPath, settDbFile);
     final settFile = File(settDbPath);
 
@@ -167,14 +180,32 @@ Future<void> _restoreSettingsDb(String backupDirPath) async {
     // Close settings DB before overwriting
     await settDb.close();
 
-    await settingsFile.first.copy(settDbPath);
-    myPrint('Settings DB restored from backup');
+    try {
+      await settingsFile.first.copy(settDbPath);
+      myPrint('Settings DB restored from backup');
+    } catch (copyError) {
+      myPrint('Error copying settings DB: $copyError');
+    }
 
-    // Reopen settings DB
-    settDb = await openDatabase(settDbPath);
+    // Always reopen settings DB (even if copy failed, the old file still exists)
+    settDb = await openDatabase(
+      settDbPath,
+      version: settDbVersion,
+      onCreate: (db, version) {
+        return db.execute(
+          'CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT)',
+        );
+      },
+    );
     myPrint('Settings DB reopened');
   } catch (e) {
     myPrint('Error restoring settings DB: $e');
+    // Ensure settDb is reopened even on unexpected errors
+    try {
+      final databasesPath = await getDatabasesPath();
+      final settDbPath = path.join(databasesPath, settDbFile);
+      settDb = await openDatabase(settDbPath);
+    } catch (_) {}
   }
 }
 
@@ -225,7 +256,7 @@ Future<void> _restorePhotoFolder(String backupDirPath) async {
     // Remove existing item_* folders to avoid duplicates
     final existing = await photoDirectory!.list().toList();
     for (var entity in existing) {
-      final name = entity.path.split('/').last;
+      final name = path.basename(entity.path);
       if (name.startsWith('item_') && await FileSystemEntity.isDirectory(entity.path)) {
         await Directory(entity.path).delete(recursive: true);
       }
@@ -261,7 +292,7 @@ Future<void> _backupSoundsFolder(String backupDirPath) async {
 
     for (var entity in entities) {
       if (entity is File && isAudioFile(entity.path)) {
-        final fileName = entity.path.split('/').last;
+        final fileName = path.basename(entity.path);
         await entity.copy('${backupSoundsDir.path}/$fileName');
         copiedFiles++;
       }
@@ -300,15 +331,12 @@ Future<void> _restoreSoundsFolder(String backupDirPath) async {
     int restoredFiles = 0;
 
     for (var entity in entities) {
-      if (entity is File) {
-        final fileName = entity.path.split('/').last;
+      if (entity is File && isAudioFile(entity.path)) {
+        final fileName = path.basename(entity.path);
         final targetPath = '${soundsDirectory!.path}/$fileName';
 
-        // Skip if file already exists
-        if (!await File(targetPath).exists()) {
-          await entity.copy(targetPath);
-          restoredFiles++;
-        }
+        await entity.copy(targetPath);
+        restoredFiles++;
       }
     }
 
@@ -318,7 +346,7 @@ Future<void> _restoreSoundsFolder(String backupDirPath) async {
   }
 }
 
-// Экспорт данных в CSV
+// Export data to CSV
 Future<String> exportToCSV() async {
   try {
     myPrint('Starting CSV export...');
@@ -341,7 +369,7 @@ Future<String> exportToCSV() async {
     final csvFile = File('${backupDir.path}/items-$dateStr.csv');
     final sink = csvFile.openWrite();
 
-    // Заголовки колонок
+    // Column headers
     final headers = items.first.keys.toList();
     sink.writeln(headers.join(','));
 
@@ -349,17 +377,17 @@ Future<String> exportToCSV() async {
       final values = headers.map((header) {
         var value = item[header];
 
-        // Обработка NULL и числовых полей
+        // Handle NULL and numeric fields
         if (value == null) {
-          return ''; // Пустая строка для NULL
+          return ''; // Empty string for NULL
         }
 
-        // Для строк - экранирование кавычек
+        // Escape quotes for strings
         if (value is String) {
           return '"${value.replaceAll('"', '""')}"';
         }
 
-        // Все остальные типы (числа, bool) - как есть
+        // All other types (numbers, bool) - as is
         return value.toString();
       }).toList();
 
@@ -379,15 +407,15 @@ Future<String> exportToCSV() async {
   }
 }
 
-// Восстановление из резервной копии
+// Restore from backup
 Future<String> restoreBackup() async {
   try {
     myPrint('Starting restore process...');
 
-    // Проверяем директорию бэкапа
+    // Check backup directory
     await listBackupFiles();
 
-    // Получаем директорию для выбора файла бэкапа
+    // Get directory for backup file selection
     if (documentsDirectory == null) {
       await initStoragePaths();
     }
@@ -405,7 +433,7 @@ Future<String> restoreBackup() async {
       return lw('No backups found. Create a backup first.');
     }
 
-    // Сразу открываем выбор файла, а не каталога
+    // Open file picker directly (not directory picker)
     myPrint('Opening file picker...');
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.any,
@@ -429,14 +457,14 @@ Future<String> restoreBackup() async {
       return lw('Error');
     }
 
-    // Проверяем, что выбранный файл имеет расширение .db
+    // Check that selected file has .db extension
     if (!filePath.toLowerCase().endsWith('.db')) {
       myPrint('Selected file is not a database file');
       okInfoBarRed(lw('Error: selected file is not a database'));
       return lw('Error: selected file is not a database');
     }
 
-    // Показываем предупреждение о замене данных (если не было показано ранее)
+    // Show data replacement warning
     final shouldRestore = await showCustomDialog(
       title: lw('Warning'),
       content: lw('Restore will replace all current data with backup'),
@@ -459,16 +487,16 @@ Future<String> restoreBackup() async {
       return lw('Cancel');
     }
 
-    // Закрытие соединения с базой данных
+    // Close database connection
     myPrint('Closing database connection...');
     await mainDb.close();
 
-    // Получение пути к базе данных
+    // Get database path
     final databasesPath = await getDatabasesPath();
     final mainDbPath = path.join(databasesPath, mainDbFile);
     myPrint('Target DB path: $mainDbPath');
 
-    // Копирование файла резервной копии
+    // Copy backup file
     myPrint('Copying backup file to database location...');
     try {
       final sourceFile = File(filePath);
@@ -484,19 +512,34 @@ Future<String> restoreBackup() async {
       }
     } catch (copyError) {
       myPrint('Error copying backup file: $copyError');
+      // Reopen mainDb since it was closed before copy attempt
+      try {
+        mainDb = await openDatabase(mainDbPath);
+      } catch (_) {}
       okInfoBarRed(lw('Error copying backup file'));
       return lw('Error copying backup file');
     }
 
-    // Пытаемся повторно открыть базу данных
+    // Reopen database with version check (triggers migrations for older backups)
     myPrint('Reopening database...');
     try {
-      mainDb = await openDatabase(mainDbPath);
-      myPrint('Database reopened successfully');
+      mainDb = await openDatabase(
+        mainDbPath,
+        version: mainDbVersion,
+        onUpgrade: mainDbOnUpgrade,
+      );
+      // Validate restored database
+      final testQuery = await mainDb.rawQuery('SELECT count(*) as cnt FROM items');
+      final count = testQuery.first['cnt'] as int? ?? 0;
+      myPrint('Database reopened successfully, $count items');
     } catch (openError) {
       myPrint('Error reopening database: $openError');
-      okInfoBarRed(lw('Error reopening database'));
-      return lw('Error reopening database');
+      // Try to reopen without version check as fallback
+      try {
+        mainDb = await openDatabase(mainDbPath);
+      } catch (_) {}
+      okInfoBarRed(lw('Error: selected file is not a database'));
+      return lw('Error: selected file is not a database');
     }
 
     // Restore Photo and Sounds folders from backup
@@ -526,44 +569,45 @@ Future<String> restoreBackup() async {
     await _restorePhotoFolder(backupDirPath);
     await _restoreSoundsFolder(backupDirPath);
 
-    // НОВОЕ: Перепланируем все напоминания после успешного восстановления
+    // Reschedule all reminders after successful restore
     myPrint('Rescheduling reminders after restore...');
     try {
       await SimpleNotifications.rescheduleAllReminders();
       myPrint('Reminders rescheduled successfully');
     } catch (reminderError) {
       myPrint('Error rescheduling reminders: $reminderError');
-      // Не прерываем процесс восстановления из-за ошибки напоминаний
+      // Don't interrupt restore process due to reminder errors
       okInfoBarOrange(lw('Database restored. Please restart the app.'));
     }
 
-    // Если успешно, возвращаем сообщение с рекомендацией перезапустить
+    // Return success message with restart recommendation
     myPrint('Database restored successfully');
     okInfoBarGreen(lw('Database restored. Please restart the app.'));
     return lw('Database restored. Please restart the app.');
   } catch (e) {
     myPrint('Error restoring backup: $e');
-    // Повторная инициализация баз данных
+    // Re-initialize both databases after error
     try {
-      // Пытаемся повторно открыть базу данных
       final databasesPath = await getDatabasesPath();
       final mainDbPath = path.join(databasesPath, mainDbFile);
       mainDb = await openDatabase(mainDbPath);
-      myPrint('Database reopened after error');
+      final settDbPath = path.join(databasesPath, settDbFile);
+      settDb = await openDatabase(settDbPath);
+      myPrint('Databases reopened after error');
     } catch (reInitError) {
-      myPrint('Error re-opening database: $reInitError');
+      myPrint('Error re-opening databases: $reInitError');
     }
     okInfoBarRed(lw('Error restoring backup'));
     return lw('Error restoring backup');
   }
 }
 
-// Восстановление из CSV файла
+// Restore from CSV file
 Future<String> restoreFromCSV() async {
   try {
     myPrint('Starting restore from CSV process...');
 
-    // Получаем директорию для выбора файла CSV
+    // Get directory for CSV file selection
     if (documentsDirectory == null) {
       await initStoragePaths();
     }
@@ -581,7 +625,7 @@ Future<String> restoreFromCSV() async {
       return lw('No backups found. Create a backup first.');
     }
 
-    // Выбор CSV файла
+    // Select CSV file
     myPrint('Opening file picker...');
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -612,7 +656,7 @@ Future<String> restoreFromCSV() async {
       return lw('Error: selected file is not a CSV');
     }
 
-    // Подтверждение восстановления
+    // Confirm restore
     final shouldRestore = await showCustomDialog(
       title: lw('Warning'),
       content: lw('Restore will replace all data in the Items table'),
@@ -627,7 +671,7 @@ Future<String> restoreFromCSV() async {
       return lw('Cancel');
     }
 
-    // Чтение и обработка CSV
+    // Read and process CSV
     myPrint('Reading CSV file...');
     final csvFile = File(filePath);
     final lines = await csvFile.readAsLines();
@@ -638,11 +682,11 @@ Future<String> restoreFromCSV() async {
       return lw('Error: CSV file is empty');
     }
 
-    // Парсинг заголовков
+    // Parse headers
     final headers = _parseCSVLine(lines[0]);
     myPrint('CSV headers: $headers');
 
-    // Восстановление данных
+    // Restore data
     await mainDb.transaction((txn) async {
       await txn.execute('DELETE FROM items');
 
@@ -677,12 +721,13 @@ Future<String> restoreFromCSV() async {
               case 'active':
               case 'period':
               case 'period_days':
+              case 'loop_sound':
                 row[columnName] = int.tryParse(value) ?? 0;
                 break;
               case 'date':
               case 'time':
               case 'period_to':
-                row[columnName] = int.tryParse(value); // Может быть null
+                row[columnName] = int.tryParse(value); // Can be null
                 break;
               default:
                 row[columnName] = value;
@@ -694,14 +739,14 @@ Future<String> restoreFromCSV() async {
       }
     });
 
-    // НОВОЕ: Перепланируем все напоминания после успешного восстановления CSV
+    // Reschedule all reminders after successful CSV restore
     myPrint('Rescheduling reminders after CSV restore...');
     try {
       await SimpleNotifications.rescheduleAllReminders();
       myPrint('Reminders rescheduled successfully after CSV restore');
     } catch (reminderError) {
       myPrint('Error rescheduling reminders after CSV restore: $reminderError');
-      // Не прерываем процесс восстановления из-за ошибки напоминаний
+      // Don't interrupt restore process due to reminder errors
       okInfoBarOrange(lw('Data restored from CSV. Please restart the app.'));
     }
 
@@ -715,7 +760,7 @@ Future<String> restoreFromCSV() async {
   }
 }
 
-// Вспомогательная функция для парсинга строк CSV
+// Helper function for parsing CSV lines
 List<String> _parseCSVLine(String line) {
   List<String> result = [];
   bool inQuotes = false;
@@ -725,31 +770,31 @@ List<String> _parseCSVLine(String line) {
     String char = line[i];
 
     if (char == '"') {
-      // Проверяем на экранированные кавычки (двойные кавычки)
+      // Check for escaped quotes (double quotes)
       if (i + 1 < line.length && line[i + 1] == '"') {
         currentValue += '"';
-        i++; // Пропускаем следующую кавычку
+        i++; // Skip next quote
       } else {
-        // Переключаем флаг кавычек
+        // Toggle quotes flag
         inQuotes = !inQuotes;
       }
     } else if (char == ',' && !inQuotes) {
-      // Конец значения
+      // End of value
       result.add(currentValue);
       currentValue = '';
     } else {
-      // Добавляем символ к текущему значению
+      // Append character to current value
       currentValue += char;
     }
   }
 
-  // Добавляем последнее значение
+  // Add last value
   result.add(currentValue);
 
   return result;
 }
 
-// Функция для проверки наличия и отображения файлов бэкапа
+// List and display backup files
 Future<void> listBackupFiles() async {
   try {
     final documentsDir = await getDocumentsDirectory();
@@ -766,7 +811,7 @@ Future<void> listBackupFiles() async {
 
     myPrint('Listing directories in Memorizer directory: ${memorizerDir.path}');
 
-    // Получаем список каталогов в Memorizer
+    // Get list of directories in Memorizer
     final entities = await memorizerDir.list().toList();
     final backupDirs = entities.whereType<Directory>().where(
             (dir) => path.basename(dir.path).startsWith('mem-')
@@ -777,13 +822,13 @@ Future<void> listBackupFiles() async {
       return;
     }
 
-    // Сортируем каталоги по имени (по дате) в обратном порядке
+    // Sort directories by name (date) in reverse order
     backupDirs.sort((a, b) => path.basename(b.path).compareTo(path.basename(a.path)));
 
     for (var dir in backupDirs) {
       myPrint('Backup directory: ${dir.path}');
 
-      // Получаем содержимое каждого каталога
+      // Get contents of each directory
       final dirEntities = await dir.list().toList();
 
       for (var entity in dirEntities) {

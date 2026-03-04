@@ -53,6 +53,15 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
++ Restore: mainDb left closed if file copy fails — app crashes on next DB operation (backup.dart)
++ Restore: mainDb left closed if openDatabase with migrations fails — no fallback reopen (backup.dart)
++ CSV restore: loop_sound parsed as String instead of int — missing from int column list (backup.dart)
++ Backup: WAL not checkpointed before copy — backup could be incomplete (backup.dart)
++ Restore: mainDb reopened without migrations — old backup schemas caused crashes (backup.dart)
++ Restore: settDb reopened without version/onCreate — table missing on corrupt restore (backup.dart)
++ Restore: sounds not overwritten, only skipped if exists — corrupt sounds not replaced (backup.dart)
++ Restore: settDb left closed on copy error — subsequent settings ops crashed (backup.dart)
++ Restore: error recovery only reopened mainDb, not settDb (backup.dart)
 + Virtual folders: full table scan, no SQL filtering — all items loaded then filtered in Dart (main.dart getItems)
 + Entering virtual folder destroyed user-set filters — xvFilter overwritten (main.dart enter/exit methods)
 + "Last items" LIMIT applied before virtual folder filtering — incomplete results in folders (main.dart getItems)

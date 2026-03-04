@@ -1,3 +1,23 @@
+  + Audit Phase 2: Backup/restore — second pass (3 more fixes):
+    11. Restore: reopen mainDb if file copy fails (was left closed, causing crash on next DB access)
+    12. Restore: fallback reopen mainDb without version if openDatabase+migrations fails
+    13. CSV restore: added loop_sound to integer column parsing list (was parsed as String)
+    14. Translated all Russian comments to English in backup.dart
+
+  + Audit Phase 2: Backup/restore — 10 fixes:
+    1. CRITICAL: WAL checkpoint (PRAGMA wal_checkpoint(TRUNCATE)) before backup copy for both mainDb and settDb
+    2. CRITICAL: Restore reopens mainDb with version+onUpgrade (was bare openDatabase, skipping migrations).
+       Extracted _mainDbOnUpgrade(), added mainDbVersion/settDbVersion/mainDbOnUpgrade to globals.dart
+    3. Settings DB restore: reopen with version+onCreate for table creation
+    4. Sounds restore: overwrite existing files instead of skipping (consistent with photo restore behavior)
+    5. Sounds restore: filter by isAudioFile() same as backup (was restoring all files)
+    6. _restoreSettingsDb: always reopen settDb even if copy fails (was left closed on error)
+    7. Error recovery in restoreBackup(): reopen BOTH mainDb and settDb (was only mainDb)
+    8. DB validation after restore: SELECT count(*) FROM items to catch corrupt files
+    9. Replaced all hardcoded split('/').last with path.basename()
+    10. Not fixed (low/design): same-day backup overwrite, destructive photo delete, file picker heuristic,
+        rescheduleAllReminders stale settings — documented as known issues
+
   + Audit Phase 2: Filter logic — second pass:
     - Removed redundant Dart-side .where() filtering in _refreshItems() for virtual folders (SQL already filters)
     - Added virtual folder exit for Tag Filter screen (was only done for Filters screen)
