@@ -1,3 +1,8 @@
+  + Audit Phase 2: CSV import/export — 1 fix:
+    1. CRITICAL: CSV export newlines in strings broke reimport. readAsLines() splits on \n even inside
+       quoted fields. Fix: escape \n→\\n, \r→\\r, \\→\\\\ on export; unescape on import in default
+       (string) branch of column switch. Round-trip now preserves multiline content/title.
+
   + Audit Phase 2: Backup/restore — second pass (3 more fixes):
     11. Restore: reopen mainDb if file copy fails (was left closed, causing crash on next DB access)
     12. Restore: fallback reopen mainDb without version if openDatabase+migrations fails

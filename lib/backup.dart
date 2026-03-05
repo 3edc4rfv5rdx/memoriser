@@ -382,9 +382,13 @@ Future<String> exportToCSV() async {
           return ''; // Empty string for NULL
         }
 
-        // Escape quotes for strings
+        // Escape strings: quotes, newlines, carriage returns
         if (value is String) {
-          return '"${value.replaceAll('"', '""')}"';
+          var escaped = value.replaceAll('\\', '\\\\');
+          escaped = escaped.replaceAll('\r', '\\r');
+          escaped = escaped.replaceAll('\n', '\\n');
+          escaped = escaped.replaceAll('"', '""');
+          return '"$escaped"';
         }
 
         // All other types (numbers, bool) - as is
@@ -730,7 +734,11 @@ Future<String> restoreFromCSV() async {
                 row[columnName] = int.tryParse(value); // Can be null
                 break;
               default:
-                row[columnName] = value;
+                // Unescape newlines and backslashes from CSV export
+                var unescaped = value.replaceAll('\\n', '\n');
+                unescaped = unescaped.replaceAll('\\r', '\r');
+                unescaped = unescaped.replaceAll('\\\\', '\\');
+                row[columnName] = unescaped;
             }
           }
         }
