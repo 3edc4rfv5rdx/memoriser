@@ -2006,6 +2006,21 @@ class BootReceiver : BroadcastReceiver() {
         }
     }
 
+    // Decode Base64 obfuscated text (same logic as Flutter's deobfuscateText)
+    private fun deobfuscateText(encodedText: String): String {
+        if (encodedText.isEmpty()) return encodedText
+        return try {
+            if (encodedText.matches(Regex("^[A-Za-z0-9+/=]+$"))) {
+                val decodedBytes = android.util.Base64.decode(encodedText, android.util.Base64.DEFAULT)
+                String(decodedBytes, Charsets.UTF_8)
+            } else {
+                encodedText
+            }
+        } catch (e: Exception) {
+            encodedText
+        }
+    }
+
     private fun rescheduleAllReminders(context: Context) {
         try {
             // Check if reminders are enabled
