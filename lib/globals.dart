@@ -1,15 +1,15 @@
 // globals.dart
-import 'dart:async'; // Для Timer
-import 'dart:convert'; // Для работы с JSON (json.decode) and base64
+import 'dart:async'; // For Timer
+import 'dart:convert'; // For JSON (json.decode) and base64
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Для доступа к rootBundle
+import 'package:flutter/services.dart'; // For rootBundle access
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:intl/intl.dart';
 
-// Глобальные ключи для доступа к основным компонентам Flutter
+// Global keys for accessing main Flutter components
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -32,7 +32,7 @@ late Database mainDb;
 late Database settDb;
 late BuildContext globalContext;
 
-// Пути для хранения файлов
+// File storage paths
 late Directory? documentsDirectory;
 late Directory? memorizerDirectory;
 late Directory? photoDirectory;
@@ -45,7 +45,7 @@ String xvFilter = '';
 bool xvHiddenMode = false;
 
 String currentPin = '';
-// Константа для ключа в настройках
+// Settings key constant
 const String hiddPinKey = 'hiddpin';
 const hidModeColor = Color(0xFFf29238);
 
@@ -106,13 +106,13 @@ List<List<Color>> colorThemes = [
   ], // clMenu - blue-gray
   // Green theme, 3
   [
-    Color(0xFF121E0A), // text - темно-зеленый
-    Color(0xFFF3F7ED), // fon clBgrnd - светлый фисташковый
-    Color(0xFF97BA60), // upBar - глубокий оливковый
+    Color(0xFF121E0A), // text - dark green
+    Color(0xFFF3F7ED), // fon clBgrnd - light pistachio
+    Color(0xFF97BA60), // upBar - deep olive
     Color(0xFFFFFFFF), // fill
-    Color(0x4D4C6B3D), // selected - оливковый с прозрачностью
+    Color(0x4D4C6B3D), // selected - olive with transparency
     Color(0xFFD4E2C6),
-  ], // menu - шалфейный
+  ], // menu - sage
 ];
 
 // Default settings
@@ -131,19 +131,19 @@ String? _currentLogFile;
 
 const ymdDateFormat = 'yyyy-MM-dd';
 
-// Карта поддерживаемых языков с их названиями
+// Map of supported languages with their names
 Map<String, String> langNames = {
   'en': 'English',
   'ru': 'Русский',
   'ua': 'Українська',
 };
 
-// Кеш переводов для текущего языка
+// Translation cache for current language
 Map<String, String> _uiLocale = {};
-// Текущая локаль
+// Current locale
 String currentLocale = 'en';
 
-// Функция проверки поддерживаемого языка
+// Check if language is supported
 bool isLanguageSupported(String locale) {
   return langNames.containsKey(locale.toLowerCase());
 }
@@ -155,29 +155,29 @@ String lw(String text) {
   return _uiLocale[text] ?? text;
 }
 
-// Чтение локализаций из файла
+// Read localizations from file
 Future<void> readLocale(String locale) async {
   locale = locale.toLowerCase();
-  // Проверяем, что язык поддерживается
+  // Check that the language is supported
   if (!isLanguageSupported(locale)) {
     myPrint('Language $locale not supported, using English instead');
     currentLocale = 'en';
   } else {
     currentLocale = locale;
   }
-  // Для английского языка кеш не нужен
+  // No cache needed for English
   if (currentLocale == 'en') {
     _uiLocale = {};
     return;
   }
 
   try {
-    // Загружаем JSON файл с локализациями
+    // Load JSON file with localizations
     final jsonString = await rootBundle.loadString(localesFile);
     final Map<String, dynamic> allTranslations = json.decode(jsonString);
-    // Создаем пустой кеш
+    // Create empty cache
     _uiLocale = {};
-    // Заполняем кеш переводами для текущей локали
+    // Fill cache with translations for current locale
     allTranslations.forEach((key, value) {
       if (value is Map && value.containsKey(currentLocale)) {
         _uiLocale[key] = value[currentLocale];
@@ -212,7 +212,7 @@ int getThemeIndex(String themeName) {
 }
 
 // Set global colors based on theme name
-// Максимально упрощенный вариант
+// Simplified version
 void setThemeColors(String themeName) {
   final index = appTHEMES.indexOf(themeName);
   final themeIndex = index >= 0 ? index : 0;
@@ -233,7 +233,7 @@ ThemeData getAppTheme() {
     scaffoldBackgroundColor: clBgrnd,
     appBarTheme: AppBarTheme(backgroundColor: clUpBar, foregroundColor: clText),
     cardColor: clFill,
-    // Вместо устаревшего dialogBackgroundColor используем DialogTheme
+    // Use DialogTheme instead of deprecated dialogBackgroundColor
     dialogTheme: DialogThemeData(backgroundColor: clFill),
     textTheme: TextTheme(
       bodyMedium: TextStyle(color: clText),
@@ -445,7 +445,7 @@ void okInfoBarBlue(String message, {Duration? duration}) {
 }
 
 void okInfoBarOrange(String message, {Duration? duration}) {
-  myPrint("Showing green SnackBar: $message");
+  myPrint("Showing orange SnackBar: $message");
   scaffoldMessengerKey.currentState?.clearSnackBars();
   scaffoldMessengerKey.currentState?.showSnackBar(
     SnackBar(
@@ -483,28 +483,28 @@ void okInfoBarPurple(String message) {
   );
 }
 
-// Отладочная функция для проверки состояния ключа
+// Debug function to check key state
 bool isScaffoldMessengerKeyInitialized() {
   bool isInitialized = scaffoldMessengerKey.currentState != null;
   myPrint("ScaffoldMessengerKey initialized: $isInitialized");
   return isInitialized;
 }
 
-// Функция для отображения справки по ID
+// Show help by ID
 void showHelp(int id) async {
   try {
-    // Загружаем JSON файл с текстами справки
+    // Load JSON file with help texts
     final jsonString = await rootBundle.loadString(helpFile);
     final Map<String, dynamic> helpTexts = json.decode(jsonString);
     final String helpId = id.toString();
     String helpText = '';
-    // Получаем текст справки для текущего языка
+    // Get help text for current language
     if (helpTexts.containsKey(helpId)) {
       final Map<String, dynamic> helpEntry = helpTexts[helpId];
       if (helpEntry.containsKey(currentLocale)) {
         helpText = helpEntry[currentLocale];
       } else if (helpEntry.containsKey('en')) {
-        // Если нет перевода для текущего языка, используем английский
+        // If no translation for current language, use English
         helpText = helpEntry['en'];
       } else {
         helpText = 'Help text not available';
@@ -512,7 +512,7 @@ void showHelp(int id) async {
     } else {
       helpText = 'Help ID:$helpId not found';
     }
-    // Отображаем диалог с текстом справки
+    // Show dialog with help text
     showCustomDialog(
       title: lw('Help'),
       content: helpText,
@@ -545,7 +545,7 @@ String getLocaleCode(String language) {
   return exceptions[langCode] ?? langCode;
 }
 
-// Функция для проверки PIN-кода
+// Verify PIN code
 Future<bool> verifyPin(String enteredPin) async {
   final storedPin = await getSetting(hiddPinKey);
 
@@ -556,47 +556,47 @@ Future<bool> verifyPin(String enteredPin) async {
   return storedPin == enteredPin;
 }
 
-// Функция для сохранения нового PIN-кода
+// Save new PIN code
 Future<void> saveNewPin(String pin) async {
   await saveSetting(hiddPinKey, pin);
 }
 
-// Функция проверки, установлен ли уже PIN-код
+// Check if PIN code is already set
 Future<bool> isPinSet() async {
   final storedPin = await getSetting(hiddPinKey);
   return storedPin != null;
 }
 
-// Функция для обфускации текста - просто Base64
+// Text obfuscation function - simple Base64
 String obfuscateText(String text) {
   if (text.isEmpty) return text;
 
-  // Используем простой Base64 для обфускации
+  // Use simple Base64 for obfuscation
   return base64Encode(utf8.encode(text));
 }
 
 String deobfuscateText(String encodedText) {
   if (encodedText.isEmpty) return encodedText;
   try {
-    // Проверяем, является ли строка валидным Base64
+    // Check if string is valid Base64
     if (RegExp(r'^[A-Za-z0-9+/=]+$').hasMatch(encodedText)) {
       return utf8.decode(base64Decode(encodedText));
     } else {
-      // Если не Base64, возвращаем как есть
+      // If not Base64, return as is
       myPrint('Text is not Base64 encoded, returning as is');
       return encodedText;
     }
   } catch (e) {
     myPrint('Error deobfuscating text: $e');
-    // Возвращаем оригинальный текст вместо сообщения об ошибке
+    // Return original text instead of error message
     return encodedText;
   }
 }
 
-// Функция для кодирования/декодирования записи в зависимости от режима
+// Encode/decode item depending on mode
 Map<String, dynamic> processItemForView(Map<String, dynamic> item) {
   if (item['hidden'] == 1 && xvHiddenMode) {
-    // Деобфускация скрытых записей при просмотре в скрытом режиме
+    // Deobfuscate hidden items when viewing in hidden mode
     return {
       ...item,
       'title': deobfuscateText(item['title'] ?? ''),
@@ -607,7 +607,7 @@ Map<String, dynamic> processItemForView(Map<String, dynamic> item) {
   return item;
 }
 
-// Функция для добавления визуальной индикации режима скрытых записей
+// Visual indication for hidden items mode
 Color getAppBarColor() {
   return xvHiddenMode ? hidModeColor : clUpBar;
 }
@@ -616,14 +616,14 @@ void exitHiddenMode(BuildContext context) {
   xvHiddenMode = false;
   currentPin = '';
   okInfoBarBlue(lw('Left private mode'));
-  // возвращаемся на главный экран
+  // Return to main screen
   Navigator.popUntil(navigatorKey.currentContext!, (route) => route.isFirst);
 }
 
-// Таймер для автоматического выхода из режима скрытых записей
+// Timer for automatic exit from hidden items mode
 Timer? _hiddenModeTimer;
 
-// Функция для сброса таймера автоматического выхода
+// Reset automatic exit timer
 void resetHiddenModeTimer() {
   _hiddenModeTimer?.cancel();
   if (xvHiddenMode) {
@@ -635,21 +635,21 @@ void resetHiddenModeTimer() {
   }
 }
 
-// В globals.dart:
+// In globals.dart:
 
-// Основная функция для получения всех тегов с их частотами
+// Main function to get all tags with their frequencies
 Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
   try {
-    // Запрашиваем все записи для извлечения тегов
+    // Query all items to extract tags
     List<Map<String, dynamic>> allItems = [];
 
-    // В скрытом режиме нам нужны все записи
+    // In hidden mode we need all items
     if (xvHiddenMode) {
       // Get only hidden items in hidden mode
       final items = await mainDb.query('items', where: 'hidden = 1');
       allItems = items.map((item) => processItemForView(item)).toList();
     } else {
-      // Обычный режим - получаем только нескрытые записи
+      // Normal mode - get only non-hidden items
       allItems = await mainDb.query(
         'items',
         where: 'hidden = 0 OR hidden IS NULL',
@@ -658,11 +658,11 @@ Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
 
     Map<String, int> tagCounts = {};
 
-    // Считаем встречаемость каждого тега
+    // Count occurrences of each tag
     for (var item in allItems) {
       final tagsString = item['tags'] as String?;
       if (tagsString != null && tagsString.isNotEmpty) {
-        // Разделяем теги по запятой и убираем лишние пробелы
+        // Split tags by comma and trim whitespace
         List<String> itemTags =
             tagsString
                 .split(',')
@@ -670,25 +670,25 @@ Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
                 .where((tag) => tag.isNotEmpty)
                 .toList();
 
-        // Подсчитываем вхождения каждого тега
+        // Count each tag occurrence
         for (var tag in itemTags) {
           tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
         }
       }
     }
 
-    // Преобразуем Map в список Map
+    // Convert Map to list of Maps
     List<Map<String, dynamic>> result =
         tagCounts.entries.map((entry) {
           return {'name': entry.key, 'count': entry.value};
         }).toList();
 
-    // Сортируем по количеству (по убыванию), затем по имени (по алфавиту)
+    // Sort by count (descending), then by name (alphabetically)
     result.sort((a, b) {
-      // Сначала сравниваем по количеству (по убыванию)
+      // First compare by count (descending)
       int countComparison = b['count'].compareTo(a['count']);
 
-      // Если количество одинаковое, сортируем по имени
+      // If count is equal, sort by name
       if (countComparison == 0) {
         return a['name'].compareTo(b['name']);
       }
@@ -703,7 +703,7 @@ Future<List<Map<String, dynamic>>> getTagsWithCounts() async {
   }
 }
 
-// Вспомогательная функция для получения только имен тегов
+// Helper function to get only tag names
 Future<List<String>> getAllUniqueTags() async {
   final tagsWithCounts = await getTagsWithCounts();
   return tagsWithCounts.map((tag) => tag['name'] as String).toList();
@@ -764,7 +764,7 @@ int? dateTimeToYYYYMMDD(DateTime? date) {
 }
 
 
-// Функция для преобразования int YYYYMMDD в DateTime
+// Convert int YYYYMMDD to DateTime
 DateTime? yyyymmddToDateTime(int? yyyymmdd) {
   if (yyyymmdd == null) return null;
   if (yyyymmdd == 0) return null; // Explicitly handle 0 as null
@@ -799,17 +799,17 @@ DateTime? yyyymmddToDateTime(int? yyyymmdd) {
 
 Future<void> initStoragePaths() async {
   try {
-    // Инициализируем директорию документов
+    // Initialize documents directory
     documentsDirectory = await getDocumentsDirectory();
 
     if (documentsDirectory != null) {
-      // Создаем основную директорию приложения
+      // Create main app directory
       memorizerDirectory = Directory('${documentsDirectory!.path}/Memorizer');
       if (!await memorizerDirectory!.exists()) {
         await memorizerDirectory!.create(recursive: true);
       }
 
-      // Создаем директорию для фотографий
+      // Create photos directory
       photoDirectory = Directory('${memorizerDirectory!.path}/Photo');
       if (!await photoDirectory!.exists()) {
         await photoDirectory!.create(recursive: true);
@@ -832,7 +832,7 @@ Future<void> initStoragePaths() async {
   }
 }
 
-// Получение директории документов
+// Get documents directory
 Future<Directory?> getDocumentsDirectory() async {
   try {
     if (Platform.isAndroid) {
@@ -860,14 +860,14 @@ Future<Directory?> getDocumentsDirectory() async {
       }
       return await getApplicationDocumentsDirectory();
     } else if (Platform.isLinux) {
-      // На Linux обычно используем ~/Documents
+      // On Linux we typically use ~/Documents
       final home = Platform.environment['HOME'];
       if (home != null) {
         final documentsDir = Directory('$home/Documents');
         if (await documentsDir.exists()) {
           return documentsDir;
         }
-        // Если директория не существует, создаем ее
+        // If directory doesn't exist, create it
         try {
           await documentsDir.create(recursive: true);
           return documentsDir;
@@ -877,7 +877,7 @@ Future<Directory?> getDocumentsDirectory() async {
       }
       return await getApplicationDocumentsDirectory();
     } else {
-      // Другие платформы - используем директорию приложения
+      // Other platforms - use app directory
       return await getApplicationDocumentsDirectory();
     }
   } catch (e) {
@@ -886,7 +886,7 @@ Future<Directory?> getDocumentsDirectory() async {
   }
 }
 
-// Создание каталога для резервной копии с указанием даты
+// Create backup directory with date
 Future<Directory?> createBackupDirWithDate() async {
   try {
     if (memorizerDirectory == null) {
@@ -898,11 +898,11 @@ Future<Directory?> createBackupDirWithDate() async {
       return null;
     }
 
-    // Генерация имени подкаталога с датой
+    // Generate subdirectory name with date
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
     final backupDirPath = '${memorizerDirectory!.path}/mem-$dateStr';
 
-    // Создание подкаталога с датой
+    // Create subdirectory with date
     backupDirectory = Directory(backupDirPath);
     if (!await backupDirectory!.exists()) {
       await backupDirectory!.create(recursive: true);
@@ -1315,21 +1315,21 @@ Future<bool> deletePhotoFile(String photoPath) async {
   return false;
 }
 
-// Функция для преобразования int HHMM в строку "HH:MM"
+// Convert int HHMM to string "HH:MM"
 String? timeIntToString(int? timeInt) {
   if (timeInt == null) return null;
 
-  // Проверка корректности формата
+  // Validate format
   if (timeInt < 0 || timeInt > 2359) return null;
 
-  // Разделяем на часы и минуты
+  // Split into hours and minutes
   final hours = timeInt ~/ 100;
   final minutes = timeInt % 100;
 
-  // Проверка правильности времени
+  // Validate time values
   if (hours > 23 || minutes > 59) return null;
 
-  // Форматируем с ведущими нулями
+  // Format with leading zeros
   return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
 }
 
@@ -1352,31 +1352,31 @@ int? dateStrToInt(String? dateStr) {
   }
 }
 
-// Функция для преобразования строки "HH:MM" в int HHMM
+// Convert string "HH:MM" to int HHMM
 int? timeStringToInt(String? timeString) {
   if (timeString == null || timeString.isEmpty) return null;
 
-  // Разбиваем строку на части
+  // Split string into parts
   final parts = timeString.split(':');
   if (parts.length != 2) return null;
 
-  // Пытаемся преобразовать части в числа
+  // Try to parse parts as numbers
   final hours = int.tryParse(parts[0]);
   final minutes = int.tryParse(parts[1]);
 
-  // Проверяем корректность значений
+  // Validate values
   if (hours == null || minutes == null) return null;
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
 
-  // Возвращаем в формате HHMM
+  // Return in HHMM format
   return hours * 100 + minutes;
 }
 
-// Функция для проверки времени на корректность
+// Validate time format
 bool isValidTimeFormat(String? timeString) {
-  if (timeString == null || timeString.isEmpty) return true; // Пустое значение допустимо
+  if (timeString == null || timeString.isEmpty) return true; // Empty value is allowed
 
-  // Проверяем формат HH:MM
+  // Check HH:MM format
   final RegExp timeRegex = RegExp(r'^([01]?[0-9]|2[0-3]):([0-5][0-9])$');
   if (!timeRegex.hasMatch(timeString)) return false;
 
@@ -1452,7 +1452,7 @@ String getDaysString(int dayMask) {
   return enabledDays.map((i) => getDayName(i)).join(', ');
 }
 
-/// Get compact days string (e.g., "пвсчп--" or "MTWTF--")
+/// Get compact days string (e.g., "MTWTF--")
 String getDaysCompact(int dayMask) {
   final sb = StringBuffer();
   for (int i = 0; i < 7; i++) {
@@ -1530,22 +1530,22 @@ Future<void> initLogging() async {
       if (documentsDirectory == null) await initStoragePaths();
       if (documentsDirectory == null) return;
 
-      // Создаем папку Logs
+      // Create Logs folder
       final logsDir = Directory('${documentsDirectory!.path}/Memorizer/Logs');
       if (!await logsDir.exists()) {
         await logsDir.create(recursive: true);
       }
 
-      // Имя файла с датой и временем
+      // File name with date and time
       final now = DateTime.now();
       final dateTime = DateFormat('yyyyMMdd-HHmmss').format(now);
       _currentLogFile = '${logsDir.path}/log-$dateTime.txt';
 
-      // Записываем заголовок
+      // Write header
       final startMessage = 'App started at ${DateFormat('yyyy-MM-dd HH:mm:ss').format(now)}\n';
       await File(_currentLogFile!).writeAsString(startMessage);
     } catch (e) {
-      // Игнорируем ошибки в логировании
+      // Ignore logging errors
     }
   }
 }

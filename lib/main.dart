@@ -1,5 +1,5 @@
 // main.dart
-import 'dart:async'; // Для Timer
+import 'dart:async'; // For Timer
 import 'dart:convert';
 import 'dart:io';
 
@@ -259,7 +259,7 @@ Future<void> _migratePhotosToItemFolders(Database db) async {
   }
 }
 
-// Функция для получения текста состояния фильтра
+// Function to get filter status text
 Future<String> getFilterStatusText() async {
   bool hasTagFilter = xvTagFilter.isNotEmpty;
 
@@ -289,8 +289,8 @@ Future<String> getFilterStatusText() async {
   }
 }
 
-// Оптимизированная функция getItems() с использованием SQL для сортировки и LIMIT
-// Исправленная функция getItems() с корректным SQL-синтаксисом
+// Optimized getItems() using SQL for sorting and LIMIT
+// Fixed getItems() with correct SQL syntax
 
 Future<List<Map<String, dynamic>>> getItems() async {
   try {
@@ -303,15 +303,15 @@ Future<List<Map<String, dynamic>>> getItems() async {
     final lastItems = int.tryParse(lastItemsStr) ?? 0;
     myPrint('Last items setting: $lastItems');
 
-    // Определяем сегодняшнюю дату в формате YYYYMMDD
+    // Get today's date in YYYYMMDD format
     final todayDate = dateTimeToYYYYMMDD(DateTime.now());
     myPrint('Today date: $todayDate');
 
-    // Начальные значения для WHERE
+    // Initial WHERE values
     List<String> whereConditions = [];
     List<dynamic> whereArgs = [];
 
-    // Добавляем условие для фильтрации по hidden
+    // Add hidden filter condition
     if (xvHiddenMode) {
       whereConditions.add('hidden = 1');
     } else {
@@ -322,7 +322,7 @@ Future<List<Map<String, dynamic>>> getItems() async {
     if (xvTagFilter.isNotEmpty) {
       myPrint('Tag filter is active: $xvTagFilter');
 
-      // Разбиваем строку тегов на отдельные теги
+      // Split tag string into individual tags
       List<String> tagFilters = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
 
       if (xvHiddenMode) {
@@ -462,21 +462,21 @@ Future<List<Map<String, dynamic>>> getItems() async {
       }
     }
 
-    // Собираем окончательный WHERE
+    // Build final WHERE clause
     String whereClause = whereConditions.isEmpty ? "" : "WHERE ${whereConditions.join(' AND ')}";
 
-    // Определяем множитель направления сортировки (-1 для DESC, 1 для ASC)
-    // SQLite не позволяет использовать DESC/ASC в выражениях CASE,
-    // поэтому используем множитель для изменения направления сортировки
+    // Define sort direction multiplier (-1 for DESC, 1 for ASC)
+    // SQLite doesn't allow DESC/ASC in CASE expressions,
+    // so we use a multiplier to change sort direction
     final dateFactor = newestFirst == "true" ? "-1" : "1";
     final createdFactor = newestFirst == "true" ? "-1" : "1";
 
-    // Формируем ORDER BY как строку с правильным синтаксисом SQLite
-    // Вместо использования DESC/ASC в выражениях, умножаем значения на -1 для обратной сортировки
+    // Build ORDER BY string with correct SQLite syntax
+    // Instead of using DESC/ASC in expressions, multiply values by -1 for reverse sort
     String orderByClause =
         "CASE WHEN date = $todayDate THEN 1 WHEN date IS NOT NULL AND date > 0 THEN 2 ELSE 3 END ASC, " "priority DESC, " "CASE WHEN date = $todayDate THEN 0 WHEN date IS NOT NULL AND date > 0 THEN $dateFactor * date ELSE 0 END, " "CASE WHEN date IS NULL OR date = 0 THEN $createdFactor * created ELSE 0 END";
 
-    // Формируем полный SQL-запрос
+    // Build full SQL query
     String sqlQuery = "SELECT * FROM items $whereClause ORDER BY $orderByClause";
 
     // Apply LIMIT only on main screen, not inside virtual folders
@@ -484,10 +484,10 @@ Future<List<Map<String, dynamic>>> getItems() async {
       sqlQuery += " LIMIT $lastItems";
     }
 
-    // Выполняем запрос
+    // Execute query
     List<Map<String, dynamic>> result = await mainDb.rawQuery(sqlQuery, whereArgs);
 
-    // Обработка обфускированных записей, если мы в режиме скрытых записей
+    // Process obfuscated records if in hidden mode
     if (xvHiddenMode) {
       result = result.map((item) => processItemForView(item)).toList();
     }
@@ -776,7 +776,7 @@ class _HomePageState extends State<HomePage> {
   int? _selectedItemId; // Track the selected item
   String _filterStatus = '(All) ';
 
-  // Переменные для обработки множественного тапа
+  // Variables for multiple tap handling
   int _tapCount = 0;
   Timer? _tapTimer;
   bool _isInYearlyFolder = false;
@@ -790,7 +790,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _refreshItems();
-    _updateFilterStatus(); // Обновление статуса фильтра при запуске
+    _updateFilterStatus(); // Update filter status on startup
   }
 
   @override
@@ -832,7 +832,7 @@ class _HomePageState extends State<HomePage> {
 
   Map<String, dynamic> _createYearlyFolderItem() {
     return {
-      'id': -2, // Специальный ID для виртуального элемента
+      'id': -2, // Special ID for virtual element
       'isVirtual': true,
       'type': 'yearly_folder',
       'title': lw('Yearly Events'),
@@ -850,7 +850,7 @@ class _HomePageState extends State<HomePage> {
 
   Map<String, dynamic> _createNotesFolderItem() {
     return {
-      'id': -3, // Специальный ID для виртуального элемента
+      'id': -3, // Special ID for virtual element
       'isVirtual': true,
       'type': 'notes_folder',
       'title': lw('Notes'),
@@ -868,7 +868,7 @@ class _HomePageState extends State<HomePage> {
 
   Map<String, dynamic> _createDailyFolderItem() {
     return {
-      'id': -4, // Специальный ID для виртуального элемента
+      'id': -4, // Special ID for virtual element
       'isVirtual': true,
       'type': 'daily_folder',
       'title': lw('Daily Reminders'),
@@ -1114,40 +1114,40 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Обработчик множественного тапа
+  // Multiple tap handler
   void _handleMultipleTap() {
     _tapCount++;
 
     if (_tapCount == 1) {
-      // При первом тапе запускаем таймер
+      // On first tap, start the timer
       _tapTimer?.cancel();
       _tapTimer = Timer(Duration(milliseconds: 800), () {
-        // Если таймер истек, сбрасываем счетчик
+        // If timer expired, reset counter
         _tapCount = 0;
       });
     } else if (_tapCount >= 4) {
-      // При четвертом тапе обрабатываем вход в скрытый режим
+      // On fourth tap, enter hidden mode
       _tapCount = 0;
       _tapTimer?.cancel();
       _showPinDialog();
     }
   }
 
-  // Метод _showPinDialog должен использовать this.context
+  // _showPinDialog method uses this.context
   void _showPinDialog() async {
-    // Проверяем, установлен ли уже PIN-код
+    // Check if PIN is already set
     bool hasPIN = await isPinSet();
 
     if (hasPIN) {
-      // Если PIN уже установлен, показываем диалог входа
+      // If PIN is set, show login dialog
       _showEnterPinDialog();
     } else {
-      // Если PIN еще не установлен, показываем диалог создания PIN-кода
+      // If PIN is not set, show create PIN dialog
       _showCreatePinDialog();
     }
   }
 
-  // Диалог для создания нового PIN-кода
+  // Dialog for creating a new PIN code
   void _showCreatePinDialog() {
     final TextEditingController pinController = TextEditingController();
     final FocusNode focusNode = FocusNode();
@@ -1156,7 +1156,7 @@ class _HomePageState extends State<HomePage> {
       context: this.context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        // Используем Future.delayed для надежной установки фокуса
+        // Use Future.delayed for reliable focus setting
         Future.delayed(Duration.zero, () {
           if (dialogContext.mounted) {
             FocusScope.of(dialogContext).requestFocus(focusNode);
@@ -1178,7 +1178,7 @@ class _HomePageState extends State<HomePage> {
                 controller: pinController,
                 focusNode: focusNode,
                 autofocus: true,
-                // Добавляем autofocus свойство
+                // Add autofocus property
                 keyboardType: TextInputType.number,
                 maxLength: 4,
                 obscureText: true,
@@ -1210,32 +1210,32 @@ class _HomePageState extends State<HomePage> {
               ),
               child: Text(lw('Save')),
               onPressed: () async {
-                // Получаем PIN из контроллера
+                // Get PIN from controller
                 final pin = pinController.text;
 
-                // Проверяем, что PIN состоит из 4 цифр
+                // Verify PIN is 4 digits
                 if (pin.length == 4 && int.tryParse(pin) != null) {
                   Navigator.pop(dialogContext);
 
-                  // Сохраняем PIN-код
+                  // Save PIN code
                   await saveNewPin(pin);
 
-                  // Активируем режим скрытых записей
+                  // Activate hidden records mode
                   setState(() {
                     xvHiddenMode = true;
                     currentPin = pin;
                   });
 
-                  // Обновляем список элементов, чтобы отобразить скрытые
+                  // Refresh items list to show hidden ones
                   _refreshItems();
 
-                  // Запускаем таймер автоматического выхода
+                  // Start auto-logout timer
                   resetHiddenModeTimer();
 
-                  // Показываем подтверждение
+                  // Show confirmation
                   okInfoBarGreen(lw('Private mode activated'));
                 } else {
-                  // Показываем ошибку, если PIN неверного формата
+                  // Show error if PIN format is invalid
                   okInfoBarRed(lw('PIN must be 4 digits'));
                 }
               },
@@ -1246,7 +1246,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Диалог для ввода существующего PIN-кода
+  // Dialog for entering existing PIN code
   void _showEnterPinDialog() {
     String enteredPin = '';
     final TextEditingController pinController = TextEditingController();
@@ -1256,7 +1256,7 @@ class _HomePageState extends State<HomePage> {
       context: this.context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        // Используем Future.delayed вместо addPostFrameCallback
+        // Use Future.delayed instead of addPostFrameCallback
         Future.delayed(Duration.zero, () {
           if (dialogContext.mounted) {
             FocusScope.of(dialogContext).requestFocus(focusNode);
@@ -1311,28 +1311,28 @@ class _HomePageState extends State<HomePage> {
               ),
               child: Text(lw('Ok')),
               onPressed: () async {
-                // Проверяем PIN-код
+                // Verify PIN code
                 if (await verifyPin(enteredPin)) {
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext);
                   }
 
-                  // Активируем режим скрытых записей
+                  // Activate hidden records mode
                   setState(() {
                     xvHiddenMode = true;
                     currentPin = enteredPin;
                   });
 
-                  // Обновляем список элементов, чтобы отобразить скрытые
+                  // Refresh items list to show hidden ones
                   _refreshItems();
 
-                  // Запускаем таймер автоматического выхода
+                  // Start auto-logout timer
                   resetHiddenModeTimer();
 
-                  // Показываем подтверждение
+                  // Show confirmation
                   okInfoBarGreen(lw('Private mode activated'));
                 } else {
-                  // Показываем ошибку, если PIN неверный
+                  // Show error if PIN is incorrect
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext);
                   }
@@ -1594,7 +1594,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final items = await getItems();
 
-      // Добавляем виртуальные элементы
+      // Add virtual elements
       List<Map<String, dynamic>> finalItems = [];
 
       if (_isInYearlyFolder) {
@@ -1875,13 +1875,13 @@ class _HomePageState extends State<HomePage> {
           title: Text(lw('Edit'), style: TextStyle(color: clText)),
           onTap: () {
             Navigator.pop(context); // Close the menu
-            // Navigate to edit page, передаем только ID
+            // Navigate to edit page, pass only ID
             Navigator.push<bool>(
               context,
               MaterialPageRoute(
                 builder:
                     (context) => EditItemPage(
-                      itemId: item['id'], // Передаем только ID
+                      itemId: item['id'], // Pass only ID
                     ),
               ),
             ).then((updated) {
@@ -1945,7 +1945,7 @@ class _HomePageState extends State<HomePage> {
       ),
     ];
 
-    // Если находимся в режиме скрытых записей, добавляем опцию выхода
+    // If in hidden mode, add exit option
     if (xvHiddenMode) {
       menuItems.add(
         PopupMenuItem(
@@ -2034,7 +2034,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         actions: [
-          // Кнопка проверки напоминаний
+          // Check reminders button
           GestureDetector(
             onLongPress: () => showHelp(40),
             child: IconButton(
@@ -2043,7 +2043,7 @@ class _HomePageState extends State<HomePage> {
               onPressed: _checkReminders,
             ),
           ),
-          // Индикатор состояния фильтра
+          // Filter status indicator
           GestureDetector(
             onLongPress: () => showHelp(22),
             child: Center(
@@ -2057,7 +2057,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          // Меню
+          // Menu
           GestureDetector(
             onLongPress: () => showHelp(25),
             child: PopupMenuButton<String>(
@@ -2209,12 +2209,12 @@ class _HomePageState extends State<HomePage> {
         itemBuilder: (context, index) {
           final item = _items[index];
 
-          // Обработка виртуальных элементов
+          // Handle virtual elements
           if (item['isVirtual'] == true) {
             return _buildVirtualItem(item);
           }
 
-          // Остальной код ListView.builder остается без изменений
+          // Rest of ListView.builder code remains unchanged
           final priorityValue = item['priority'] ?? 0;
           final hasDate = item['date'] != null && item['date'] != 0;
           final hasTime = item['time'] != null;

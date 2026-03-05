@@ -10,7 +10,7 @@ import 'globals.dart';
 import 'reminders.dart';
 
 class EditItemPage extends StatefulWidget {
-  final int? itemId; // Используем ID вместо целой записи
+  final int? itemId; // Use ID instead of full record
 
   const EditItemPage({super.key, this.itemId});
 
@@ -120,10 +120,10 @@ class _EditItemPageState extends State<EditItemPage> {
     myPrint('Initialized temp photo dir: $_currentPhotoDir');
   }
 
-  // Функция для загрузки данных тегов
+  // Load tags data
   Future<void> _loadTagsData() async {
     try {
-      // Получаем отсортированные теги с их частотами
+      // Get sorted tags with their frequencies
       List<Map<String, dynamic>> tags = await getTagsWithCounts();
       setState(() {
         _tagsWithCounts = tags;
@@ -835,7 +835,7 @@ class _EditItemPageState extends State<EditItemPage> {
   // Build priority selector with + and - buttons
   Widget _buildPrioritySelector() {
     return GestureDetector(
-      onLongPress: () => showHelp(34), // ID 34 для всех элементов приоритета
+      onLongPress: () => showHelp(34), // ID 34 for priority selector
       child: Row(
         children: [
           // Label for priority
@@ -2187,11 +2187,11 @@ class _EditItemPageState extends State<EditItemPage> {
 
   // Build hidden checkbox (only shown in hidden mode)
   Widget _buildHiddenSelector() {
-    // Показываем чекбокс только если мы в режиме скрытых записей
+    // Show checkbox only in hidden items mode
     if (!xvHiddenMode) return SizedBox.shrink();
 
     return GestureDetector(
-      onLongPress: () => showHelp(37), // ID 37 для чекбокса скрытых записей
+      onLongPress: () => showHelp(37), // ID 37 for hidden items checkbox
       child: Row(
         children: [
           Checkbox(
@@ -2218,7 +2218,7 @@ class _EditItemPageState extends State<EditItemPage> {
 // Build date field with date picker button
   Widget _buildDateField() {
     return GestureDetector(
-      onLongPress: () => showHelp(36), // ID 36 для поля даты и кнопок
+      onLongPress: () => showHelp(36), // ID 36 for date field and buttons
       child: TextField(
         controller: dateController,
         style: TextStyle(color: clText),
@@ -2276,27 +2276,27 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  // Виджет для выбора времени с полем ввода и кнопками
+  // Time picker widget with input field and buttons
   Widget _buildTimeField() {
     return GestureDetector(
-      onLongPress: () => showHelp(39), // ID 39 для поля времени
+      onLongPress: () => showHelp(39), // ID 39 for time field
       child: TextField(
         controller: timeController,
         style: TextStyle(color: clText),
-        readOnly: false, // Разрешаем ручной ввод
+        readOnly: false, // Allow manual input
         enabled: _remind || _period, // Active for one-time and period reminders
         onChanged: (value) {
           if (value.isEmpty) {
             setState(() {
               _time = null;
-              _selectedTimeOption = null; // Сбрасываем выбор радио-кнопок
+              _selectedTimeOption = null; // Reset radio button selection
             });
           } else if (isValidTimeFormat(value)) {
-            // Если ввод корректен, обновляем _time
+            // If input is valid, update _time
             setState(() {
               _time = timeStringToInt(value);
 
-              // Проверяем, соответствует ли введенное время одному из предустановленных вариантов
+              // Check if entered time matches a preset option
               if (_time == timeMorning) {
                 _selectedTimeOption = 0;
               } else if (_time == timeDay) {
@@ -2328,7 +2328,7 @@ class _EditItemPageState extends State<EditItemPage> {
                   setState(() {
                     timeController.clear();
                     _time = null;
-                    _selectedTimeOption = null; // Сбрасываем выбор радио-кнопок
+                    _selectedTimeOption = null; // Reset radio button selection
                   });
                 } : null,
               ),
@@ -2339,7 +2339,7 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-// Виджет для выбора предустановленных вариантов времени (радио-кнопки)
+// Preset time options widget (radio buttons)
   Widget _buildTimeOptions() {
     final bool timeEnabled = _remind || _period;
     return GestureDetector(
@@ -2415,16 +2415,16 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-// Метод для отображения выбора времени
+// Show time picker dialog
   Future<void> _selectTime(BuildContext context) async {
-    // Парсим текущее время или используем время по умолчанию
+    // Parse current time or use default
     TimeOfDay initialTime;
     if (_time != null) {
       final hours = _time! ~/ 100;
       final minutes = _time! % 100;
       initialTime = TimeOfDay(hour: hours, minute: minutes);
     } else {
-      initialTime = TimeOfDay.now(); // Используем текущее время
+      initialTime = TimeOfDay.now(); // Use current time
     }
 
     final TimeOfDay? picked = await showTimePicker(
@@ -2465,13 +2465,13 @@ class _EditItemPageState extends State<EditItemPage> {
 
     if (picked != null) {
       setState(() {
-        // Преобразуем выбранное время в числовой формат HHMM
+        // Convert selected time to HHMM numeric format
         _time = picked.hour * 100 + picked.minute;
 
-        // Обновляем текст в поле ввода
+        // Update text in input field
         timeController.text = timeIntToString(_time) ?? '';
 
-        // Проверяем, соответствует ли выбранное время одному из предустановленных вариантов
+        // Check if selected time matches a preset option
         if (_time == timeMorning) {
           _selectedTimeOption = 0;
         } else if (_time == timeDay) {
@@ -2479,7 +2479,7 @@ class _EditItemPageState extends State<EditItemPage> {
         } else if (_time == timeEvening) {
           _selectedTimeOption = 2;
         } else {
-          _selectedTimeOption = null; // Не соответствует предустановленным вариантам
+          _selectedTimeOption = null; // Does not match any preset
         }
       });
     }
@@ -2675,7 +2675,7 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  // Функция для показа диалога выбора тегов
+  // Show tag selection dialog
   void _showTagsDialog() {
     if (_tagsWithCounts.isEmpty) {
       okInfoBarBlue(lw('No tags found'));
@@ -2724,16 +2724,16 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  // Функция для добавления тега в поле ввода
+  // Add tag to input field
   void _addTagToField(String tag) {
-    // Получаем текущее значение поля
+    // Get current field value
     String currentTags = tagsController.text.trim();
 
-    // Если поле пустое, просто добавляем тег
+    // If field is empty, just add the tag
     if (currentTags.isEmpty) {
       tagsController.text = tag;
     } else {
-      // Проверяем, содержит ли уже тег
+      // Check if tag already exists
       List<String> existingTags =
           currentTags
               .split(',')
@@ -2742,19 +2742,19 @@ class _EditItemPageState extends State<EditItemPage> {
               .toList();
 
       if (!existingTags.contains(tag)) {
-        // Добавляем тег с запятой
+        // Add tag with comma
         tagsController.text = '$currentTags, $tag';
       } else {
-        // Тег уже есть, показываем сообщение
+        // Tag already exists, show message
         okInfoBarBlue(lw('Tag already added'));
       }
     }
   }
 
-// Модифицируем существующий виджет для поля тегов
+// Tags input field widget
   Widget _buildTagsField() {
     return GestureDetector(
-      onLongPress: () => showHelp(33), // ID 33 для поля тегов
+      onLongPress: () => showHelp(33), // ID 33 for tags field
       child: TextField(
         controller: tagsController,
         style: TextStyle(color: clText),

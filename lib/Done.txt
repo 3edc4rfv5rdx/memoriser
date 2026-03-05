@@ -1,3 +1,9 @@
+  + Audit Phase 3: Code quality fixes:
+    1. Fixed debug message "Showing green SnackBar" → "Showing orange SnackBar" in okInfoBarOrange()
+    2. Replaced 4 silent catch(_){} blocks in backup.dart with proper error logging
+    3. Translated ALL Russian comments to English: globals.dart (73), main.dart (44), additem.dart (30),
+       backup.dart (40+). Total ~190 comments translated across all files.
+
   + Audit Phase 2: Hidden mode — 1 bug, 8 fix points:
     Hidden items with reminders showed Base64-encoded titles in notifications.
     Root cause: obfuscated titleText was passed to notification scheduling functions.

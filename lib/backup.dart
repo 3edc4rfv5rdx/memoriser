@@ -139,7 +139,9 @@ Future<void> _backupSettingsDb(String databasesPath, String backupDirPath, Strin
     // Flush WAL before copying
     try {
       await settDb.execute("PRAGMA wal_checkpoint(TRUNCATE)");
-    } catch (_) {}
+    } catch (e) {
+      myPrint('WAL checkpoint warning for settDb: $e');
+    }
 
     final settDbPath = path.join(databasesPath, settDbFile);
     final settFile = File(settDbPath);
@@ -205,7 +207,9 @@ Future<void> _restoreSettingsDb(String backupDirPath) async {
       final databasesPath = await getDatabasesPath();
       final settDbPath = path.join(databasesPath, settDbFile);
       settDb = await openDatabase(settDbPath);
-    } catch (_) {}
+    } catch (e) {
+      myPrint('Error reopening settDb in fallback: $e');
+    }
   }
 }
 
@@ -519,7 +523,9 @@ Future<String> restoreBackup() async {
       // Reopen mainDb since it was closed before copy attempt
       try {
         mainDb = await openDatabase(mainDbPath);
-      } catch (_) {}
+      } catch (e) {
+        myPrint('Error reopening mainDb after copy failure: $e');
+      }
       okInfoBarRed(lw('Error copying backup file'));
       return lw('Error copying backup file');
     }
@@ -541,7 +547,9 @@ Future<String> restoreBackup() async {
       // Try to reopen without version check as fallback
       try {
         mainDb = await openDatabase(mainDbPath);
-      } catch (_) {}
+      } catch (e) {
+        myPrint('Error reopening mainDb in fallback: $e');
+      }
       okInfoBarRed(lw('Error: selected file is not a database'));
       return lw('Error: selected file is not a database');
     }
