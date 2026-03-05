@@ -1,3 +1,13 @@
+  + Audit Phase 2: Hidden mode — 1 bug, 8 fix points:
+    Hidden items with reminders showed Base64-encoded titles in notifications.
+    Root cause: obfuscated titleText was passed to notification scheduling functions.
+    Fixed in 8 places:
+    - additem.dart: save original title before obfuscation (notificationTitle), use it for
+      updateDailyReminders, updatePeriodReminders, scheduleAllDailyReminders, schedulePeriodReminders
+    - reminders.dart: rescheduleAllReminders() — deobfuscate title for daily and period items
+    - NotificationSystem.kt BootReceiver: added hidden column to SELECT queries and deobfuscateText()
+      for specific (one-time), daily, period, monthly, yearly reminder rescheduling (5 cursors fixed)
+
   + Audit Phase 2: CSV import/export — 1 fix:
     1. CRITICAL: CSV export newlines in strings broke reimport. readAsLines() splits on \n even inside
        quoted fields. Fix: escape \n→\\n, \r→\\r, \\→\\\\ on export; unescape on import in default
