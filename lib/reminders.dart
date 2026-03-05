@@ -237,7 +237,9 @@ class SimpleNotifications {
           final dateTo = item['period_to'] as int?;
           final itemTime = item['time'] as int?;
           final periodDays = item['period_days'] as int? ?? 127;
-          final title = item['title'] as String? ?? '';
+          var title = item['title'] as String? ?? '';
+          final hidden = item['hidden'] as int? ?? 0;
+          if (hidden == 1) title = deobfuscateText(title);
 
           if (dateFrom == null || dateTo == null) continue;
 
@@ -265,7 +267,9 @@ class SimpleNotifications {
         for (var item in dailyReminders) {
           try {
             final itemId = item['id'] as int;
-            final title = item['title'] as String? ?? '';
+            var title = item['title'] as String? ?? '';
+            final hidden = item['hidden'] as int? ?? 0;
+            if (hidden == 1) title = deobfuscateText(title);
             final dailyTimesStr = item['daily_times'] as String?;
             final dailyDays = item['daily_days'] as int? ?? 127;
 

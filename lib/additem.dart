@@ -409,6 +409,8 @@ class _EditItemPageState extends State<EditItemPage> {
     String titleText = titleController.text.trim();
     String contentText = contentController.text.trim();
     String tagsText = tagsController.text.trim();
+    // Keep original title for notifications (before obfuscation)
+    final notificationTitle = titleText;
 
     // Obfuscate data if the record is hidden and we're in hidden mode
     if (hiddenValue == 1 && xvHiddenMode) {
@@ -471,7 +473,7 @@ class _EditItemPageState extends State<EditItemPage> {
           _daily && _active,
           _dailyTimes,
           _dailyDays,
-          titleText,
+          notificationTitle,
         );
 
         // Update period reminders for this item
@@ -482,7 +484,7 @@ class _EditItemPageState extends State<EditItemPage> {
           periodToValue,
           timeValue,
           periodDaysValue,
-          titleText,
+          notificationTitle,
         );
 
       } else {
@@ -547,7 +549,7 @@ class _EditItemPageState extends State<EditItemPage> {
             insertedId,
             _dailyTimes,
             _dailyDays,
-            titleText,
+            notificationTitle,
           );
         }
 
@@ -559,7 +561,7 @@ class _EditItemPageState extends State<EditItemPage> {
             periodToValue!,
             timeValue,
             periodDaysValue,
-            titleText,
+            notificationTitle,
           );
         }
       }

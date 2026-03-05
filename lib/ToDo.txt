@@ -127,6 +127,7 @@
 + Style time picker dialog buttons with background (not pale text)
 
 ===ERRORS:
++ Hidden items: daily/period/monthly/yearly notifications showed Base64-encoded titles after save and reboot (additem.dart, reminders.dart, NotificationSystem.kt BootReceiver)
 + CSV export: newlines in content/title broke readAsLines() on reimport — data loss on round-trip (backup.dart)
 + Restore: mainDb left closed if file copy fails — app crashes on next DB operation (backup.dart)
 + Restore: mainDb left closed if openDatabase with migrations fails — no fallback reopen (backup.dart)

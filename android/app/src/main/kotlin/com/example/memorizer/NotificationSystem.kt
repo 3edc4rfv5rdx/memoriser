@@ -2032,7 +2032,7 @@ class BootReceiver : BroadcastReceiver() {
 
             // Query for all future reminders
             val cursor = db.rawQuery(
-                "SELECT id, title, content, date, time FROM items WHERE remind = 1 AND date >= ?",
+                "SELECT id, title, content, date, time, hidden FROM items WHERE remind = 1 AND date >= ?",
                 arrayOf(todayDate.toString())
             )
 
@@ -2041,10 +2041,15 @@ class BootReceiver : BroadcastReceiver() {
             while (cursor.moveToNext()) {
                 try {
                     val itemId = cursor.getInt(0)
-                    val title = cursor.getString(1) ?: ""
-                    val content = cursor.getString(2) ?: ""
+                    var title = cursor.getString(1) ?: ""
+                    var content = cursor.getString(2) ?: ""
                     val date = cursor.getInt(3)
                     val time = if (cursor.isNull(4)) null else cursor.getInt(4)
+                    val hidden = cursor.getInt(5)
+                    if (hidden == 1) {
+                        title = deobfuscateText(title)
+                        content = deobfuscateText(content)
+                    }
 
                     // Parse date
                     val year = date / 10000
@@ -2080,16 +2085,18 @@ class BootReceiver : BroadcastReceiver() {
             var rescheduledDailyCount = 0
             if (isDailyRemindersEnabled(context)) {
                 val dailyCursor = db.rawQuery(
-                    "SELECT id, title, daily_times, daily_days FROM items WHERE daily = 1 AND active = 1",
+                    "SELECT id, title, daily_times, daily_days, hidden FROM items WHERE daily = 1 AND active = 1",
                     null
                 )
 
                 while (dailyCursor.moveToNext()) {
                     try {
                         val itemId = dailyCursor.getInt(0)
-                        val title = dailyCursor.getString(1) ?: ""
+                        var title = dailyCursor.getString(1) ?: ""
                         val dailyTimes = dailyCursor.getString(2) ?: ""
                         val dailyDays = dailyCursor.getInt(3)
+                        val hiddenDaily = dailyCursor.getInt(4)
+                        if (hiddenDaily == 1) title = deobfuscateText(title)
 
                         // Parse times from JSON array format: ["06:33","18:33"] or ["16:56"]
                         val cleanedTimes = dailyTimes
@@ -2129,7 +2136,7 @@ class BootReceiver : BroadcastReceiver() {
 
             // Reschedule yearly reminders
             val yearlyCursor = db.rawQuery(
-                "SELECT id, title, content, date, time FROM items WHERE yearly = 1 AND active = 1",
+                "SELECT id, title, content, date, time, hidden FROM items WHERE yearly = 1 AND active = 1",
                 null
             )
 
@@ -2138,10 +2145,15 @@ class BootReceiver : BroadcastReceiver() {
             while (yearlyCursor.moveToNext()) {
                 try {
                     val itemId = yearlyCursor.getInt(0)
-                    val title = yearlyCursor.getString(1) ?: ""
-                    val content = yearlyCursor.getString(2) ?: ""
+                    var title = yearlyCursor.getString(1) ?: ""
+                    var content = yearlyCursor.getString(2) ?: ""
                     val date = yearlyCursor.getInt(3)
                     val time = if (yearlyCursor.isNull(4)) null else yearlyCursor.getInt(4)
+                    val hiddenYearly = yearlyCursor.getInt(5)
+                    if (hiddenYearly == 1) {
+                        title = deobfuscateText(title)
+                        content = deobfuscateText(content)
+                    }
 
                     // Parse date (YYYYMMDD)
                     val month = (date % 10000) / 100
@@ -2187,7 +2199,7 @@ class BootReceiver : BroadcastReceiver() {
 
             // Reschedule monthly reminders
             val monthlyCursor = db.rawQuery(
-                "SELECT id, title, content, date, time FROM items WHERE monthly = 1 AND active = 1",
+                "SELECT id, title, content, date, time, hidden FROM items WHERE monthly = 1 AND active = 1",
                 null
             )
 
@@ -2196,10 +2208,15 @@ class BootReceiver : BroadcastReceiver() {
             while (monthlyCursor.moveToNext()) {
                 try {
                     val itemId = monthlyCursor.getInt(0)
-                    val title = monthlyCursor.getString(1) ?: ""
-                    val content = monthlyCursor.getString(2) ?: ""
+                    var title = monthlyCursor.getString(1) ?: ""
+                    var content = monthlyCursor.getString(2) ?: ""
                     val date = monthlyCursor.getInt(3)
                     val time = if (monthlyCursor.isNull(4)) null else monthlyCursor.getInt(4)
+                    val hiddenMonthly = monthlyCursor.getInt(5)
+                    if (hiddenMonthly == 1) {
+                        title = deobfuscateText(title)
+                        content = deobfuscateText(content)
+                    }
 
                     // Parse date (YYYYMMDD) - use day of month
                     val day = date % 100
@@ -2251,18 +2268,20 @@ class BootReceiver : BroadcastReceiver() {
             // Reschedule period reminders
             var rescheduledPeriodCount = 0
             val periodCursor = db.rawQuery(
-                "SELECT id, title, date, time, period_to, period_days FROM items WHERE period = 1 AND active = 1",
+                "SELECT id, title, date, time, period_to, period_days, hidden FROM items WHERE period = 1 AND active = 1",
                 null
             )
 
             while (periodCursor.moveToNext()) {
                 try {
                     val itemId = periodCursor.getInt(0)
-                    val title = periodCursor.getString(1) ?: ""
+                    var title = periodCursor.getString(1) ?: ""
                     val dateFrom = periodCursor.getInt(2)
                     val time = if (periodCursor.isNull(3)) null else periodCursor.getInt(3)
                     val dateTo = periodCursor.getInt(4)
                     val periodDays = periodCursor.getInt(5)
+                    val hiddenPeriod = periodCursor.getInt(6)
+                    if (hiddenPeriod == 1) title = deobfuscateText(title)
 
                     val hour = time?.let { it / 100 } ?: 9
                     val minute = time?.let { it % 100 } ?: 30
