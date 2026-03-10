@@ -1,4 +1,5 @@
 ===TODO:
+# v0.9.260310+133 (2026-03-10 14:10:25)
 # v0.9.260310+132 (2026-03-10 13:37:58)
 # v0.9.260310+125 (2026-03-10 08:56:17)
 + Audit Phase 3: code quality refactoring (getFilterStatusText dedup, magic constants, IntentExtras, split large functions, SoundUtils.kt)
@@ -55,6 +56,7 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
+# v0.9.260310+133 (2026-03-10 14:10:25)
 # v0.9.260310+132 (2026-03-10 13:37:58)
 # v0.9.260310+125 (2026-03-10 08:56:17)
 + CSV restore: loop_sound parsed as String instead of int — missing from int column list (backup.dart)
@@ -131,6 +133,7 @@
 + Style time picker dialog buttons with background (not pale text)
 
 ===ERRORS:
+# v0.9.260310+133 (2026-03-10 14:10:25)
 + Fix: main screen showed all items (including notes/daily/monthly/period/yearly) — missing SQL exclusion filter in getItems()
 # v0.9.260310+132 (2026-03-10 13:37:58)
 + Remove "Last items" feature (redundant with virtual folders), cleanup locales/help
