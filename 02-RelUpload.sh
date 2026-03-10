@@ -3,7 +3,7 @@ set -e
 
 PROJECT="memorizer"
 APK_DIR="/home/e/AndroidStudioProjects/memorizer/build/app/outputs/flutter-apk"
-TODO_FILE="lib/ToDo.txt"
+TODO_FILE="ToDo.txt"
 CHANGELOG_FILE="/tmp/release_notes_$$.md"
 
 # ------------------------------------------------------------
@@ -234,3 +234,4 @@ echo "=== Release upload completed successfully ==="
 # Cleanup
 # ------------------------------------------------------------
 rm -f "$CHANGELOG_FILE"
+sleep 3

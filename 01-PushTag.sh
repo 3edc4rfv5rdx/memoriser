@@ -2,7 +2,7 @@
 set -e
 
 REMOTE="origin"
-TODO_FILE="/home/e/AndroidStudioProjects/memorizer/lib/ToDo.txt"
+TODO_FILE="/home/e/AndroidStudioProjects/memorizer/ToDo.txt"
 
 # ===== dry-run switch =====
 #DRY="--dry-run"
@@ -77,3 +77,4 @@ echo "=== Pushing tag ($DRY) ==="
 git push $DRY "$REMOTE" "$LAST_TAG"
 
 echo "=== Done ==="
+sleep 3

@@ -17,4 +17,10 @@ Android memory assistant
 - PIN-protected hidden area (accessed by tapping the header four times)
 - Color themes
 
+## Scripts
+- `00-Make.sh` — build APK (sets xvDebug=false, restores after)
+- `01-PushTag.sh` — git push with version tag
+- `02-RelUpload.sh` — upload APK to GitHub release
+- `98-InstallAPK.sh` — install latest APK to connected device
+
 Partial Vibe coding with Anthropic Claude :)
