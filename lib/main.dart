@@ -392,6 +392,14 @@ Future<List<Map<String, dynamic>>> getItems() async {
           whereConditions.add('time IS NULL AND yearly != 1 AND (daily != 1 OR daily IS NULL) AND (monthly != 1 OR monthly IS NULL) AND (period != 1 OR period IS NULL)');
           break;
       }
+    } else {
+      // Main screen (no virtual folder active): show only one-time reminder items
+      // Exclude notes (time IS NULL), yearly, daily, monthly, period — they have their own folders
+      whereConditions.add('time IS NOT NULL');
+      whereConditions.add('(yearly != 1 OR yearly IS NULL)');
+      whereConditions.add('(daily != 1 OR daily IS NULL)');
+      whereConditions.add('(monthly != 1 OR monthly IS NULL)');
+      whereConditions.add('(period != 1 OR period IS NULL)');
     }
 
     // User-set filter

@@ -1,3 +1,12 @@
+  + Fix: main screen showed ALL items instead of only one-time reminders
+    Root cause: Audit Phase 2 removed Dart-side .where() filtering in _refreshItems()
+    (yearly!=1, daily!=1, time!=null) as "redundant with SQL", but the SQL equivalent
+    was never added to getItems(). After restore, main screen showed notes, daily,
+    monthly, period, yearly items mixed with regular reminders.
+    Fix: added else branch in getItems() virtual folder filter — when not inside a
+    virtual folder, SQL now excludes: time IS NULL (notes), yearly=1, daily=1,
+    monthly=1, period=1. These items only appear in their respective virtual folders.
+
   + Remove "Last items" feature entirely
     - main.dart getItems(): removed LIMIT logic (lastItems variable, SQL LIMIT clause,
       and the extra WHERE condition that excluded virtual folder items for LIMIT counting)
