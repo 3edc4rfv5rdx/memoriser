@@ -354,9 +354,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                     if (result != null) return result
                 }
                 // Fallback to system default alarm sound
-                val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                return uri?.toString()
+                return SoundUtils.getSystemFallbackUri()?.toString()
             } catch (e: Exception) {
                 Log.e("MemorizerApp", "Error getting default sound: ${e.message}")
                 return null
@@ -1305,16 +1303,8 @@ class NotificationReceiver : BroadcastReceiver() {
         // Stop any currently playing sound first
         NotificationService.stopSoundStatic()
 
-        val primaryUri = when {
-            soundValue == null || soundValue.isEmpty() || soundValue == "default" -> {
-                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            }
-            soundValue.startsWith("/") -> Uri.fromFile(java.io.File(soundValue))
-            else -> Uri.parse(soundValue)
-        }
-        val fallbackUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val primaryUri = SoundUtils.resolveUri(soundValue)
+        val fallbackUri = SoundUtils.getSystemFallbackUri()
 
         if (playSoundUriThroughSpeaker(context, primaryUri, soundValue)) {
             return
@@ -1339,20 +1329,8 @@ class NotificationReceiver : BroadcastReceiver() {
         return try {
             NotificationService.mediaPlayer = android.media.MediaPlayer().apply {
                 setDataSource(context, uri)
-                setAudioAttributes(
-                    android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                // Force playback through built-in speaker (bypass Bluetooth)
-                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-                val speaker = audioManager.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)
-                    .firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
-                if (speaker != null) {
-                    setPreferredDevice(speaker)
-                    Log.d("MemorizerApp", "Forced audio output to built-in speaker")
-                }
+                setAudioAttributes(SoundUtils.alarmAudioAttributes)
+                SoundUtils.routeToSpeaker(this, context)
                 prepare()
                 start()
                 setOnCompletionListener {
