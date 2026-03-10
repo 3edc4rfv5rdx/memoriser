@@ -16,7 +16,7 @@
 5. **Don't check build** - Never run `gradlew assembleDebug` or similar build commands (saves time/tokens, user rebuilds anyway)
 
 ## ToDo.txt Structure
-Location: `lib/ToDo.txt`
+Location: `ToDo.txt` (project root)
 
 ### Task markers:
 - `o` or `>` — new/current tasks
@@ -34,7 +34,7 @@ Location: `lib/ToDo.txt`
 New entries are added at the TOP of each section (right after ===XXX:)
 
 ### Done.txt
-Location: `lib/Done.txt`
+Location: `Done.txt` (project root)
 Detailed descriptions of completed features go here.
 
 ## Photo Storage Structure

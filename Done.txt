@@ -5,7 +5,9 @@
     - globals.dart defSettings: removed "Last items": "0" entry
     - settings.dart: removed all UI/state for Last items (_lastItems, _newLastItems,
       _lastItemsController, _buildLastItemsField widget, load/save/check logic)
-    - DB setting left in place (unused), locales.json entry left in place
+    - locales.json: removed "Last items" string
+    - help.json: removed helpId 103, updated filter indicator description (removed "(N)" mention)
+    - DB setting left in place (harmless)
 
   + Fix: Period date order validation
     - Added check in _validateItem(): fromVal > toVal → error "Start date must be before end date"

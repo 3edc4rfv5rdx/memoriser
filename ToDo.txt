@@ -129,6 +129,9 @@
 + Style time picker dialog buttons with background (not pale text)
 
 ===ERRORS:
++ Remove "Last items" feature (redundant with virtual folders), cleanup locales/help
++ Fix: period date order validation (start must be before end)
++ Fix: user filters (date, priority) now apply inside virtual folders + correct folder counts + monthly period day-of-month filtering
 # v0.9.260310+125 (2026-03-10 08:56:17)
 + Hidden items: daily/period/monthly/yearly notifications showed Base64-encoded titles after save and reboot (additem.dart, reminders.dart, NotificationSystem.kt BootReceiver)
 + CSV export: newlines in content/title broke readAsLines() on reimport — data loss on round-trip (backup.dart)
