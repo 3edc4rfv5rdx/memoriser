@@ -340,6 +340,10 @@ class _EditItemPageState extends State<EditItemPage> {
         okInfoBarRed(lw('Both dates must be the same format'), duration: Duration(seconds: 4));
         return false;
       }
+      if (fromVal > toVal) {
+        okInfoBarRed(lw('Start date must be before end date'), duration: Duration(seconds: 4));
+        return false;
+      }
     }
 
     // Check time conflicts with other items (warning only, not blocking)
