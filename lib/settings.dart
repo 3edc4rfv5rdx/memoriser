@@ -23,7 +23,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _currentTheme;
   String? _currentLanguage;
   bool _newestFirst = true;
-  int _lastItems = 0;
   bool _enableReminders = true;
   bool _enableDailyReminders = true;
   bool _debugLogs = false;
@@ -39,7 +38,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _newTheme;
   String? _newLanguage;
   bool? _newNewestFirst;
-  int? _newLastItems;
   bool? _newEnableReminders;
   bool? _newEnableDailyReminders;
   bool? _newDebugLogs;
@@ -48,8 +46,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
   String? _newSoundRepeats;
   bool _hasChanges = false;
 
-  // Controller for Last items input field
-  late TextEditingController _lastItemsController;
   late TextEditingController _soundRepeatsController;
 
   @override
@@ -60,7 +56,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
   @override
   void dispose() {
-    _lastItemsController.dispose();
     _soundRepeatsController.dispose();
     super.dispose();
   }
@@ -78,11 +73,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     final newestFirstValue =
         await getSetting("Newest first") ?? defSettings["Newest first"];
     final isNewestFirst = newestFirstValue == "true";
-
-    // Load Last items setting
-    final lastItemsValue =
-        await getSetting("Last items") ?? defSettings["Last items"];
-    final lastItems = int.tryParse(lastItemsValue) ?? 0;
 
     // Load enable reminders setting
     final enableRemindersValue =
@@ -107,7 +97,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     // Load system sounds
     final systemSounds = await SimpleNotifications.getSystemSounds();
 
-    _lastItemsController = TextEditingController(text: lastItems.toString());
     _soundRepeatsController = TextEditingController(text: soundRepeatsValue);
 
     if (mounted) {
@@ -115,7 +104,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _currentTheme = themeValue;
         _currentLanguage = languageValue.toLowerCase();
         _newestFirst = isNewestFirst;
-        _lastItems = lastItems;
         _enableReminders = enableReminders;
         _enableDailyReminders = enableDailyReminders;
         _debugLogs = debugLogs;
@@ -128,7 +116,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
         _newTheme = themeValue;
         _newLanguage = languageValue.toLowerCase();
         _newNewestFirst = isNewestFirst;
-        _newLastItems = lastItems;
         _newEnableReminders = enableReminders;
         _newEnableDailyReminders = enableDailyReminders;
         _newDebugLogs = debugLogs;
@@ -149,7 +136,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           _newTheme != _currentTheme ||
               _newLanguage != _currentLanguage ||
               _newNewestFirst != _newestFirst ||
-              _newLastItems != _lastItems ||
               _newEnableReminders != _enableReminders ||
               _newEnableDailyReminders != _enableDailyReminders ||
               _newDebugLogs != _debugLogs ||
@@ -187,12 +173,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
     if (_newNewestFirst != _newestFirst && _newNewestFirst != null) {
       await saveSetting("Newest first", _newNewestFirst.toString());
       savedSettings.add('sort order');
-    }
-
-    // Save Last items setting if changed
-    if (_newLastItems != _lastItems && _newLastItems != null) {
-      await saveSetting("Last items", _newLastItems.toString());
-      savedSettings.add('last items');
     }
 
     // Save enable reminders setting if changed
@@ -284,7 +264,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
       _currentTheme = _newTheme;
       _currentLanguage = _newLanguage;
       _newestFirst = _newNewestFirst ?? _newestFirst;
-      _lastItems = _newLastItems ?? _lastItems;
       _enableReminders = _newEnableReminders ?? _enableReminders;
       _enableDailyReminders = _newEnableDailyReminders ?? _enableDailyReminders;
       _debugLogs = _newDebugLogs ?? _debugLogs;
@@ -510,15 +489,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
 
               SizedBox(height: 10),
 
-              // Last items row
-              _buildSettingsRow(
-                label: lw('Last items'),
-                child: _buildLastItemsField(),
-                helpId: 103,
-              ),
-
-              SizedBox(height: 10),
-
               // Enable reminders checkbox row
               _buildSettingsRow(
                 label: lw('Enable reminders'),
@@ -676,38 +646,6 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
           if (value != null && value != _newNewestFirst) {
             setState(() {
               _newNewestFirst = value;
-            });
-            _checkForChanges();
-          }
-        },
-      ),
-    );
-  }
-
-  // Function for Last items input field
-  Widget _buildLastItemsField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: clFill,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: clUpBar),
-      ),
-      padding: EdgeInsets.symmetric(horizontal: 8),
-      child: TextField(
-        controller: _lastItemsController,
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.left,
-        style: TextStyle(color: clText),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          hintText: '0',
-          hintStyle: TextStyle(color: clText),
-        ),
-        onChanged: (value) {
-          final parsedValue = int.tryParse(value) ?? 0;
-          if (parsedValue >= 0) {
-            setState(() {
-              _newLastItems = parsedValue;
             });
             _checkForChanges();
           }
