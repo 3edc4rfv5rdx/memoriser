@@ -1,4 +1,5 @@
 ===TODO:
+# v0.9.260310+125 (2026-03-10 08:56:17)
 + Audit Phase 3: code quality refactoring (getFilterStatusText dedup, magic constants, IntentExtras, split large functions, SoundUtils.kt)
 + Loop sound for fullscreen alert: per-item checkbox + global repeat count setting + 2s pause between loops
 # v0.9.260302+119 (2026-03-02 15:19:25)
@@ -53,6 +54,7 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
+# v0.9.260310+125 (2026-03-10 08:56:17)
 + CSV restore: loop_sound parsed as String instead of int — missing from int column list (backup.dart)
 + Restore: settDb reopened without version/onCreate — table missing on corrupt restore (backup.dart)
 + Restore: sounds not overwritten, only skipped if exists — corrupt sounds not replaced (backup.dart)
@@ -127,6 +129,7 @@
 + Style time picker dialog buttons with background (not pale text)
 
 ===ERRORS:
+# v0.9.260310+125 (2026-03-10 08:56:17)
 + Hidden items: daily/period/monthly/yearly notifications showed Base64-encoded titles after save and reboot (additem.dart, reminders.dart, NotificationSystem.kt BootReceiver)
 + CSV export: newlines in content/title broke readAsLines() on reimport — data loss on round-trip (backup.dart)
 + Restore: mainDb left closed if file copy fails — app crashes on next DB operation (backup.dart)
