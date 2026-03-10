@@ -49,23 +49,23 @@ class FullScreenAlertActivity : Activity() {
         setContentView(R.layout.activity_fullscreen_alert)
 
         // Get intent data
-        val itemId = intent.getIntExtra("itemId", -1)
-        val title = intent.getStringExtra("title") ?: "Reminder"
-        val content = intent.getStringExtra("content") ?: ""
-        val soundValue = intent.getStringExtra("sound")
+        val itemId = intent.getIntExtra(IntentExtras.ITEM_ID, -1)
+        val title = intent.getStringExtra(IntentExtras.TITLE) ?: "Reminder"
+        val content = intent.getStringExtra(IntentExtras.CONTENT) ?: ""
+        val soundValue = intent.getStringExtra(IntentExtras.SOUND)
 
         // Get translated labels (fallback to English if not provided)
-        val labelReminder = intent.getStringExtra("label_reminder") ?: "Reminder:"
-        val labelPostpone = intent.getStringExtra("label_postpone") ?: "Postpone for:"
-        val labelMin = intent.getStringExtra("label_min") ?: "min"
-        val labelHour = intent.getStringExtra("label_hour") ?: "hour"
-        val labelHours = intent.getStringExtra("label_hours") ?: "hours"
-        val labelDay = intent.getStringExtra("label_day") ?: "day"
-        val isDaily = intent.getBooleanExtra("isDaily", false)
-        val isPeriod = intent.getBooleanExtra("isPeriod", false)
-        val isMonthlyPeriod = intent.getBooleanExtra("isMonthlyPeriod", false)
-        val labelContinue = intent.getStringExtra("label_continue") ?: "Continue"
-        val labelDone = intent.getStringExtra("label_done") ?: "Done"
+        val labelReminder = intent.getStringExtra(IntentExtras.LABEL_REMINDER) ?: "Reminder:"
+        val labelPostpone = intent.getStringExtra(IntentExtras.LABEL_POSTPONE) ?: "Postpone for:"
+        val labelMin = intent.getStringExtra(IntentExtras.LABEL_MIN) ?: "min"
+        val labelHour = intent.getStringExtra(IntentExtras.LABEL_HOUR) ?: "hour"
+        val labelHours = intent.getStringExtra(IntentExtras.LABEL_HOURS) ?: "hours"
+        val labelDay = intent.getStringExtra(IntentExtras.LABEL_DAY) ?: "day"
+        val isDaily = intent.getBooleanExtra(IntentExtras.IS_DAILY, false)
+        val isPeriod = intent.getBooleanExtra(IntentExtras.IS_PERIOD, false)
+        val isMonthlyPeriod = intent.getBooleanExtra(IntentExtras.IS_MONTHLY_PERIOD, false)
+        val labelContinue = intent.getStringExtra(IntentExtras.LABEL_CONTINUE) ?: "Continue"
+        val labelDone = intent.getStringExtra(IntentExtras.LABEL_DONE) ?: "Done"
 
         Log.d("MemorizerApp", "FullScreenAlert - itemId: $itemId, title: $title, sound: $soundValue, isPeriod: $isPeriod")
         Log.d("MemorizerApp", "Labels - reminder: $labelReminder, postpone: $labelPostpone")
@@ -165,8 +165,8 @@ class FullScreenAlertActivity : Activity() {
         setupDragGesture()
 
         // Read loop sound settings from intent
-        loopSound = intent.getBooleanExtra("loopSound", true)
-        repeatCount = intent.getIntExtra("repeatCount", 25)
+        loopSound = intent.getBooleanExtra(IntentExtras.LOOP_SOUND, true)
+        repeatCount = intent.getIntExtra(IntentExtras.REPEAT_COUNT, 25)
         currentRepeat = 0
 
         // Stop any sound already playing from the receiver (in case the system auto-launched
@@ -390,10 +390,10 @@ class FullScreenAlertActivity : Activity() {
             // Create intent for the snoozed reminder - store all data in intent (no DB lookup)
             val intent = Intent(this, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SNOOZED_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("title", title)
-                putExtra("content", content)
-                putExtra("sound", soundValue)
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.CONTENT, content)
+                putExtra(IntentExtras.SOUND, soundValue)
             }
 
             // Use unique requestCode for snoozed reminders (1000000 + itemId to avoid conflicts)

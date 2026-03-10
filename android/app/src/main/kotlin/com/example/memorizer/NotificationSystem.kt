@@ -31,6 +31,33 @@ import java.util.Calendar
 import java.util.Locale
 
 
+// Intent extra key constants
+object IntentExtras {
+    const val ITEM_ID = "itemId"
+    const val TITLE = "title"
+    const val BODY = "body"
+    const val CONTENT = "content"
+    const val SOUND = "sound"
+    const val HOUR = "hour"
+    const val MINUTE = "minute"
+    const val DAYS_MASK = "daysMask"
+    const val NOTIFICATION_ID = "notificationId"
+    const val NOTIFICATION_PAYLOAD = "notification_payload"
+    const val IS_DAILY = "isDaily"
+    const val IS_PERIOD = "isPeriod"
+    const val IS_MONTHLY_PERIOD = "isMonthlyPeriod"
+    const val LOOP_SOUND = "loopSound"
+    const val REPEAT_COUNT = "repeatCount"
+    const val LABEL_REMINDER = "label_reminder"
+    const val LABEL_POSTPONE = "label_postpone"
+    const val LABEL_MIN = "label_min"
+    const val LABEL_HOUR = "label_hour"
+    const val LABEL_HOURS = "label_hours"
+    const val LABEL_DAY = "label_day"
+    const val LABEL_CONTINUE = "label_continue"
+    const val LABEL_DONE = "label_done"
+}
+
 /**
  * Main activity for the application.
  * Initializes Method Channel for Flutter communication and sets up notifications.
@@ -177,8 +204,8 @@ class MainActivity : FlutterActivity() {
             notificationManager.cancelAll()
 
             // Check if there's payload in intent
-            if (intent.hasExtra("notification_payload")) {
-                val payload = intent.getStringExtra("notification_payload")
+            if (intent.hasExtra(IntentExtras.NOTIFICATION_PAYLOAD)) {
+                val payload = intent.getStringExtra(IntentExtras.NOTIFICATION_PAYLOAD)
                 // Handle notification click if needed
             }
         } catch (e: Exception) {
@@ -411,7 +438,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
                 for (day in 1..31) {
                     val intent = Intent(context, NotificationReceiver::class.java).apply {
                         action = "com.example.memorizer.PERIOD_REMINDER"
-                        putExtra("itemId", itemId)
+                        putExtra(IntentExtras.ITEM_ID, itemId)
                     }
                     val requestCode = itemId * 10000 + month * 100 + day
                     val pendingIntent = PendingIntent.getBroadcast(
@@ -536,12 +563,12 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             // Create intent for daily reminder
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.DAILY_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("hour", hour)
-                putExtra("minute", minute)
-                putExtra("daysMask", daysMask)
-                putExtra("title", title)
-                putExtra("body", body)
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.HOUR, hour)
+                putExtra(IntentExtras.MINUTE, minute)
+                putExtra(IntentExtras.DAYS_MASK, daysMask)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.BODY, body)
             }
 
             // Use unique requestCode based on itemId, hour and minute
@@ -669,9 +696,9 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
 
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.PERIOD_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("title", title)
-                putExtra("body", body)
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.BODY, body)
             }
 
             // requestCode must be unique per item + month + day
@@ -729,9 +756,9 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
             // Create intent for specific reminder
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SPECIFIC_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("title", title)
-                putExtra("body", body)
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.BODY, body)
             }
 
             // Use itemId as unique requestCode for PendingIntent
@@ -803,7 +830,7 @@ class NotificationService(private val context: Context) : MethodChannel.MethodCa
         try {
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra("notification_payload", payload)
+                putExtra(IntentExtras.NOTIFICATION_PAYLOAD, payload)
             }
 
             val pendingIntent = PendingIntent.getActivity(
@@ -897,7 +924,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 "com.example.memorizer.STOP_SOUND" -> {
                     // Stop playing sound and dismiss notification
                     NotificationService.stopSoundStatic()
-                    val notifId = intent.getIntExtra("notificationId", 0)
+                    val notifId = intent.getIntExtra(IntentExtras.NOTIFICATION_ID, 0)
                     if (notifId != 0) {
                         NotificationManagerCompat.from(context).cancel(notifId)
                     }
@@ -933,12 +960,12 @@ class NotificationReceiver : BroadcastReceiver() {
     // Handle daily reminder
     private fun handleDailyReminder(context: Context, intent: Intent) {
         try {
-            val itemId = intent.getIntExtra("itemId", 0)
-            val hour = intent.getIntExtra("hour", 0)
-            val minute = intent.getIntExtra("minute", 0)
-            val daysMask = intent.getIntExtra("daysMask", 127)
-            val title = intent.getStringExtra("title") ?: "Daily Reminder"
-            val body = intent.getStringExtra("body") ?: ""
+            val itemId = intent.getIntExtra(IntentExtras.ITEM_ID, 0)
+            val hour = intent.getIntExtra(IntentExtras.HOUR, 0)
+            val minute = intent.getIntExtra(IntentExtras.MINUTE, 0)
+            val daysMask = intent.getIntExtra(IntentExtras.DAYS_MASK, 127)
+            val title = intent.getStringExtra(IntentExtras.TITLE) ?: "Daily Reminder"
+            val body = intent.getStringExtra(IntentExtras.BODY) ?: ""
 
             Log.d("MemorizerApp", "Handling daily reminder for item $itemId at $hour:$minute")
 
@@ -1015,12 +1042,12 @@ class NotificationReceiver : BroadcastReceiver() {
         try {
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.DAILY_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("hour", hour)
-                putExtra("minute", minute)
-                putExtra("daysMask", daysMask)
-                putExtra("title", title)
-                putExtra("body", body)
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.HOUR, hour)
+                putExtra(IntentExtras.MINUTE, minute)
+                putExtra(IntentExtras.DAYS_MASK, daysMask)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.BODY, body)
             }
 
             val requestCode = itemId * 10000 + hour * 100 + minute
@@ -1205,7 +1232,7 @@ class NotificationReceiver : BroadcastReceiver() {
         try {
             val notificationIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra("notification_payload", itemId.toString())
+                putExtra(IntentExtras.NOTIFICATION_PAYLOAD, itemId.toString())
             }
 
             // Use unique notification ID based on itemId, hour and minute
@@ -1228,7 +1255,7 @@ class NotificationReceiver : BroadcastReceiver() {
             // Stop sound intent (for action button and swipe dismiss)
             val stopIntent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.STOP_SOUND"
-                putExtra("notificationId", notificationId)
+                putExtra(IntentExtras.NOTIFICATION_ID, notificationId)
             }
             val stopPendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -1399,9 +1426,9 @@ class NotificationReceiver : BroadcastReceiver() {
             // Create intent for next reminder
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SPECIFIC_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("title", itemData.title ?: "")
-                putExtra("body", itemData.content ?: "")
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.TITLE, itemData.title ?: "")
+                putExtra(IntentExtras.BODY, itemData.content ?: "")
             }
 
             val pendingIntent = PendingIntent.getBroadcast(
@@ -1446,9 +1473,9 @@ class NotificationReceiver : BroadcastReceiver() {
     // Handle specific reminder
     private fun handleSpecificReminder(context: Context, intent: Intent) {
         try {
-            val itemId = intent.getIntExtra("itemId", 0)
-            val title = intent.getStringExtra("title") ?: "Memorizer"
-            val body = intent.getStringExtra("body") ?: "Reminder"
+            val itemId = intent.getIntExtra(IntentExtras.ITEM_ID, 0)
+            val title = intent.getStringExtra(IntentExtras.TITLE) ?: "Memorizer"
+            val body = intent.getStringExtra(IntentExtras.BODY) ?: "Reminder"
 
             Log.d("MemorizerApp", "Handling specific reminder for item $itemId")
 
@@ -1525,10 +1552,10 @@ class NotificationReceiver : BroadcastReceiver() {
         try {
             Log.d("MemorizerApp", "=== SNOOZED REMINDER FIRED ===")
 
-            val itemId = intent.getIntExtra("itemId", 0)
-            val title = intent.getStringExtra("title") ?: "Memorizer"
-            val content = intent.getStringExtra("content") ?: ""
-            val soundValue = intent.getStringExtra("sound")
+            val itemId = intent.getIntExtra(IntentExtras.ITEM_ID, 0)
+            val title = intent.getStringExtra(IntentExtras.TITLE) ?: "Memorizer"
+            val content = intent.getStringExtra(IntentExtras.CONTENT) ?: ""
+            val soundValue = intent.getStringExtra(IntentExtras.SOUND)
 
             Log.d("MemorizerApp", "Snooze fired at: ${java.util.Date()}")
             Log.d("MemorizerApp", "Data: itemId=$itemId, title=$title")
@@ -1549,7 +1576,7 @@ class NotificationReceiver : BroadcastReceiver() {
     // Handle period reminder - loads item from DB, shows notification/fullscreen
     private fun handlePeriodReminder(context: Context, intent: Intent) {
         try {
-            val itemId = intent.getIntExtra("itemId", 0)
+            val itemId = intent.getIntExtra(IntentExtras.ITEM_ID, 0)
             Log.d("MemorizerApp", "Handling period reminder for item $itemId")
 
             // Check if reminders are enabled
@@ -1731,24 +1758,24 @@ class NotificationReceiver : BroadcastReceiver() {
             // Build intent with all data for FullScreenAlertActivity
             val fullScreenIntent = Intent(context, FullScreenAlertActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra("itemId", itemId)
-                putExtra("title", title)
-                putExtra("content", content)
-                putExtra("sound", soundValue)
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.CONTENT, content)
+                putExtra(IntentExtras.SOUND, soundValue)
                 // Pass translations for UI labels (add punctuation programmatically)
-                putExtra("label_reminder", translate(context, "Reminder") + ":")
-                putExtra("label_postpone", translate(context, "Postpone for") + ":")
-                putExtra("label_min", translate(context, "min"))
-                putExtra("label_hour", translate(context, "hour"))
-                putExtra("label_hours", translate(context, "hours"))
-                putExtra("label_day", translate(context, "day"))
-                putExtra("isDaily", isDaily)
-                putExtra("isPeriod", isPeriod)
-                putExtra("isMonthlyPeriod", isMonthlyPeriod)
-                putExtra("loopSound", loopSound)
-                putExtra("repeatCount", repeatCount)
-                putExtra("label_continue", translate(context, "Continue"))
-                putExtra("label_done", translate(context, "Done"))
+                putExtra(IntentExtras.LABEL_REMINDER, translate(context, "Reminder") + ":")
+                putExtra(IntentExtras.LABEL_POSTPONE, translate(context, "Postpone for") + ":")
+                putExtra(IntentExtras.LABEL_MIN, translate(context, "min"))
+                putExtra(IntentExtras.LABEL_HOUR, translate(context, "hour"))
+                putExtra(IntentExtras.LABEL_HOURS, translate(context, "hours"))
+                putExtra(IntentExtras.LABEL_DAY, translate(context, "day"))
+                putExtra(IntentExtras.IS_DAILY, isDaily)
+                putExtra(IntentExtras.IS_PERIOD, isPeriod)
+                putExtra(IntentExtras.IS_MONTHLY_PERIOD, isMonthlyPeriod)
+                putExtra(IntentExtras.LOOP_SOUND, loopSound)
+                putExtra(IntentExtras.REPEAT_COUNT, repeatCount)
+                putExtra(IntentExtras.LABEL_CONTINUE, translate(context, "Continue"))
+                putExtra(IntentExtras.LABEL_DONE, translate(context, "Done"))
             }
 
             // Try direct startActivity only if "Draw over other apps" is granted.
@@ -1835,7 +1862,7 @@ class NotificationReceiver : BroadcastReceiver() {
             // Create notification intent that opens the app
             val notificationIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                putExtra("notification_payload", itemId.toString())
+                putExtra(IntentExtras.NOTIFICATION_PAYLOAD, itemId.toString())
             }
 
             val pendingIntent = PendingIntent.getActivity(
@@ -1856,7 +1883,7 @@ class NotificationReceiver : BroadcastReceiver() {
             // Stop sound intent (for action button and swipe dismiss)
             val stopIntent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.STOP_SOUND"
-                putExtra("notificationId", notificationId)
+                putExtra(IntentExtras.NOTIFICATION_ID, notificationId)
             }
             val stopPendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -2334,12 +2361,12 @@ class BootReceiver : BroadcastReceiver() {
         try {
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.DAILY_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("hour", hour)
-                putExtra("minute", minute)
-                putExtra("daysMask", daysMask)
-                putExtra("title", title)
-                putExtra("body", "")
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.HOUR, hour)
+                putExtra(IntentExtras.MINUTE, minute)
+                putExtra(IntentExtras.DAYS_MASK, daysMask)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.BODY, "")
             }
 
             val requestCode = itemId * 10000 + hour * 100 + minute
@@ -2423,9 +2450,9 @@ class BootReceiver : BroadcastReceiver() {
         try {
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.SPECIFIC_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("title", title)
-                putExtra("body", body)
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.BODY, body)
             }
 
             val pendingIntent = PendingIntent.getBroadcast(
@@ -2472,9 +2499,9 @@ class BootReceiver : BroadcastReceiver() {
         try {
             val intent = Intent(context, NotificationReceiver::class.java).apply {
                 action = "com.example.memorizer.PERIOD_REMINDER"
-                putExtra("itemId", itemId)
-                putExtra("title", title)
-                putExtra("body", "")
+                putExtra(IntentExtras.ITEM_ID, itemId)
+                putExtra(IntentExtras.TITLE, title)
+                putExtra(IntentExtras.BODY, "")
             }
 
             val requestCode = itemId * 10000 + month * 100 + day
