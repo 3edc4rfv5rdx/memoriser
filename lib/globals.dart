@@ -16,7 +16,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 const String progVersion = '0.9.260310';
-const int buildNumber = 125;
+const int buildNumber = 126;
 const String progAuthor = 'Eugen';
 
 const String localesFile = 'assets/locales.json';
@@ -42,6 +42,7 @@ late Directory? backupDirectory;
 bool xvDebug = true;
 String xvTagFilter = '';
 String xvFilter = '';
+String xvSavedUserFilter = ''; // User filter preserved when inside virtual folders
 bool xvHiddenMode = false;
 
 String currentPin = '';
