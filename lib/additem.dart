@@ -795,8 +795,8 @@ class _EditItemPageState extends State<EditItemPage> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      firstDate: datePickerFirst,
+      lastDate: datePickerLast,
       locale: Locale(getLocaleCode(currentLocale)),
       builder: (context, child) {
         return Theme(
@@ -879,7 +879,7 @@ class _EditItemPageState extends State<EditItemPage> {
           // Plus button with upbar color
           ElevatedButton(
             onPressed:
-                _priority < 3 ? () => setState(() => _priority++) : null,
+                _priority < maxPriority ? () => setState(() => _priority++) : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: clUpBar,
               foregroundColor: clText,

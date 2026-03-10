@@ -1397,6 +1397,18 @@ const int dayAllDays = 127;   // 0b1111111 (all days)
 const int dayWeekdays = 31;   // 0b0011111 (Mon-Fri)
 const int dayWeekend = 96;    // 0b1100000 (Sat-Sun)
 
+// Virtual folder filter identifiers
+const Set<String> virtualFolderFilters = {
+  'notes:true', 'yearly:true', 'daily:true', 'monthly:true', 'period:true'
+};
+
+// Date picker bounds
+final DateTime datePickerFirst = DateTime(2000);
+final DateTime datePickerLast = DateTime(2101);
+
+// Priority
+const int maxPriority = 3;
+
 // Day name keys for localization (ordered: Mon-Sun)
 const List<String> dayKeys = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
@@ -1555,9 +1567,6 @@ Future<String> getFilterStatusText() async {
   bool hasTagFilter = xvTagFilter.isNotEmpty;
 
   // Virtual folder filters are not user-set filters, don't show (F)
-  const virtualFolderFilters = {
-    'notes:true', 'yearly:true', 'daily:true', 'monthly:true', 'period:true'
-  };
   bool hasUserFilter = xvFilter.isNotEmpty &&
       !virtualFolderFilters.contains(xvFilter);
 

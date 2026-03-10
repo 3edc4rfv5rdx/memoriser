@@ -314,9 +314,6 @@ Future<List<Map<String, dynamic>>> getItems() async {
 
     // Virtual folder SQL filtering — filter by type directly in SQL
     bool isVirtualFolder = false;
-    const virtualFolderFilters = {
-      'notes:true', 'yearly:true', 'daily:true', 'monthly:true', 'period:true'
-    };
     if (virtualFolderFilters.contains(xvFilter)) {
       isVirtualFolder = true;
       switch (xvFilter) {
@@ -1045,7 +1042,7 @@ class _HomePageState extends State<HomePage> {
         // Add stars for priority
         int priority = item['priority'] ?? 0;
         if (priority > 0) {
-          priorityStars = ' ${'★' * (priority > 3 ? 3 : priority)}';
+          priorityStars = ' ${'★' * (priority > maxPriority ? maxPriority : priority)}';
         }
 
         // Add time if available
@@ -2357,7 +2354,7 @@ class _HomePageState extends State<HomePage> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: List.generate(
-                        priorityValue > 3 ? 3 : priorityValue,
+                        priorityValue > maxPriority ? maxPriority : priorityValue,
                             (i) => Icon(Icons.star, color: clUpBar, size: 34),
                       ),
                     ),

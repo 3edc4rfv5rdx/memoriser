@@ -232,7 +232,7 @@ class _SettingsScreenImplState extends State<_SettingsScreenImpl> {
             final itemId = item['id'] as int;
             final title = item['title'] as String? ?? '';
             final dailyTimesStr = item['daily_times'] as String?;
-            final dailyDays = item['daily_days'] as int? ?? 127;
+            final dailyDays = item['daily_days'] as int? ?? dayAllDays;
             if (dailyTimesStr == null || dailyTimesStr.isEmpty) continue;
             final dailyTimes = parseDailyTimes(dailyTimesStr);
             if (dailyTimes.isEmpty) continue;

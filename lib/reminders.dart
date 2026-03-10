@@ -236,7 +236,7 @@ class SimpleNotifications {
           final dateFrom = item['date'] as int?;
           final dateTo = item['period_to'] as int?;
           final itemTime = item['time'] as int?;
-          final periodDays = item['period_days'] as int? ?? 127;
+          final periodDays = item['period_days'] as int? ?? dayAllDays;
           var title = item['title'] as String? ?? '';
           final hidden = item['hidden'] as int? ?? 0;
           if (hidden == 1) title = deobfuscateText(title);
@@ -271,7 +271,7 @@ class SimpleNotifications {
             final hidden = item['hidden'] as int? ?? 0;
             if (hidden == 1) title = deobfuscateText(title);
             final dailyTimesStr = item['daily_times'] as String?;
-            final dailyDays = item['daily_days'] as int? ?? 127;
+            final dailyDays = item['daily_days'] as int? ?? dayAllDays;
 
             if (dailyTimesStr == null || dailyTimesStr.isEmpty) {
               myPrint('Skipping daily item $itemId - no times');

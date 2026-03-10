@@ -325,8 +325,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      firstDate: datePickerFirst,
+      lastDate: datePickerLast,
       locale: Locale(getLocaleCode(currentLocale)),
       builder: (context, child) {
         return Theme(
@@ -368,8 +368,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      firstDate: datePickerFirst,
+      lastDate: datePickerLast,
       locale: Locale(getLocaleCode(currentLocale)),
       builder: (context, child) {
         return Theme(
@@ -548,7 +548,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(3, (index) {
+                  children: List.generate(maxPriority, (index) {
                     return Icon(
                       Icons.star,
                       color:
