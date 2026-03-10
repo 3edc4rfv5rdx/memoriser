@@ -1,3 +1,23 @@
+  + Audit Phase 3 continued: Code quality refactoring
+    1. Moved getFilterStatusText() to globals.dart, removed duplicates from main.dart and filters.dart
+       (filters.dart version was dead code, lacked virtual folder exclusion)
+    2. Extracted magic numbers/strings to named constants in globals.dart:
+       - dayAllDays (replacing hardcoded 127 in settings.dart, reminders.dart)
+       - datePickerFirst/datePickerLast (replacing DateTime(2000)/DateTime(2101))
+       - maxPriority (replacing hardcoded 3)
+       - virtualFolderFilters (shared constant set)
+    3. Created IntentExtras constants object in NotificationSystem.kt — replaced 60+ hardcoded
+       intent extra string literals across NotificationSystem.kt and FullScreenAlertActivity.kt
+    4. Split large functions:
+       - additem.dart: _saveItem() (293 lines) → _validateItem() + _buildItemData() + _saveItem() (~60 lines)
+       - main.dart: getItems() (210 lines) → _applyTagCloudFilter() + _applyUserFilter() + getItems() (~60 lines)
+    5. Created SoundUtils.kt with shared sound utilities:
+       - alarmAudioAttributes: shared AudioAttributes for USAGE_ALARM
+       - resolveUri(): unified sound URI resolution (fixed subtle difference in else-branch fallback)
+       - routeToSpeaker(): force output to built-in speaker
+       - getSystemFallbackUri(): alarm → notification fallback chain
+       Both NotificationSystem.kt and FullScreenAlertActivity.kt now use SoundUtils
+
   + Audit Phase 3: Code quality fixes:
     1. Fixed debug message "Showing green SnackBar" → "Showing orange SnackBar" in okInfoBarOrange()
     2. Replaced 4 silent catch(_){} blocks in backup.dart with proper error logging

@@ -1,6 +1,8 @@
 #!/bin/sh
 
 
+exit
+
 #adb -s RFCW91FV79X shell settings put secure backup_enabled 0
 #adb -s RFCW91FV79X shell settings put secure backup_auto_restore 0
 ##adb -s RFCW91FV79X shell settings get secure backup_enabled
