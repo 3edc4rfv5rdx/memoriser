@@ -260,59 +260,104 @@ Future<void> _migratePhotosToItemFolders(Database db) async {
 }
 
 // Function to get filter status text
-// Optimized getItems() using SQL for sorting and LIMIT
-// Fixed getItems() with correct SQL syntax
+// Apply tag cloud filter conditions (AND logic — items must have ALL selected tags)
+void _applyTagCloudFilter(List<String> conditions, List<dynamic> args) {
+  if (xvTagFilter.isEmpty) return;
+  myPrint('Tag filter is active: $xvTagFilter');
+
+  List<String> tagFilters = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
+  for (String tag in tagFilters) {
+    final matchTag = xvHiddenMode ? obfuscateText(tag) : tag;
+    conditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
+    args.add('%,$matchTag,%');
+  }
+}
+
+// Apply user-set filter string to query conditions
+void _applyUserFilter(List<String> conditions, List<dynamic> args) {
+  if (xvFilter.isEmpty || virtualFolderFilters.contains(xvFilter)) return;
+  myPrint('Main filter is active: $xvFilter');
+
+  for (String part in xvFilter.split('|')) {
+    final colonIndex = part.indexOf(':');
+    if (colonIndex < 0) continue;
+
+    String key = part.substring(0, colonIndex);
+    String value = part.substring(colonIndex + 1);
+    if (value.isEmpty) continue;
+
+    switch (key) {
+      case 'dateFrom':
+        try {
+          final dateValue = dateTimeToYYYYMMDD(DateFormat(ymdDateFormat).parse(value));
+          conditions.add('(date IS NOT NULL AND (date >= ? OR (period_to IS NOT NULL AND period_to >= ?)))');
+          args.add(dateValue);
+          args.add(dateValue);
+        } catch (e) {
+          myPrint('Error parsing dateFrom: $e');
+        }
+        break;
+
+      case 'dateTo':
+        try {
+          final dateValue = dateTimeToYYYYMMDD(DateFormat(ymdDateFormat).parse(value));
+          conditions.add('(date IS NOT NULL AND date <= ?)');
+          args.add(dateValue);
+        } catch (e) {
+          myPrint('Error parsing dateTo: $e');
+        }
+        break;
+
+      case 'priority':
+        try {
+          conditions.add('priority = ?');
+          args.add(int.parse(value));
+        } catch (e) {
+          myPrint('Error parsing priority: $e');
+        }
+        break;
+
+      case 'hasReminder':
+        if (value.toLowerCase() == 'true') {
+          conditions.add('(remind = 1 OR daily = 1 OR period = 1)');
+        } else {
+          conditions.add('(remind != 1 OR remind IS NULL) AND (daily != 1 OR daily IS NULL) AND (period != 1 OR period IS NULL)');
+        }
+        break;
+
+      case 'tags':
+        // Filters screen tags: OR logic (items with ANY of the tags)
+        List<String> tagConditions = [];
+        for (String tag in value.split(',').map((t) => t.trim())) {
+          final matchTag = xvHiddenMode ? obfuscateText(tag) : tag;
+          tagConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
+          args.add('%,$matchTag,%');
+        }
+        if (tagConditions.isNotEmpty) {
+          conditions.add('(${tagConditions.join(' OR ')})');
+        }
+        break;
+    }
+  }
+}
 
 Future<List<Map<String, dynamic>>> getItems() async {
   try {
-    // Get sort order from settings
     final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
-    myPrint('Newest first setting: $newestFirst');
-
-    // Get last items limit from settings
     final lastItemsStr = await getSetting("Last items") ?? defSettings["Last items"];
     final lastItems = int.tryParse(lastItemsStr) ?? 0;
-    myPrint('Last items setting: $lastItems');
-
-    // Get today's date in YYYYMMDD format
     final todayDate = dateTimeToYYYYMMDD(DateTime.now());
-    myPrint('Today date: $todayDate');
 
-    // Initial WHERE values
     List<String> whereConditions = [];
     List<dynamic> whereArgs = [];
 
-    // Add hidden filter condition
-    if (xvHiddenMode) {
-      whereConditions.add('hidden = 1');
-    } else {
-      whereConditions.add('(hidden = 0 OR hidden IS NULL)');
-    }
+    // Hidden filter
+    whereConditions.add(xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)');
 
-    // Tag Cloud filter: AND logic (items must have ALL selected tags)
-    if (xvTagFilter.isNotEmpty) {
-      myPrint('Tag filter is active: $xvTagFilter');
+    // Tag cloud filter (AND logic)
+    _applyTagCloudFilter(whereConditions, whereArgs);
 
-      // Split tag string into individual tags
-      List<String> tagFilters = xvTagFilter.split(',').map((tag) => tag.trim()).toList();
-
-      if (xvHiddenMode) {
-        for (String tag in tagFilters) {
-          String obfuscatedTag = obfuscateText(tag);
-          // Exact tag match: wrap in commas, trim spaces around commas
-          whereConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
-          whereArgs.add('%,$obfuscatedTag,%');
-        }
-      } else {
-        for (String tag in tagFilters) {
-          // Exact tag match: wrap in commas, trim spaces around commas
-          whereConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
-          whereArgs.add('%,$tag,%');
-        }
-      }
-    }
-
-    // Virtual folder SQL filtering — filter by type directly in SQL
+    // Virtual folder filter
     bool isVirtualFolder = false;
     if (virtualFolderFilters.contains(xvFilter)) {
       isVirtualFolder = true;
@@ -335,141 +380,36 @@ Future<List<Map<String, dynamic>>> getItems() async {
       }
     }
 
-    // Parse user-set filter string
-    if (xvFilter.isNotEmpty && !isVirtualFolder) {
-      myPrint('Main filter is active: $xvFilter');
+    // User-set filter
+    _applyUserFilter(whereConditions, whereArgs);
 
-      // Split filter string into parts
-      List<String> filterParts = xvFilter.split('|');
-
-      for (String part in filterParts) {
-        // Split on first colon only to handle values containing colons
-        final colonIndex = part.indexOf(':');
-        if (colonIndex < 0) continue;
-
-        String key = part.substring(0, colonIndex);
-        String value = part.substring(colonIndex + 1);
-
-        switch (key) {
-          case 'dateFrom':
-            if (value.isNotEmpty) {
-              try {
-                final date = DateFormat(ymdDateFormat).parse(value);
-                final dateValue = dateTimeToYYYYMMDD(date);
-                // Include period items where period_to >= dateFrom
-                whereConditions.add('(date IS NOT NULL AND (date >= ? OR (period_to IS NOT NULL AND period_to >= ?)))');
-                whereArgs.add(dateValue);
-                whereArgs.add(dateValue);
-              } catch (e) {
-                myPrint('Error parsing dateFrom: $e');
-              }
-            }
-            break;
-
-          case 'dateTo':
-            if (value.isNotEmpty) {
-              try {
-                final date = DateFormat(ymdDateFormat).parse(value);
-                final dateValue = dateTimeToYYYYMMDD(date);
-                whereConditions.add('(date IS NOT NULL AND date <= ?)');
-                whereArgs.add(dateValue);
-              } catch (e) {
-                myPrint('Error parsing dateTo: $e');
-              }
-            }
-            break;
-
-          case 'priority':
-            if (value.isNotEmpty) {
-              try {
-                final priorityValue = int.parse(value);
-                whereConditions.add('priority = ?');
-                whereArgs.add(priorityValue);
-              } catch (e) {
-                myPrint('Error parsing priority: $e');
-              }
-            }
-            break;
-
-          case 'hasReminder':
-            if (value.isNotEmpty) {
-              if (value.toLowerCase() == 'true') {
-                // Match any reminder type: one-time, daily, or period
-                whereConditions.add('(remind = 1 OR daily = 1 OR period = 1)');
-              } else {
-                whereConditions.add('(remind != 1 OR remind IS NULL) AND (daily != 1 OR daily IS NULL) AND (period != 1 OR period IS NULL)');
-              }
-            }
-            break;
-
-          case 'tags':
-            if (value.isNotEmpty) {
-              // Split by comma to handle multiple tags in filter
-              List<String> tagFilters = value.split(',').map((tag) => tag.trim()).toList();
-
-              // For each tag, add a LIKE condition
-              List<String> tagConditions = [];
-              for (String tag in tagFilters) {
-                if (xvHiddenMode) {
-                  String obfuscatedTag = obfuscateText(tag);
-                  tagConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
-                  whereArgs.add('%,$obfuscatedTag,%');
-                } else {
-                  tagConditions.add("(',' || REPLACE(tags, ', ', ',') || ',') LIKE ?");
-                  whereArgs.add('%,$tag,%');
-                }
-              }
-
-              // Filters screen tags: OR logic (items with ANY of the tags)
-              if (tagConditions.isNotEmpty) {
-                whereConditions.add('(${tagConditions.join(' OR ')})');
-              }
-            }
-            break;
-        }
-      }
-    }
-
-    // Build final WHERE clause
+    // Build query
     String whereClause = whereConditions.isEmpty ? "" : "WHERE ${whereConditions.join(' AND ')}";
-
-    // Define sort direction multiplier (-1 for DESC, 1 for ASC)
-    // SQLite doesn't allow DESC/ASC in CASE expressions,
-    // so we use a multiplier to change sort direction
     final dateFactor = newestFirst == "true" ? "-1" : "1";
     final createdFactor = newestFirst == "true" ? "-1" : "1";
 
-    // Build ORDER BY string with correct SQLite syntax
-    // Instead of using DESC/ASC in expressions, multiply values by -1 for reverse sort
     String orderByClause =
-        "CASE WHEN date = $todayDate THEN 1 WHEN date IS NOT NULL AND date > 0 THEN 2 ELSE 3 END ASC, " "priority DESC, " "CASE WHEN date = $todayDate THEN 0 WHEN date IS NOT NULL AND date > 0 THEN $dateFactor * date ELSE 0 END, " "CASE WHEN date IS NULL OR date = 0 THEN $createdFactor * created ELSE 0 END";
+        "CASE WHEN date = $todayDate THEN 1 WHEN date IS NOT NULL AND date > 0 THEN 2 ELSE 3 END ASC, "
+        "priority DESC, "
+        "CASE WHEN date = $todayDate THEN 0 WHEN date IS NOT NULL AND date > 0 THEN $dateFactor * date ELSE 0 END, "
+        "CASE WHEN date IS NULL OR date = 0 THEN $createdFactor * created ELSE 0 END";
 
-    // Build full SQL query
     String sqlQuery = "SELECT * FROM items $whereClause ORDER BY $orderByClause";
-
-    // Apply LIMIT only on main screen, not inside virtual folders
     if (lastItems > 0 && !isVirtualFolder) {
       sqlQuery += " LIMIT $lastItems";
     }
 
-    // Execute query
     List<Map<String, dynamic>> result = await mainDb.rawQuery(sqlQuery, whereArgs);
 
-    // Process obfuscated records if in hidden mode
     if (xvHiddenMode) {
       result = result.map((item) => processItemForView(item)).toList();
     }
 
     myPrint('Retrieved items count: ${result.length}');
-    myPrint('Today items count: ${result.where((item) => item['date'] == todayDate).length}');
-    if (result.isNotEmpty) {
-      myPrint('First item: ${result.first}');
-    }
-
     return result;
   } catch (e) {
     myPrint('Error loading items: $e');
-    return []; // Return empty list instead of throwing error
+    return [];
   }
 }
 

@@ -277,37 +277,25 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
 // Save function that directly interacts with the database
-  Future<void> _saveItem() async {
+  // Validate all item fields before saving, returns true if valid
+  Future<bool> _validateItem() async {
     if (titleController.text.trim().isEmpty) {
       okInfoBarRed(lw('Title cannot be empty'), duration: Duration(seconds: 4));
-      return;
+      return false;
     }
 
     // Validation for one-time reminder
     if (_remind) {
-      // Check if date is set
       if (_date == null) {
-        okInfoBarRed(
-          lw('Set a date for the reminder'),
-          duration: Duration(seconds: 4),
-        );
-        return;
+        okInfoBarRed(lw('Set a date for the reminder'), duration: Duration(seconds: 4));
+        return false;
       }
-
       // Validate the reminder date is not in the past (skip for yearly/monthly — they auto-advance)
       if (!_yearly && !_monthly) {
-        final today = DateTime(
-          DateTime.now().year,
-          DateTime.now().month,
-          DateTime.now().day,
-        );
-
+        final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
         if (_date!.isBefore(today)) {
-          okInfoBarRed(
-            lw('Reminder date cannot be in the past'),
-            duration: Duration(seconds: 4),
-          );
-          return;
+          okInfoBarRed(lw('Reminder date cannot be in the past'), duration: Duration(seconds: 4));
+          return false;
         }
       }
     }
@@ -315,18 +303,12 @@ class _EditItemPageState extends State<EditItemPage> {
     // Validation for daily reminder
     if (_daily) {
       if (_dailyTimes.isEmpty) {
-        okInfoBarRed(
-          lw('Add at least one time'),
-          duration: Duration(seconds: 4),
-        );
-        return;
+        okInfoBarRed(lw('Add at least one time'), duration: Duration(seconds: 4));
+        return false;
       }
       if (_dailyDays == 0) {
-        okInfoBarRed(
-          lw('Select at least one day'),
-          duration: Duration(seconds: 4),
-        );
-        return;
+        okInfoBarRed(lw('Select at least one day'), duration: Duration(seconds: 4));
+        return false;
       }
     }
 
@@ -336,33 +318,31 @@ class _EditItemPageState extends State<EditItemPage> {
       final toText = periodToController.text.trim();
       if (fromText.isEmpty || toText.isEmpty) {
         okInfoBarRed(lw('Set both dates for the period'), duration: Duration(seconds: 4));
-        return;
+        return false;
       }
       if (_time == null) {
         okInfoBarRed(lw('Set a time for the reminder'), duration: Duration(seconds: 4));
-        return;
+        return false;
       }
       if (_periodDays == 0) {
         okInfoBarRed(lw('Select at least one day'), duration: Duration(seconds: 4));
-        return;
+        return false;
       }
-      // Parse and validate period dates
       final fromVal = _parsePeriodValue(fromText);
       final toVal = _parsePeriodValue(toText);
       if (fromVal == null || toVal == null) {
         okInfoBarRed(lw('Invalid date format'), duration: Duration(seconds: 4));
-        return;
+        return false;
       }
-      // Check both are same type
       final fromIsDayOfMonth = fromVal >= 1 && fromVal <= 31;
       final toIsDayOfMonth = toVal >= 1 && toVal <= 31;
       if (fromIsDayOfMonth != toIsDayOfMonth) {
         okInfoBarRed(lw('Both dates must be the same format'), duration: Duration(seconds: 4));
-        return;
+        return false;
       }
     }
 
-    // Check time conflicts with other items
+    // Check time conflicts with other items (warning only, not blocking)
     if (_remind && _time != null) {
       final timeStr = timeIntToString(_time);
       if (timeStr != null) {
@@ -376,192 +356,120 @@ class _EditItemPageState extends State<EditItemPage> {
       }
     }
 
-    // Convert date to YYYYMMDD format for storage
-    int? dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
-    final remindValue = _remind ? 1 : 0;
-    final activeValue = _active ? 1 : 0;
-    final hiddenValue = _hidden ? 1 : 0;
-    final removeValue = _removeAfterReminder ? 1 : 0;
-    final yearlyValue = _yearly ? 1 : 0;
-    final monthlyValue = _monthly ? 1 : 0;
-    final fullscreenValue = _fullscreen ? 1 : 0;
+    return true;
+  }
 
-    // Period reminder fields
-    final periodValue = _period ? 1 : 0;
+  // Build column map for DB insert/update
+  Map<String, dynamic> _buildItemData() {
+    int? dateValue = _date != null ? dateTimeToYYYYMMDD(_date) : null;
     int? periodToValue;
-    final periodDaysValue = _periodDays;
     if (_period) {
-      final fromVal = _parsePeriodValue(periodFromController.text.trim());
-      final toVal = _parsePeriodValue(periodToController.text.trim());
-      dateValue = fromVal; // Store period start in date field
-      periodToValue = toVal;
+      dateValue = _parsePeriodValue(periodFromController.text.trim());
+      periodToValue = _parsePeriodValue(periodToController.text.trim());
     }
 
-    // Daily reminder fields
-    final dailyValue = _daily ? 1 : 0;
-    final dailyTimesValue = encodeDailyTimes(_dailyTimes);
-    final dailyDaysValue = _dailyDays;
-
-    // Get time value (may be null)
-    final timeValue = _time;
-
-    // Prepare data for saving
     String titleText = titleController.text.trim();
     String contentText = contentController.text.trim();
     String tagsText = tagsController.text.trim();
-    // Keep original title for notifications (before obfuscation)
-    final notificationTitle = titleText;
 
     // Obfuscate data if the record is hidden and we're in hidden mode
-    if (hiddenValue == 1 && xvHiddenMode) {
+    if (_hidden && xvHiddenMode) {
       titleText = obfuscateText(titleText);
       contentText = obfuscateText(contentText);
       tagsText = obfuscateText(tagsText);
     }
 
+    return {
+      'title': titleText,
+      'content': contentText.isEmpty ? null : contentText,
+      'tags': tagsText.isEmpty ? null : tagsText,
+      'priority': _priority,
+      'date': dateValue,
+      'time': _time,
+      'remind': _remind ? 1 : 0,
+      'active': _active ? 1 : 0,
+      'hidden': _hidden ? 1 : 0,
+      'remove': _removeAfterReminder ? 1 : 0,
+      'yearly': _yearly ? 1 : 0,
+      'monthly': _monthly ? 1 : 0,
+      'daily': _daily ? 1 : 0,
+      'daily_times': encodeDailyTimes(_dailyTimes),
+      'daily_days': _dailyDays,
+      'sound': _sound,
+      'daily_sound': _dailySound,
+      'fullscreen': _fullscreen ? 1 : 0,
+      'loop_sound': _loopSound ? 1 : 0,
+      'period': _period ? 1 : 0,
+      'period_to': periodToValue,
+      'period_days': _periodDays,
+    };
+  }
+
+  Future<void> _saveItem() async {
+    if (!await _validateItem()) return;
+
+    final data = _buildItemData();
+    final notificationTitle = titleController.text.trim();
+
     try {
-      myPrint("Saving item - fullscreen: $_fullscreen (value: $fullscreenValue)");
+      myPrint("Saving item - fullscreen: $_fullscreen (value: ${data['fullscreen']})");
 
       if (widget.itemId != null) {
-        // Update existing item - photos are already in item_X directory
-        final photoData = encodePhotoPaths(_photoPaths);
-
-        await mainDb.update(
-          'items',
-          {
-            'title': titleText,
-            'content': contentText.isEmpty ? null : contentText,
-            'tags': tagsText.isEmpty ? null : tagsText,
-            'priority': _priority,
-            'date': dateValue,
-            'time': timeValue,
-            'remind': remindValue,
-            'active': activeValue,
-            'hidden': hiddenValue,
-            'remove': removeValue,
-            'yearly': yearlyValue,
-            'monthly': monthlyValue,
-            'daily': dailyValue,
-            'daily_times': dailyTimesValue,
-            'daily_days': dailyDaysValue,
-            'sound': _sound,
-            'daily_sound': _dailySound,
-            'fullscreen': fullscreenValue,
-            'loop_sound': _loopSound ? 1 : 0,
-            'period': periodValue,
-            'period_to': periodToValue,
-            'period_days': periodDaysValue,
-            'photo': photoData,
-          },
-          where: 'id = ?',
-          whereArgs: [widget.itemId],
-        );
-        myPrint("Item updated: ${widget.itemId} - $titleText - fullscreen: $fullscreenValue - Photos: ${_photoPaths.length}");
+        // Update existing item
+        data['photo'] = encodePhotoPaths(_photoPaths);
+        await mainDb.update('items', data, where: 'id = ?', whereArgs: [widget.itemId]);
+        myPrint("Item updated: ${widget.itemId} - ${data['title']} - fullscreen: ${data['fullscreen']} - Photos: ${_photoPaths.length}");
 
         // Update/cancel specific reminder for this item
         await SimpleNotifications.updateSpecificReminder(
-          widget.itemId!,
-          _remind && _active,
-          _date,
-          _time,
+          widget.itemId!, _remind && _active, _date, _time,
         );
 
         // Update daily reminders for this item
         myPrint("Daily save: id=${widget.itemId}, daily=$_daily, active=$_active, times=$_dailyTimes, days=$_dailyDays");
         await SimpleNotifications.updateDailyReminders(
-          widget.itemId!,
-          _daily && _active,
-          _dailyTimes,
-          _dailyDays,
-          notificationTitle,
+          widget.itemId!, _daily && _active, _dailyTimes, _dailyDays, notificationTitle,
         );
 
         // Update period reminders for this item
         await SimpleNotifications.updatePeriodReminders(
-          widget.itemId!,
-          _period && _active,
-          dateValue,
-          periodToValue,
-          timeValue,
-          periodDaysValue,
-          notificationTitle,
+          widget.itemId!, _period && _active, data['date'], data['period_to'],
+          data['time'], data['period_days'], notificationTitle,
         );
 
       } else {
-        // Insert new item first to get the ID
-        final insertedId = await mainDb.insert('items', {
-          'title': titleText,
-          'content': contentText.isEmpty ? null : contentText,
-          'tags': tagsText.isEmpty ? null : tagsText,
-          'priority': _priority,
-          'date': dateValue,
-          'time': timeValue,
-          'remind': remindValue,
-          'active': activeValue,
-          'hidden': hiddenValue,
-          'remove': removeValue,
-          'yearly': yearlyValue,
-          'monthly': monthlyValue,
-          'daily': dailyValue,
-          'daily_times': dailyTimesValue,
-          'daily_days': dailyDaysValue,
-          'sound': _sound,
-          'daily_sound': _dailySound,
-          'fullscreen': fullscreenValue,
-          'loop_sound': _loopSound ? 1 : 0,
-          'period': periodValue,
-          'period_to': periodToValue,
-          'period_days': periodDaysValue,
-          'photo': null, // Will update after moving photos
-          'created': dateTimeToYYYYMMDD(DateTime.now()),
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
-
-        myPrint("Item inserted with ID: $insertedId - fullscreen: $fullscreenValue");
+        // Insert new item
+        data['photo'] = null; // Will update after moving photos
+        data['created'] = dateTimeToYYYYMMDD(DateTime.now());
+        final insertedId = await mainDb.insert('items', data, conflictAlgorithm: ConflictAlgorithm.replace);
+        myPrint("Item inserted with ID: $insertedId - fullscreen: ${data['fullscreen']}");
 
         // Move photos from temp directory to item directory
         if (_currentPhotoDir != null && _photoPaths.isNotEmpty) {
           final newPaths = await movePhotosFromTempToItem(_currentPhotoDir!, insertedId);
           _photoPaths = newPaths;
-
-          // Update the photo field with new paths
           final photoData = encodePhotoPaths(_photoPaths);
-          await mainDb.update(
-            'items',
-            {'photo': photoData},
-            where: 'id = ?',
-            whereArgs: [insertedId],
-          );
+          await mainDb.update('items', {'photo': photoData}, where: 'id = ?', whereArgs: [insertedId]);
           myPrint("Updated photo paths for item $insertedId: ${_photoPaths.length} photos");
         }
 
         // Schedule specific reminder for new item if needed
         if (_remind && _active && _date != null) {
-          await SimpleNotifications.scheduleSpecificReminder(
-            insertedId,
-            _date!,
-            _time,
-          );
+          await SimpleNotifications.scheduleSpecificReminder(insertedId, _date!, _time);
         }
 
         // Schedule daily reminders for new item if needed
         if (_daily && _active && _dailyTimes.isNotEmpty) {
           await SimpleNotifications.scheduleAllDailyReminders(
-            insertedId,
-            _dailyTimes,
-            _dailyDays,
-            notificationTitle,
+            insertedId, _dailyTimes, _dailyDays, notificationTitle,
           );
         }
 
         // Schedule period reminders for new item if needed
-        if (_period && _active && dateValue != null && periodToValue != null) {
+        if (_period && _active && data['date'] != null && data['period_to'] != null) {
           await SimpleNotifications.schedulePeriodReminders(
-            insertedId,
-            dateValue!,
-            periodToValue!,
-            timeValue,
-            periodDaysValue,
-            notificationTitle,
+            insertedId, data['date']!, data['period_to']!, data['time'],
+            data['period_days'], notificationTitle,
           );
         }
       }
@@ -569,7 +477,6 @@ class _EditItemPageState extends State<EditItemPage> {
       _isSaved = true; // Mark as saved so dispose won't delete photos
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      // Show error message if database operation fails
       okInfoBarPurple('${lw('Error saving item')}: $e');
       myPrint("Error saving item: $e");
     }
