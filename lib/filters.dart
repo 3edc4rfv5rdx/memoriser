@@ -799,27 +799,4 @@ class _FiltersScreenState extends State<FiltersScreen> {
     );
   }
 
-  // Function to get filter status text
-  Future<String> getFilterStatusText() async {
-    bool hasTagFilter = xvTagFilter.isNotEmpty;
-    bool hasMainFilter = xvFilter.isNotEmpty;
-
-    // Get "Last items" setting value
-    final lastItemsStr =
-        await getSetting("Last items") ?? defSettings["Last items"]?.toString() ?? '0';
-    final lastItems = int.tryParse(lastItemsStr.toString()) ?? 0;
-    bool hasLastItems = lastItems > 0;
-
-    if (hasTagFilter && hasMainFilter) {
-      return '(FT) ';
-    } else if (hasTagFilter) {
-      return '(T) ';
-    } else if (hasMainFilter) {
-      return '(F) ';
-    } else if (hasLastItems) {
-      return '($lastItems) ';
-    } else {
-      return '(All) ';
-    }
-  }
 }

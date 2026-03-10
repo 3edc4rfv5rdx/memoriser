@@ -1549,3 +1549,33 @@ Future<void> initLogging() async {
     }
   }
 }
+
+// Returns filter status indicator for the app bar title
+Future<String> getFilterStatusText() async {
+  bool hasTagFilter = xvTagFilter.isNotEmpty;
+
+  // Virtual folder filters are not user-set filters, don't show (F)
+  const virtualFolderFilters = {
+    'notes:true', 'yearly:true', 'daily:true', 'monthly:true', 'period:true'
+  };
+  bool hasUserFilter = xvFilter.isNotEmpty &&
+      !virtualFolderFilters.contains(xvFilter);
+
+  // Get Last items setting
+  final lastItemsStr =
+      await getSetting("Last items") ?? defSettings["Last items"];
+  final lastItems = int.tryParse(lastItemsStr) ?? 0;
+  bool hasLastItems = lastItems > 0;
+
+  if (hasUserFilter && hasTagFilter) {
+    return '(FT) ';
+  } else if (hasTagFilter) {
+    return '(T) ';
+  } else if (hasUserFilter) {
+    return '(F) ';
+  } else if (hasLastItems) {
+    return '($lastItems) ';
+  } else {
+    return '(All) ';
+  }
+}
