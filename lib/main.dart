@@ -275,10 +275,14 @@ void _applyTagCloudFilter(List<String> conditions, List<dynamic> args) {
 
 // Apply user-set filter string to query conditions
 void _applyUserFilter(List<String> conditions, List<dynamic> args) {
-  if (xvFilter.isEmpty || virtualFolderFilters.contains(xvFilter)) return;
-  myPrint('Main filter is active: $xvFilter');
+  // Use saved user filter when inside virtual folder, otherwise use xvFilter
+  final filterStr = virtualFolderFilters.contains(xvFilter)
+      ? xvSavedUserFilter
+      : xvFilter;
+  if (filterStr.isEmpty) return;
+  myPrint('Main filter is active: $filterStr');
 
-  for (String part in xvFilter.split('|')) {
+  for (String part in filterStr.split('|')) {
     final colonIndex = part.indexOf(':');
     if (colonIndex < 0) continue;
 
@@ -290,7 +294,13 @@ void _applyUserFilter(List<String> conditions, List<dynamic> args) {
       case 'dateFrom':
         try {
           final dateValue = dateTimeToYYYYMMDD(DateFormat(ymdDateFormat).parse(value));
-          conditions.add('(date IS NOT NULL AND (date >= ? OR (period_to IS NOT NULL AND period_to >= ?)))');
+          // Separate logic: regular items compare YYYYMMDD, monthly periods compare day-of-month
+          conditions.add('(date IS NOT NULL AND ('
+              '(NOT (period = 1 AND date >= 1 AND date <= 31) AND (date >= ? OR (period_to IS NOT NULL AND period_to >= ?)))'
+              ' OR '
+              '(period = 1 AND date >= 1 AND date <= 31 AND period_to IS NOT NULL AND period_to >= (? % 100))'
+              '))');
+          args.add(dateValue);
           args.add(dateValue);
           args.add(dateValue);
         } catch (e) {
@@ -301,7 +311,13 @@ void _applyUserFilter(List<String> conditions, List<dynamic> args) {
       case 'dateTo':
         try {
           final dateValue = dateTimeToYYYYMMDD(DateFormat(ymdDateFormat).parse(value));
-          conditions.add('(date IS NOT NULL AND date <= ?)');
+          // Separate logic: regular items compare YYYYMMDD, monthly periods compare day-of-month
+          conditions.add('(date IS NOT NULL AND ('
+              '(NOT (period = 1 AND date >= 1 AND date <= 31) AND date <= ?)'
+              ' OR '
+              '(period = 1 AND date >= 1 AND date <= 31 AND date <= (? % 100))'
+              '))');
+          args.add(dateValue);
           args.add(dateValue);
         } catch (e) {
           myPrint('Error parsing dateTo: $e');
@@ -692,7 +708,6 @@ class _HomePageState extends State<HomePage> {
   bool _isInDailyFolder = false;
   bool _isInMonthlyFolder = false;
   bool _isInPeriodFolder = false;
-  String _savedUserFilter = ''; // Preserve user filter when entering virtual folders
 
   @override
   void initState() {
@@ -712,7 +727,7 @@ class _HomePageState extends State<HomePage> {
     bool monthly = false, bool period = false,
   }) {
     setState(() {
-      _savedUserFilter = xvFilter;
+      xvSavedUserFilter = xvFilter;
       _isInNotesFolder = notes;
       _isInYearlyFolder = yearly;
       _isInDailyFolder = daily;
@@ -731,8 +746,8 @@ class _HomePageState extends State<HomePage> {
       _isInDailyFolder = false;
       _isInMonthlyFolder = false;
       _isInPeriodFolder = false;
-      xvFilter = _savedUserFilter; // Restore user filter
-      _savedUserFilter = '';
+      xvFilter = xvSavedUserFilter; // Restore user filter
+      xvSavedUserFilter = '';
     });
     _refreshItems();
     _updateFilterStatus();
@@ -811,25 +826,18 @@ class _HomePageState extends State<HomePage> {
     };
   }
 
-  // Count items matching type condition, respecting active tag filter
+  // Count items matching type condition, respecting active tag and user filters
   Future<int> _getFolderItemsCount(String typeCondition) async {
     try {
-      String hiddenCond = xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)';
-      String where = '$typeCondition AND $hiddenCond';
+      List<String> conditions = [typeCondition];
       List<dynamic> args = [];
 
-      // Apply active tag filter to folder counts
-      if (xvTagFilter.isNotEmpty) {
-        List<String> tags = xvTagFilter.split(',').map((t) => t.trim()).toList();
-        for (String tag in tags) {
-          String searchTag = xvHiddenMode ? obfuscateText(tag) : tag;
-          where += " AND (',' || REPLACE(tags, ', ', ',') || ',') LIKE ?";
-          args.add('%,$searchTag,%');
-        }
-      }
+      conditions.add(xvHiddenMode ? 'hidden = 1' : '(hidden = 0 OR hidden IS NULL)');
+      _applyTagCloudFilter(conditions, args);
+      _applyUserFilter(conditions, args);
 
       final count = await mainDb.rawQuery(
-        'SELECT COUNT(*) as count FROM items WHERE $where', args,
+        'SELECT COUNT(*) as count FROM items WHERE ${conditions.join(' AND ')}', args,
       );
       return count.isNotEmpty ? (count.first['count'] as int? ?? 0) : 0;
     } catch (e) {
@@ -1258,7 +1266,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       xvTagFilter = '';
       xvFilter = '';
-      _savedUserFilter = '';
+      xvSavedUserFilter = '';
       _isInYearlyFolder = false;
       _isInNotesFolder = false;
       _isInDailyFolder = false;
