@@ -315,3 +315,4 @@ echo "========== BUILD PROCESS COMPLETED =========="
 echo "Project archive: $ZIP_NAME"
 echo "APK archive: $APK_ARCHIVE"
 echo "Final APK: $PROJ_PATH/${PROJ_NAME^}-$VERS.apkx"
+sleep 3
