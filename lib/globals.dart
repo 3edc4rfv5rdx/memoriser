@@ -121,7 +121,6 @@ Map<String, dynamic> defSettings = {
   "Language": "en",
   "Color theme": "Light",
   "Newest first": "true",
-  "Last items": "0",
   "Enable reminders": "true",
   "Enable daily reminders": "true",
   "Debug logs": "false",
@@ -1571,20 +1570,12 @@ Future<String> getFilterStatusText() async {
   bool hasUserFilter = xvFilter.isNotEmpty &&
       !virtualFolderFilters.contains(xvFilter);
 
-  // Get Last items setting
-  final lastItemsStr =
-      await getSetting("Last items") ?? defSettings["Last items"];
-  final lastItems = int.tryParse(lastItemsStr) ?? 0;
-  bool hasLastItems = lastItems > 0;
-
   if (hasUserFilter && hasTagFilter) {
     return '(FT) ';
   } else if (hasTagFilter) {
     return '(T) ';
   } else if (hasUserFilter) {
     return '(F) ';
-  } else if (hasLastItems) {
-    return '($lastItems) ';
   } else {
     return '(All) ';
   }

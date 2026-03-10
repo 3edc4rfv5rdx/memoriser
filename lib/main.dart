@@ -360,8 +360,6 @@ void _applyUserFilter(List<String> conditions, List<dynamic> args) {
 Future<List<Map<String, dynamic>>> getItems() async {
   try {
     final newestFirst = await getSetting("Newest first") ?? defSettings["Newest first"];
-    final lastItemsStr = await getSetting("Last items") ?? defSettings["Last items"];
-    final lastItems = int.tryParse(lastItemsStr) ?? 0;
     final todayDate = dateTimeToYYYYMMDD(DateTime.now());
 
     List<String> whereConditions = [];
@@ -411,9 +409,6 @@ Future<List<Map<String, dynamic>>> getItems() async {
         "CASE WHEN date IS NULL OR date = 0 THEN $createdFactor * created ELSE 0 END";
 
     String sqlQuery = "SELECT * FROM items $whereClause ORDER BY $orderByClause";
-    if (lastItems > 0 && !isVirtualFolder) {
-      sqlQuery += " LIMIT $lastItems";
-    }
 
     List<Map<String, dynamic>> result = await mainDb.rawQuery(sqlQuery, whereArgs);
 
@@ -1600,10 +1595,8 @@ class _HomePageState extends State<HomePage> {
         finalItems.addAll(periodItems);
 
       } else {
-        // Main level - exclude yearly, daily, monthly, and period items
-        final normalItems = items.where((item) =>
-        item['yearly'] != 1 && item['daily'] != 1 && item['monthly'] != 1 && item['period'] != 1 && item['time'] != null).toList();
-        finalItems.addAll(normalItems);
+        // Main level - items already filtered by SQL (no yearly/daily/monthly/period/notes)
+        finalItems.addAll(items);
 
         // Virtual folders at the END of the list
         // Order: Notes → Daily → Periods → Monthly → Yearly

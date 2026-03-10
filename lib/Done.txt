@@ -1,3 +1,26 @@
+  + Remove "Last items" feature entirely
+    - main.dart getItems(): removed LIMIT logic (lastItems variable, SQL LIMIT clause,
+      and the extra WHERE condition that excluded virtual folder items for LIMIT counting)
+    - globals.dart getFilterStatusText(): removed hasLastItems/lastItems logic and ($lastItems) return branch
+    - globals.dart defSettings: removed "Last items": "0" entry
+    - settings.dart: removed all UI/state for Last items (_lastItems, _newLastItems,
+      _lastItemsController, _buildLastItemsField widget, load/save/check logic)
+    - DB setting left in place (unused), locales.json entry left in place
+
+  + Fix: Period date order validation
+    - Added check in _validateItem(): fromVal > toVal → error "Start date must be before end date"
+    - Prevents saving periods like 27.03-20.03 where start is after end
+    - Added localization strings (ru/ua) in locales.json
+
+  + Fix: User filters now work inside virtual folders
+    - Pre-existing bug: entering a virtual folder overwrote xvFilter with 'daily:true' etc.,
+      discarding the user's date/priority filter. User filter was saved in _savedUserFilter
+      but never used by getItems().
+    - Made xvSavedUserFilter global; _applyUserFilter() reads it when inside virtual folder
+    - _getFolderItemsCount() now applies user filter → folder item counts match actual content
+    - Monthly period date filtering: separated SQL logic for YYYYMMDD items vs day-of-month
+      periods (1-31). Period 15-22 now correctly excluded by filter 1-10, included by filter 1-27.
+
   + Audit Phase 3 continued: Code quality refactoring
     1. Moved getFilterStatusText() to globals.dart, removed duplicates from main.dart and filters.dart
        (filters.dart version was dead code, lacked virtual folder exclusion)
