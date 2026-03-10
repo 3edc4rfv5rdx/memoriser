@@ -1,4 +1,5 @@
 ===TODO:
+# v0.9.260310+132 (2026-03-10 13:37:58)
 # v0.9.260310+125 (2026-03-10 08:56:17)
 + Audit Phase 3: code quality refactoring (getFilterStatusText dedup, magic constants, IntentExtras, split large functions, SoundUtils.kt)
 + Loop sound for fullscreen alert: per-item checkbox + global repeat count setting + 2s pause between loops
@@ -54,6 +55,7 @@
 + Multi-photo support (up to 10 photos per item)
 
 ===TOFIX:
+# v0.9.260310+132 (2026-03-10 13:37:58)
 # v0.9.260310+125 (2026-03-10 08:56:17)
 + CSV restore: loop_sound parsed as String instead of int — missing from int column list (backup.dart)
 + Restore: settDb reopened without version/onCreate — table missing on corrupt restore (backup.dart)
@@ -129,6 +131,7 @@
 + Style time picker dialog buttons with background (not pale text)
 
 ===ERRORS:
+# v0.9.260310+132 (2026-03-10 13:37:58)
 + Remove "Last items" feature (redundant with virtual folders), cleanup locales/help
 + Fix: period date order validation (start must be before end)
 + Fix: user filters (date, priority) now apply inside virtual folders + correct folder counts + monthly period day-of-month filtering
